@@ -157,3 +157,29 @@ Acceptance criteria:
 Notes:
 - Keep incomplete work as [ ].
 - Only mark [x] after verification.
+
+### REQ-UI-007 - Launcher and splash icon consistency
+
+Status: Proposed
+
+Objective:
+Use the same approved brand image for the installed app icon and the native splash/loading image.
+
+Checklist:
+- [ ] Requirement approved
+- [ ] UI planned or implemented if applicable
+- [ ] State planned or implemented if applicable
+- [ ] Domain planned or implemented if applicable
+- [ ] Data/persistence planned or implemented if applicable
+- [ ] Checks passed
+- [ ] Documentation updated
+- [ ] Traceability updated
+
+Acceptance criteria:
+- [ ] The launcher/install icon uses the same source brand asset as the splash/loading image.
+- [ ] Android launcher resources and native splash resources are generated or configured from the approved asset.
+- [ ] Required checks are documented before moving to Verified.
+
+Notes:
+- Keep incomplete work as [ ].
+- Only mark [x] after verification.

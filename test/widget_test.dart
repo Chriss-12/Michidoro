@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/main.dart';
 
 void main() {
-  testWidgets('App shows Ocean Blue stitched views', (tester) async {
+  testWidgets('App shows stitched views', (tester) async {
     await tester.pumpWidget(const MyApp());
 
     expect(find.text('MichiDoro'), findsOneWidget);
@@ -27,6 +27,6 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -420));
     await tester.pumpAndSettle();
     expect(find.text('Apariencia'), findsOneWidget);
-    expect(find.textContaining('Ocean Blue'), findsWidgets);
+    expect(find.textContaining('Nature Focus'), findsWidgets);
   });
 }

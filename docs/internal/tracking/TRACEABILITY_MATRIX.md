@@ -8,6 +8,7 @@
 | REQ-UI-004 | UI | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-UI.md` | Responsive UI. |
 | REQ-UI-005 | UI | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-UI.md` | Selected navigation state. |
 | REQ-UI-006 | UI | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-UI.md` | No hardcoded colors when palette values exist. |
+| REQ-UI-007 | UI | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-UI.md` | Launcher/install icon matches splash/loading icon. |
 | REQ-ARCH-001 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | Clean Architecture. |
 | REQ-ARCH-002 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | Feature First. |
 | REQ-ARCH-003 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | Dependency direction. |
@@ -15,14 +16,14 @@
 | REQ-ARCH-005 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | App layer. |
 | REQ-ARCH-006 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | Shared layer. |
 | REQ-ARCH-007 | Architecture | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-ARCHITECTURE.md` | No business logic inside large widgets. |
-| REQ-TASK-001 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Create task. |
-| REQ-TASK-002 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Edit task. |
-| REQ-TASK-003 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Complete task. |
-| REQ-TASK-004 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Delete task. |
-| REQ-TASK-005 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Filter tasks. |
-| REQ-TASK-006 | Tasks | Approved | Planned | Planned | Planned | Planned | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Local persistence with Drift. |
-| REQ-TASK-007 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Task validation. |
-| REQ-TASK-008 | Tasks | Approved | Planned | Planned | Planned | Planned via REQ-TASK-006 | Pending | `REQ-TASKS.md` | M2 phased Tasks feature: Task listing. |
+| REQ-TASK-001 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Create task with local persistence. |
+| REQ-TASK-002 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Edit task with local persistence. |
+| REQ-TASK-003 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Complete task with local persistence. |
+| REQ-TASK-004 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Delete task with confirmation and local persistence. |
+| REQ-TASK-005 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Filter repository-backed task state. |
+| REQ-TASK-006 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | build_runner + full suite passed | `REQ-TASKS.md` | M2 verified: Drift table, DAO, repository, generated code, local save/load. |
+| REQ-TASK-007 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Create and edit validation before persistence. |
+| REQ-TASK-008 | Tasks | Verified | Implemented | Repository-backed | Implemented | Drift implemented | Full suite passed | `REQ-TASKS.md` | M2 verified: Reactive list from repository-loaded state. |
 | REQ-GOAL-001 | Goals | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-GOALS.md` | Create goal. |
 | REQ-GOAL-002 | Goals | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-GOALS.md` | Track goal progress. |
 | REQ-GOAL-003 | Goals | Proposed | Pending | Pending | Pending | Pending | Pending | `REQ-GOALS.md` | Associate goals with tasks or sessions later. |

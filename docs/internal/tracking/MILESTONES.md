@@ -53,6 +53,7 @@ Deliverables:
 - [ ] Theme rules reviewed
 - [ ] Navigation state rules verified
 - [ ] Shared UI patterns documented
+- [ ] Launcher/install icon aligned with the splash/loading icon
 
 Quality gates:
 - [ ] Relevant requirements are approved before implementation.
@@ -69,7 +70,7 @@ Required checks:
 
 ## M2 - Tasks Feature
 
-Status: In Progress
+Status: Verified
 
 Objective:
 Deliver the complete Tasks feature in phases: create, list, validate, edit, complete, delete, filter, and persist tasks locally with Drift/SQLite.
@@ -81,38 +82,50 @@ Approval status:
 
 Phases:
 - [x] Phase 0 - Requirements approved for full M2 scope.
-- [ ] Phase 1 - In-memory task creation, validation, and listing.
-- [ ] Phase 2 - Edit, complete, delete, and filter tasks in state.
-- [ ] Phase 3 - Drift persistence: tasks table, DAO, repository, generated code, and local save/load.
-- [ ] Phase 4 - Verification, documentation updates, and traceability closure.
+- [x] Phase 1 - In-memory task creation, validation, and listing.
+- [x] Phase 2 - Edit, complete, delete, and filter tasks in state.
+- [x] Phase 3 - Drift persistence: tasks table, DAO, repository, generated code, and local save/load.
+- [x] Phase 4 - Verification, documentation updates, and traceability closure.
 
 Deliverables:
 - [x] Task requirements approved: `REQ-TASK-001` through `REQ-TASK-008`
-- [ ] Task UI implemented
-- [ ] Task state implemented
-- [ ] Task domain/data boundaries implemented
-- [ ] Task persistence implemented with Drift
+- [x] Task UI implemented
+- [x] Task state implemented
+- [x] Task domain boundaries implemented
+- [x] Task data boundaries implemented
+- [x] Task persistence implemented with Drift
 
 Quality gates:
 - [x] Relevant M2 requirements are approved before implementation.
 - [x] Traceability matrix is updated for approved M2 requirements.
-- [ ] UI does not access Drift DAOs directly.
-- [ ] Required checks pass before marking implemented or verified.
+- [x] UI does not access Drift DAOs directly.
+- [x] Required M2 Phase 3 checks passed.
 
 Required docs to update:
 - [x] `docs/internal/requirements/REQ-TASKS.md`
 - [x] `docs/internal/tracking/TRACEABILITY_MATRIX.md`
 - [x] `docs/internal/technical/DATABASE.md`
-- [ ] Relevant client documentation after implementation
+- [x] Relevant client documentation after implementation
 
 Required checks:
-- [ ] Run `dart run build_runner build --delete-conflicting-outputs` after Drift schema/generator changes.
-- [ ] Run `flutter analyze` after implementation.
-- [ ] Run `flutter test` if tests are added or behavior is covered.
+- [x] Run `dart run build_runner build --delete-conflicting-outputs` after Drift schema/generator changes.
+- [x] Run `flutter analyze` after implementation.
+- [x] Run targeted `flutter test test/features/tasks/presentation/controllers/tasks_controller_test.dart`.
+- [x] Run targeted `flutter test test/features/tasks`.
+- [x] Full `flutter test` suite passes.
 
 Scope notes:
 - M2 now includes persistence with Drift.
 - Implementation still happens phase by phase to avoid mixing UI, state, and database work in one uncontrolled change.
+- Phase 1 and Phase 2 are implemented in memory and verified with targeted controller tests.
+- Phase 3 is implemented with Drift and verified using a temporary local SQLite database file.
+- Phase 4 completed with full test suite verification and client-facing documentation updates.
+
+Verification evidence:
+- `dart format lib test` passed.
+- `flutter analyze` passed.
+- `flutter test test/features/tasks` passed with 9 Tasks tests.
+- Full `flutter test` passed with 10 total tests.
 
 ## M3 - Goals Feature
 
