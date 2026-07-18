@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 14 7 L 0 14 z" fill="#3f5f5a"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#12302b" flood-opacity="0.16"/>
+    </filter>
+    <style>
+      .bg { fill: #f6f3ed; }
+      .title { font: 700 34px Arial, sans-serif; fill: #1f332f; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #5d6d68; }
+      .db-label { font: 700 18px Arial, sans-serif; fill: #31544e; }
+      .table { fill: #ffffff; stroke: #cbd8d2; stroke-width: 2; filter: url(#shadow); }
+      .header { fill: #31544e; }
+      .header-alt { fill: #5a6f2f; }
+      .header-blue { fill: #42667a; }
+      .header-gold { fill: #8a6d2f; }
+      .table-name { font: 700 22px Arial, sans-serif; fill: #ffffff; }
+      .schema { font: 600 14px Arial, sans-serif; fill: #e9f1ee; }
+      .col { font: 400 17px Consolas, "Courier New", monospace; fill: #263632; }
+      .pk { font: 700 17px Consolas, "Courier New", monospace; fill: #172622; }
+      .nullable { fill: #6d7d78; }
+      .rel { stroke: #3f5f5a; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .rel-dashed { stroke: #3f5f5a; stroke-width: 3; stroke-dasharray: 10 8; fill: none; marker-end: url(#arrow); }
+      .rel-text { font: 700 16px Arial, sans-serif; fill: #31544e; }
+      .note-box { fill: #fffaf0; stroke: #d8c084; stroke-width: 2; }
+      .note { font: 400 17px Arial, sans-serif; fill: #4d4633; }
+      .legend-title { font: 700 18px Arial, sans-serif; fill: #1f332f; }
+      .legend { font: 400 16px Arial, sans-serif; fill: #4f5f5a; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="1000"/>
+
+  <text class="title" x="70" y="70">MichiFocus - esquema local Drift / SQLite</text>
+  <text class="subtitle" x="70" y="104">Tablas, propiedades y relaciones logicas actuales. Cada feature usa su propia base SQLite local.</text>
+
+  <rect class="note-box" x="70" y="125" width="1460" height="76" rx="10"/>
+  <text class="note" x="94" y="156">Nota tecnica: Drift no declara foreign keys entre estas tablas. Los enlaces se resuelven por codigo usando goal_id y task_id.</text>
+  <text class="note" x="94" y="182">Settings y preferencias del temporizador se guardan como archivo local JSON, no como tabla Drift.</text>
+
+  <text class="db-label" x="100" y="246">michifocus_goals.sqlite</text>
+  <rect class="table" x="90" y="265" width="470" height="310" rx="12"/>
+  <rect class="header" x="90" y="265" width="470" height="64" rx="12"/>
+  <rect class="header" x="90" y="310" width="470" height="19"/>
+  <text class="table-name" x="115" y="304">goals</text>
+  <text class="schema" x="430" y="304">schema v2</text>
+  <text class="pk" x="115" y="365">PK id: text</text>
+  <text class="col" x="115" y="398">title: text</text>
+  <text class="col" x="115" y="431">target_sessions: integer</text>
+  <text class="col" x="115" y="464">completed_sessions: integer default 0</text>
+  <text class="col nullable" x="115" y="497">target_date: datetime nullable</text>
+  <text class="col" x="115" y="530">created_at: datetime</text>
+  <text class="col" x="115" y="563">updated_at: datetime</text>
+
+  <text class="db-label" x="990" y="246">michifocus_tasks.sqlite</text>
+  <rect class="table" x="980" y="265" width="510" height="380" rx="12"/>
+  <rect class="header-alt" x="980" y="265" width="510" height="64" rx="12"/>
+  <rect class="header-alt" x="980" y="310" width="510" height="19"/>
+  <text class="table-name" x="1005" y="304">tasks</text>
+  <text class="schema" x="1360" y="304">schema v3</text>
+  <text class="pk" x="1005" y="365">PK id: text</text>
+  <text class="col" x="1005" y="398">title: text</text>
+  <text class="col" x="1005" y="431">is_completed: boolean default false</text>
+  <text class="col" x="1005" y="464">status: text default "listed"</text>
+  <text class="col nullable" x="1005" y="497">scheduled_date: datetime nullable</text>
+  <text class="col nullable" x="1005" y="530">goal_id: text nullable</text>
+  <text class="col nullable" x="1005" y="563">duration_minutes: integer nullable</text>
+  <text class="col" x="1005" y="596">created_at: datetime</text>
+  <text class="col" x="1005" y="629">updated_at: datetime</text>
+
+  <text class="db-label" x="95" y="708">michifocus_pomodoro_sessions.sqlite</text>
+  <rect class="table" x="90" y="727" width="560" height="270" rx="12"/>
+  <rect class="header-blue" x="90" y="727" width="560" height="64" rx="12"/>
+  <rect class="header-blue" x="90" y="772" width="560" height="19"/>
+  <text class="table-name" x="115" y="766">pomodoro_sessions</text>
+  <text class="schema" x="505" y="766">schema v4</text>
+  <text class="pk" x="115" y="827">PK id: text</text>
+  <text class="col" x="115" y="854">started_at: datetime</text>
+  <text class="col" x="115" y="881">ended_at: datetime</text>
+  <text class="col" x="115" y="908">planned_seconds: integer</text>
+  <text class="col" x="115" y="935">focused_seconds: integer</text>
+  <text class="col nullable" x="115" y="962">goal_id: text nullable</text>
+  <text class="col nullable" x="390" y="827">task_id: text nullable</text>
+  <text class="col nullable" x="390" y="854">start_mood_score: int nullable</text>
+  <text class="col nullable" x="390" y="881">end_mood_score: int nullable</text>
+  <text class="col nullable" x="390" y="908">was_distracted: bool nullable</text>
+  <text class="col nullable" x="390" y="935">distraction_minutes: int nullable</text>
+  <text class="col" x="390" y="962">status, created_at</text>
+
+  <text class="db-label" x="1000" y="708">michifocus_calendar_events.sqlite</text>
+  <rect class="table" x="990" y="727" width="500" height="250" rx="12"/>
+  <rect class="header-gold" x="990" y="727" width="500" height="64" rx="12"/>
+  <rect class="header-gold" x="990" y="772" width="500" height="19"/>
+  <text class="table-name" x="1015" y="766">calendar_events</text>
+  <text class="schema" x="1355" y="766">schema v1</text>
+  <text class="pk" x="1015" y="827">PK id: text</text>
+  <text class="col" x="1015" y="860">title: text</text>
+  <text class="col" x="1015" y="893">scheduled_at: datetime</text>
+  <text class="col" x="1015" y="926">duration_minutes: integer</text>
+  <text class="col" x="1015" y="959">created_at: datetime</text>
+
+  <path class="rel-dashed" d="M 980 530 C 810 530, 730 420, 560 420"/>
+  <text class="rel-text" x="650" y="500">tasks.goal_id -> goals.id</text>
+  <text class="rel-text" x="664" y="523">0..n tasks por objetivo</text>
+
+  <path class="rel-dashed" d="M 115 962 C 255 690, 330 595, 390 575"/>
+  <text class="rel-text" x="245" y="675">pomodoro_sessions.goal_id -> goals.id</text>
+  <text class="rel-text" x="276" y="698">0..n sesiones por objetivo</text>
+
+  <path class="rel-dashed" d="M 650 827 C 790 800, 910 720, 1005 563"/>
+  <text class="rel-text" x="715" y="805">pomodoro_sessions.task_id -> tasks.id</text>
+  <text class="rel-text" x="760" y="828">0..n sesiones por tarea</text>
+
+  <path class="rel" d="M 1260 645 C 1245 675, 1240 700, 1240 727"/>
+  <text class="rel-text" x="1264" y="690">scheduled_date agrupa tareas por dia</text>
+
+  <path class="rel" d="M 1130 727 C 1090 685, 1080 665, 1078 645"/>
+  <text class="rel-text" x="1005" y="690">scheduled_at agrupa eventos por dia</text>
+
+  <rect class="note-box" x="675" y="870" width="285" height="94" rx="10"/>
+  <text class="legend-title" x="695" y="898">Leyenda</text>
+  <text class="legend" x="695" y="925">PK = primary key</text>
+  <text class="legend" x="695" y="950">Linea punteada = relacion logica por ID</text>
+</svg>

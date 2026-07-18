@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
+import 'package:pomodoro_app_v1/features/goals/presentation/pages/goals_page.dart';
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/pages/pomodoro_page.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/pages/directory_picker_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/notification_settings_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/pomodoro_time_settings_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/profile_settings_page.dart';
@@ -50,10 +52,10 @@ class AppRouter {
             ),
           ),
           GoRoute(
-            path: CalendarPage.routePath,
+            path: GoalsPage.routePath,
             pageBuilder: (context, state) => _buildTransitionPage(
               state: state,
-              child: const CalendarPage(),
+              child: const GoalsPage(),
             ),
           ),
           GoRoute(
@@ -61,6 +63,13 @@ class AppRouter {
             pageBuilder: (context, state) => _buildTransitionPage(
               state: state,
               child: const SettingsPage(),
+            ),
+          ),
+          GoRoute(
+            path: CalendarPage.routePath,
+            pageBuilder: (context, state) => _buildTransitionPage(
+              state: state,
+              child: const CalendarPage(),
             ),
           ),
         ],
@@ -101,6 +110,15 @@ class AppRouter {
           child: const PomodoroTimeSettingsPage(),
         ),
       ),
+      GoRoute(
+        path: DirectoryPickerPage.routePath,
+        pageBuilder: (context, state) => _buildTransitionPage(
+          state: state,
+          child: DirectoryPickerPage(
+            initialPath: state.extra is String ? state.extra! as String : null,
+          ),
+        ),
+      ),
     ],
   );
 
@@ -109,7 +127,7 @@ class AppRouter {
       HomePage.routePath => 0,
       TasksPage.routePath => 1,
       PomodoroPage.routePath => 2,
-      CalendarPage.routePath => 3,
+      GoalsPage.routePath => 3,
       SettingsPage.routePath => 4,
       _ => 0,
     };

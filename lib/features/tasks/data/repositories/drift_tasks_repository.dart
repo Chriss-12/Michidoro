@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:pomodoro_app_v1/features/tasks/data/datasources/tasks_database.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart'
     as domain;
@@ -17,11 +18,44 @@ class DriftTasksRepository implements TasksRepository {
 
   @override
   Future<domain.Task> createTask(String title) async {
+    return _createTask(
+      title: title,
+      status: domain.TaskStatus.listed,
+    );
+  }
+
+  @override
+  Future<domain.Task> createPlannedTask({
+    required String title,
+    required DateTime scheduledDate,
+    String? goalId,
+    int? durationMinutes,
+  }) {
+    return _createTask(
+      title: title,
+      status: domain.TaskStatus.listed,
+      scheduledDate: scheduledDate,
+      goalId: goalId,
+      durationMinutes: durationMinutes,
+    );
+  }
+
+  Future<domain.Task> _createTask({
+    required String title,
+    required domain.TaskStatus status,
+    DateTime? scheduledDate,
+    String? goalId,
+    int? durationMinutes,
+  }) async {
     final now = DateTime.now();
     final record = await _dao.insertTask(
       TaskRecordsCompanion.insert(
         id: _createLocalId(now),
         title: title,
+        status: Value(status._storageValue),
+        scheduledDate: Value(scheduledDate),
+        goalId: Value(goalId),
+        durationMinutes: Value(durationMinutes),
         createdAt: now,
         updatedAt: now,
       ),
@@ -51,6 +85,46 @@ class DriftTasksRepository implements TasksRepository {
     final record = await _dao.updateCompletion(
       id: id,
       isCompleted: !current.isCompleted,
+      status: current.isCompleted
+          ? domain.TaskStatus.listed._storageValue
+          : domain.TaskStatus.completed._storageValue,
+      updatedAt: DateTime.now(),
+    );
+
+    return record == null ? null : _toDomain(record);
+  }
+
+  @override
+  Future<domain.Task?> updateTaskStatus(
+    String id,
+    domain.TaskStatus status,
+  ) async {
+    final record = await _dao.updateStatus(
+      id: id,
+      status: status._storageValue,
+      isCompleted: status.isCompleted,
+      updatedAt: DateTime.now(),
+    );
+
+    return record == null ? null : _toDomain(record);
+  }
+
+  @override
+  Future<domain.Task?> scheduleTask(String id, DateTime? scheduledDate) async {
+    final record = await _dao.updateSchedule(
+      id: id,
+      scheduledDate: scheduledDate,
+      updatedAt: DateTime.now(),
+    );
+
+    return record == null ? null : _toDomain(record);
+  }
+
+  @override
+  Future<domain.Task?> assignTaskToGoal(String id, String? goalId) async {
+    final record = await _dao.updateGoal(
+      id: id,
+      goalId: goalId,
       updatedAt: DateTime.now(),
     );
 
@@ -71,7 +145,29 @@ class DriftTasksRepository implements TasksRepository {
       id: record.id,
       title: record.title,
       createdAt: record.createdAt,
-      isCompleted: record.isCompleted,
+      status: _statusFromStorage(record.status, record.isCompleted),
+      scheduledDate: record.scheduledDate,
+      goalId: record.goalId,
+      durationMinutes: record.durationMinutes,
     );
+  }
+
+  domain.TaskStatus _statusFromStorage(String value, bool isCompleted) {
+    return switch (value) {
+      'listed' => domain.TaskStatus.listed,
+      'in_progress' => domain.TaskStatus.inProgress,
+      'completed' => domain.TaskStatus.completed,
+      _ => isCompleted ? domain.TaskStatus.completed : domain.TaskStatus.listed,
+    };
+  }
+}
+
+extension on domain.TaskStatus {
+  String get _storageValue {
+    return switch (this) {
+      domain.TaskStatus.listed => 'listed',
+      domain.TaskStatus.inProgress => 'in_progress',
+      domain.TaskStatus.completed => 'completed',
+    };
   }
 }

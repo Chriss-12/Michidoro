@@ -229,9 +229,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          primaryMuted.withValues(alpha: 0.20),
-          surface.withValues(alpha: 0.08),
-          accentPeach.withValues(alpha: 0.20),
+          secondary,
+          gradientStart,
+          gradientEnd,
         ],
       ),
     );
@@ -325,6 +325,7 @@ class AppTheme {
     AppThemePreset preset, {
     required bool isDark,
     double fontScale = 1,
+    AppTypographyPreset typographyPreset = AppTypographyPreset.moderna,
   }) {
     final palette = AppPalette.fromPreset(preset, isDark: isDark);
     final brightness = isDark ? Brightness.dark : Brightness.light;
@@ -333,6 +334,7 @@ class AppTheme {
       palette: palette,
       brightness: brightness,
       fontScale: fontScale,
+      typographyPreset: typographyPreset,
     );
   }
 
@@ -346,6 +348,7 @@ class AppTheme {
     required AppPalette palette,
     required Brightness brightness,
     required double fontScale,
+    required AppTypographyPreset typographyPreset,
   }) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: palette.primary,
@@ -377,6 +380,7 @@ class AppTheme {
           AppTypography.textTheme(
             colorScheme: colorScheme,
             fontScale: fontScale,
+            preset: typographyPreset,
           ).apply(
             bodyColor: palette.textPrimary,
             displayColor: palette.tertiary,

@@ -5,6 +5,7 @@ import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
+import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -115,6 +116,10 @@ class _TasksPageState extends State<TasksPage> {
                       filter: filter,
                       tasks: visibleTasks,
                       onToggleCompleted: _tasksController.toggleTaskCompletion,
+                      onStartFocus: (task) => startTaskFocusFlow(
+                        context: context,
+                        task: task,
+                      ),
                       onEdit: _showEditTaskDialog,
                       onDelete: _confirmDeleteTask,
                     ),
@@ -212,6 +217,7 @@ class _TaskList extends StatelessWidget {
     required this.filter,
     required this.tasks,
     required this.onToggleCompleted,
+    required this.onStartFocus,
     required this.onEdit,
     required this.onDelete,
   });
@@ -219,6 +225,7 @@ class _TaskList extends StatelessWidget {
   final TaskFilter filter;
   final List<Task> tasks;
   final Future<void> Function(String id) onToggleCompleted;
+  final ValueChanged<Task> onStartFocus;
   final ValueChanged<Task> onEdit;
   final Future<void> Function(Task task) onDelete;
 
@@ -255,6 +262,7 @@ class _TaskList extends StatelessWidget {
           _TaskTile(
             task: task,
             onToggleCompleted: () => onToggleCompleted(task.id),
+            onStartFocus: () => onStartFocus(task),
             onEdit: () => onEdit(task),
             onDelete: () => onDelete(task),
           ),
@@ -299,12 +307,14 @@ class _TaskTile extends StatelessWidget {
   const _TaskTile({
     required this.task,
     required this.onToggleCompleted,
+    required this.onStartFocus,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Task task;
   final VoidCallback onToggleCompleted;
+  final VoidCallback onStartFocus;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -346,6 +356,11 @@ class _TaskTile extends StatelessWidget {
                     : TextDecoration.none,
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'Empezar Pomodoro',
+            onPressed: onStartFocus,
+            icon: const Icon(Icons.play_arrow_rounded),
           ),
           IconButton(
             tooltip: 'Editar tarea',

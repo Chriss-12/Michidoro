@@ -7,7 +7,7 @@ class GlassCard extends StatelessWidget {
     required this.child,
     this.padding = AppCardPaddings.standard,
     this.margin = EdgeInsets.zero,
-    this.borderRadius = 24,
+    this.borderRadius = 8,
     this.color,
     super.key,
   });

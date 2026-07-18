@@ -14,6 +14,8 @@ Detailed requirements live in one file per area. Each requirement is tracked by 
 - `REQ-REP-001`, `REQ-REP-002`, etc.
 - `REQ-PDF-001`, `REQ-PDF-002`, etc.
 - `REQ-NFR-001`, `REQ-NFR-002`, etc.
+- `REQ-V2-001`, `REQ-V2-002`, etc.
+- `REQ-V3-001`, `REQ-V3-002`, etc.
 
 ## Statuses
 

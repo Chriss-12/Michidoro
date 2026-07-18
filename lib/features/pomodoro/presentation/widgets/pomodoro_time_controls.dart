@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
@@ -20,7 +21,7 @@ class PomodoroTimeControls extends StatelessWidget {
         const SizedBox(height: 24),
         _BreaksCard(settings: settings),
         const SizedBox(height: 24),
-        _AtmosphereCard(showSaveButton: showSaveButton),
+        _AtmosphereCard(settings: settings, showSaveButton: showSaveButton),
       ],
     );
   }
@@ -63,16 +64,16 @@ class _FocusCard extends StatelessWidget {
           ),
           const SizedBox(height: 34),
           Slider(
-            value: settings.focusMinutes.clamp(10, 90).toDouble(),
-            min: 10,
+            value: settings.focusMinutes.clamp(5, 90).toDouble(),
+            min: 5,
             max: 90,
-            divisions: 80,
+            divisions: 85,
             onChanged: (value) => settings.onFocusMinutesChanged(value.round()),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('10 min', style: Theme.of(context).textTheme.bodySmall),
+              Text('5 min', style: Theme.of(context).textTheme.bodySmall),
               Text('90 min', style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
@@ -236,6 +237,7 @@ class _FrequencySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -262,7 +264,9 @@ class _FrequencySelector extends StatelessWidget {
                 child: Text(
                   '$option',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: value == option ? Colors.white : palette.textPrimary,
+                    color: value == option
+                        ? colorScheme.onSecondary
+                        : palette.textPrimary,
                   ),
                 ),
               ),
@@ -274,8 +278,12 @@ class _FrequencySelector extends StatelessWidget {
 }
 
 class _AtmosphereCard extends StatelessWidget {
-  const _AtmosphereCard({required this.showSaveButton});
+  const _AtmosphereCard({
+    required this.settings,
+    required this.showSaveButton,
+  });
 
+  final AppSettingsScope settings;
   final bool showSaveButton;
 
   @override
@@ -298,31 +306,23 @@ class _AtmosphereCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const _AtmosphereTile(
+          _AtmosphereTile(
             icon: Icons.volume_up_outlined,
             title: 'Sonido de\nFinalización',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Cuenco Tibetano'),
-                SizedBox(width: 8),
-                Icon(Icons.keyboard_arrow_down_rounded),
-              ],
+            trailing: _CompletionSoundPicker(
+              selectedSound: settings.completionSound,
+              onChanged: settings.onCompletionSoundChanged,
+              onPreview: settings.onPreviewCompletionSound,
             ),
           ),
           const SizedBox(height: 18),
           _AtmosphereTile(
-            icon: Icons.palette_outlined,
-            title: 'Color de Énfasis',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ColorDot(color: palette.secondary, selected: true),
-                const SizedBox(width: 10),
-                _ColorDot(color: palette.primaryMuted),
-                const SizedBox(width: 10),
-                const _ColorDot(color: Color(0xFFD8D9F8)),
-              ],
+            icon: Icons.vibration_rounded,
+            title: 'Vibración\nFinal',
+            trailing: _CompletionVibrationControl(
+              enabled: settings.completionVibrationEnabled,
+              onChanged: settings.onCompletionVibrationChanged,
+              onPreview: settings.onPreviewCompletionVibration,
             ),
           ),
           if (showSaveButton) ...[
@@ -337,6 +337,104 @@ class _AtmosphereCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CompletionVibrationControl extends StatelessWidget {
+  const _CompletionVibrationControl({
+    required this.enabled,
+    required this.onChanged,
+    required this.onPreview,
+  });
+
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+  final Future<void> Function() onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          tooltip: 'Probar vibración',
+          onPressed: enabled ? () async => onPreview() : null,
+          icon: const Icon(Icons.touch_app_rounded),
+        ),
+        const SizedBox(width: 8),
+        Switch.adaptive(value: enabled, onChanged: onChanged),
+      ],
+    );
+  }
+}
+
+class _CompletionSoundPicker extends StatelessWidget {
+  const _CompletionSoundPicker({
+    required this.selectedSound,
+    required this.onChanged,
+    required this.onPreview,
+  });
+
+  final PomodoroCompletionSound selectedSound;
+  final ValueChanged<PomodoroCompletionSound> onChanged;
+  final Future<void> Function() onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filledTonal(
+          tooltip: 'Escuchar sonido',
+          onPressed: () async => onPreview(),
+          icon: const Icon(Icons.volume_up_rounded),
+        ),
+        const SizedBox(width: 8),
+        PopupMenuButton<PomodoroCompletionSound>(
+          tooltip: 'Seleccionar sonido',
+          initialValue: selectedSound,
+          onSelected: onChanged,
+          itemBuilder: (context) {
+            return [
+              for (final sound in PomodoroCompletionSound.values)
+                PopupMenuItem(
+                  value: sound,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(sound.label),
+                    subtitle: Text(sound.description),
+                  ),
+                ),
+            ];
+          },
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 156),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: palette.primaryMuted.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    selectedSound.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.keyboard_arrow_down_rounded),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -371,7 +469,7 @@ class _ForestPreview extends StatelessWidget {
               bottom: 0,
               child: Container(
                 width: 7,
-                color: Colors.black.withValues(alpha: 0.34),
+                color: palette.textPrimary.withValues(alpha: 0.34),
               ),
             ),
           Align(
@@ -424,29 +522,6 @@ class _AtmosphereTile extends StatelessWidget {
           ),
           trailing,
         ],
-      ),
-    );
-  }
-}
-
-class _ColorDot extends StatelessWidget {
-  const _ColorDot({required this.color, this.selected = false});
-
-  final Color color;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: selected ? Colors.white : Colors.transparent,
-          width: 3,
-        ),
       ),
     );
   }

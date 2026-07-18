@@ -63,6 +63,16 @@ class ProfileSettingsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   TextFormField(
+                    initialValue: settings.profileEmail,
+                    keyboardType: TextInputType.emailAddress,
+                    onChanged: settings.onProfileEmailChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextFormField(
                     initialValue: settings.profileImagePath,
                     onChanged: settings.onProfileImagePathChanged,
                     decoration: const InputDecoration(

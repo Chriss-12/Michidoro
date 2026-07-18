@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/pages/directory_picker_page.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -23,9 +28,11 @@ class SettingsPage extends StatelessWidget {
         SizedBox(height: 26),
         _FocusTimesCard(),
         SizedBox(height: 26),
+        _ReportsCard(),
+        SizedBox(height: 26),
         _NotificationsCard(),
         SizedBox(height: 26),
-        _TypographyCard(),
+        _TypographyPresetCard(),
       ],
     );
   }
@@ -37,7 +44,9 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final colorScheme = Theme.of(context).colorScheme;
     final settings = AppSettingsScope.of(context);
+    final image = _profileImage(settings.profileImagePath);
 
     return GlassCard(
       padding: AppCardPaddings.compact,
@@ -49,18 +58,20 @@ class _ProfileCard extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: palette.primaryMuted,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: palette.primary,
-                    size: 58,
-                  ),
+                CircleAvatar(
+                  radius: 48,
+                  backgroundColor: palette.primaryMuted,
+                  foregroundImage: image,
+                  child: image == null
+                      ? Text(
+                          _avatarLabel(settings),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: palette.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        )
+                      : null,
                 ),
                 Positioned(
                   right: -10,
@@ -72,9 +83,9 @@ class _ProfileCard extends StatelessWidget {
                       color: palette.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.edit_rounded,
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                       size: 18,
                     ),
                   ),
@@ -84,21 +95,91 @@ class _ProfileCard extends StatelessWidget {
             const SizedBox(height: 38),
             const _FieldLabel('Nombre de usuario'),
             TextFormField(
-              initialValue: 'Michi User',
+              key: ValueKey('profile-name-${settings.profileName}'),
+              initialValue: settings.profileName,
               onChanged: settings.onProfileNameChanged,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
             ),
             const SizedBox(height: 18),
             const _FieldLabel('Correo electrónico'),
-            TextFormField(initialValue: 'hello@michifocus.com'),
+            TextFormField(
+              key: ValueKey('profile-email-${settings.profileEmail}'),
+              initialValue: settings.profileEmail,
+              keyboardType: TextInputType.emailAddress,
+              onChanged: settings.onProfileEmailChanged,
+              decoration: const InputDecoration(
+                hintText: 'tu-correo@ejemplo.com',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const _FieldLabel('Foto local'),
+            TextFormField(
+              key: ValueKey('profile-image-${settings.profileImagePath}'),
+              initialValue: settings.profileImagePath,
+              onChanged: settings.onProfileImagePathChanged,
+              decoration: const InputDecoration(
+                hintText: r'C:\Users\TuUsuario\Pictures\foto.png',
+                prefixIcon: Icon(Icons.image_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (var index = 0; index < 4; index++)
+                  ChoiceChip(
+                    label: Text(_avatarLabelForIndex(index)),
+                    selected: settings.avatarIndex == index,
+                    onSelected: (_) => settings.onAvatarChanged(index),
+                  ),
+              ],
+            ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Perfil actualizado.')),
+                );
+              },
               child: const Text('Guardar cambios'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  ImageProvider? _profileImage(String path) {
+    if (path.trim().isEmpty) {
+      return null;
+    }
+
+    final file = File(path.trim());
+    if (!file.existsSync()) {
+      return null;
+    }
+
+    return FileImage(file);
+  }
+
+  String _avatarLabel(AppSettingsScope settings) {
+    if (settings.profileName.trim().isNotEmpty) {
+      return settings.profileName.trim().characters.first.toUpperCase();
+    }
+
+    return _avatarLabelForIndex(settings.avatarIndex);
+  }
+
+  String _avatarLabelForIndex(int index) {
+    return switch (index) {
+      0 => 'C',
+      1 => 'CH',
+      2 => 'P',
+      _ => 'A',
+    };
   }
 }
 
@@ -244,7 +325,7 @@ class _FocusTimesCard extends StatelessWidget {
           _InlineSlider(
             label: 'Sesión de Enfoque',
             value: settings.focusMinutes,
-            min: 10,
+            min: 5,
             max: 90,
             onChanged: settings.onFocusMinutesChanged,
           ),
@@ -270,12 +351,142 @@ class _FocusTimesCard extends StatelessWidget {
   }
 }
 
+class _ReportsCard extends StatelessWidget {
+  const _ReportsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppSettingsScope.of(context);
+    final palette = context.palette;
+    final currentPath = settings.reportsDirectoryPath.trim();
+
+    return GlassCard(
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(
+            icon: Icons.folder_open_rounded,
+            title: 'Reportes',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currentPath.isEmpty
+                ? 'Los PDF se guardan en Descargas cuando esta disponible.'
+                : 'Carpeta actual: $currentPath',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final path = await context.push<String>(
+                  DirectoryPickerPage.routePath,
+                  extra: currentPath,
+                );
+                if (path == null || !context.mounted) {
+                  return;
+                }
+
+                settings.onReportsDirectoryPathChanged(path);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Carpeta de reportes seleccionada.'),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.folder_open_rounded),
+              label: const Text('Seleccionar carpeta'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await settings.onUseDefaultReportsDirectory();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Carpeta de reportes configurada.'),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.download_rounded),
+              label: const Text('Usar Descargas'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                await settings.onExportDatabaseBackup();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Backup de base de datos exportado.'),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.backup_rounded),
+              label: const Text('Exportar base de datos'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final path = await context.push<String>(
+                  DirectoryPickerPage.routePath,
+                  extra: currentPath,
+                );
+                if (path == null || !context.mounted) {
+                  return;
+                }
+
+                try {
+                  await settings.onImportDatabaseBackup(path);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Backup preparado. Reinicia la app para aplicarlo.',
+                        ),
+                      ),
+                    );
+                  }
+                } on FileSystemException catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error.message)),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.restore_rounded),
+              label: const Text('Importar base de datos'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NotificationsCard extends StatelessWidget {
   const _NotificationsCard();
 
   @override
   Widget build(BuildContext context) {
     final settings = AppSettingsScope.of(context);
+    final palette = context.palette;
 
     return GlassCard(
       padding: AppCardPaddings.compact,
@@ -285,6 +496,57 @@ class _NotificationsCard extends StatelessWidget {
           const _SectionTitle(
             icon: Icons.notifications_active_outlined,
             title: 'Notificaciones',
+          ),
+          const SizedBox(height: 18),
+          DropdownButtonFormField<PomodoroCompletionSound>(
+            value: settings.completionSound,
+            decoration: const InputDecoration(
+              labelText: 'Tono',
+              prefixIcon: Icon(Icons.music_note_rounded),
+            ),
+            items: [
+              for (final sound in PomodoroCompletionSound.values)
+                DropdownMenuItem(
+                  value: sound,
+                  child: Text(sound.label),
+                ),
+            ],
+            onChanged: settings.notificationsEnabled
+                ? (value) {
+                    if (value != null) {
+                      settings.onCompletionSoundChanged(value);
+                    }
+                  }
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            settings.completionSound.description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: settings.notificationsEnabled
+                  ? () async {
+                      await settings.onTestNotification();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Notificacion de prueba enviada.',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: const Text('Probar notificacion'),
+            ),
           ),
           const SizedBox(height: 18),
           _NotificationTile(
@@ -308,6 +570,58 @@ class _NotificationsCard extends StatelessWidget {
   }
 }
 
+class _TypographyPresetCard extends StatelessWidget {
+  const _TypographyPresetCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final settings = AppSettingsScope.of(context);
+
+    return GlassCard(
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(
+            icon: Icons.text_fields_rounded,
+            title: 'Tipografia',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Seleccion actual: ${settings.typographyPreset.label} (${settings.typographyPreset.familyLabel})',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final preset in AppTypographyPreset.values)
+                ChoiceChip(
+                  label: Text('${preset.label} - ${preset.familyLabel}'),
+                  selected: settings.typographyPreset == preset,
+                  onSelected: (_) => settings.onTypographyPresetChanged(preset),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            settings.typographyPreset.description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Kept temporarily while the new V3 typography card replaces the old layout.
+// ignore: unused_element
 class _TypographyCard extends StatelessWidget {
   const _TypographyCard();
 

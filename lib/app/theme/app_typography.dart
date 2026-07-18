@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 
+enum AppTypographyPreset {
+  moderna('Moderna', 'Sora', 'Limpia y actual para dashboards.'),
+  serio('Serio', 'Merriweather', 'Mas formal para reportes y foco profundo.'),
+  normal('Normal', 'Roboto', 'Neutral y familiar para uso diario.');
+
+  const AppTypographyPreset(this.label, this.familyLabel, this.description);
+
+  final String label;
+  final String familyLabel;
+  final String description;
+}
+
 class AppFontSizes {
   const AppFontSizes._();
 
@@ -29,6 +41,7 @@ class AppTypography {
   static TextTheme textTheme({
     required ColorScheme colorScheme,
     double fontScale = 1,
+    AppTypographyPreset preset = AppTypographyPreset.moderna,
   }) {
     final textColor = colorScheme.onSurface;
     final textTheme = TextTheme(
@@ -37,7 +50,7 @@ class AppTypography {
         fontSize: AppFontSizes.timer * fontScale,
         fontWeight: FontWeight.w600,
         height: 1.2,
-        letterSpacing: -0.02 * AppFontSizes.timer * fontScale,
+        letterSpacing: 0,
       ),
       headlineLarge: TextStyle(
         color: textColor,
@@ -107,7 +120,11 @@ class AppTypography {
       ),
     );
 
-    final sora = GoogleFonts.sora();
-    return textTheme.apply(fontFamily: sora.fontFamily);
+    final font = switch (preset) {
+      AppTypographyPreset.moderna => GoogleFonts.sora(),
+      AppTypographyPreset.serio => GoogleFonts.merriweather(),
+      AppTypographyPreset.normal => GoogleFonts.roboto(),
+    };
+    return textTheme.apply(fontFamily: font.fontFamily);
   }
 }
