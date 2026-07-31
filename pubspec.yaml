@@ -36,6 +36,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_animate: ^4.5.2
+  flutter_localizations:
+    sdk: flutter
   flutter_svg: ^2.2.3
   get_it: ^9.2.1
   go_router: ^17.0.0
@@ -67,11 +69,23 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora-Variable.ttf
+    - family: Merriweather
+      fonts:
+        - asset: assets/fonts/Merriweather-Variable.ttf
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

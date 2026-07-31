@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pomodoro_app_v1/features/calendar/data/datasources/calendar_events_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/calendar/data/repositories/drift_calendar_events_repository.dart';
 
 void main() {
@@ -11,10 +11,10 @@ void main() {
       'persists calendar events in the local SQLite database file',
       () async {
         final directory = Directory.systemTemp.createTempSync(
-          'michifocus_calendar_events_test',
+          'michifocus_database_test',
         );
         final file = File('${directory.path}/calendar_events.sqlite');
-        var database = CalendarEventsDatabase(NativeDatabase(file));
+        var database = MichiFocusDatabase(NativeDatabase(file));
         var repository = DriftCalendarEventsRepository(
           CalendarEventsDao(database),
         );
@@ -33,7 +33,7 @@ void main() {
         );
         await database.close();
 
-        database = CalendarEventsDatabase(NativeDatabase(file));
+        database = MichiFocusDatabase(NativeDatabase(file));
         repository = DriftCalendarEventsRepository(CalendarEventsDao(database));
 
         final events = await repository.loadEvents();
@@ -47,7 +47,7 @@ void main() {
     );
 
     test('loads calendar events ordered by scheduled time', () async {
-      final database = CalendarEventsDatabase(NativeDatabase.memory());
+      final database = MichiFocusDatabase(NativeDatabase.memory());
       final repository = DriftCalendarEventsRepository(
         CalendarEventsDao(database),
       );

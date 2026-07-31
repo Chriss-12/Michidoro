@@ -2,43 +2,79 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
+import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/reports/data/services/local_statistics_report_file_writer.dart';
+import 'package:pomodoro_app_v1/features/reports/data/services/raw_statistics_pdf_renderer.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_document.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_document_renderer.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_file_writer.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/entities/timer_preferences.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
-enum StatisticsReportPeriod { day, week, month, year, range }
-
-enum StatisticsChartType {
-  circular('Circular'),
-  stackedBars('Barras apiladas'),
-  groupedBars('Barras agrupadas'),
-  horizontalBars('Grafico horizontal'),
-  standardBars('Grafico de barras'),
-  xy('X/Y');
-
-  const StatisticsChartType(this.label);
-
-  final String label;
-}
+export 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
 
 enum PomodoroCompletionSound {
   softBell(
     'Campana suave',
-    'Alerta serena para cerrar la sesión',
+    'Campana breve y clara para cerrar el bloque.',
     SystemSoundType.alert,
   ),
-  lightTap('Toque breve', 'Señal corta y discreta', SystemSoundType.click),
-  silent('Silencio', 'No reproducir sonido al finalizar', null);
+  lightTap(
+    'Toque ligero',
+    'Senal corta y discreta para avisos rapidos.',
+    SystemSoundType.click,
+  ),
+  warmChime(
+    'Campanilla calida',
+    'Notas suaves con un cierre mas agradable.',
+    SystemSoundType.alert,
+  ),
+  crystalChime(
+    'Cristal claro',
+    'Secuencia limpia y brillante sin sonar agresiva.',
+    SystemSoundType.alert,
+  ),
+  calmPulse(
+    'Pulso calmado',
+    'Dos pulsos redondos para una alerta tranquila.',
+    SystemSoundType.alert,
+  ),
+  deepChime(
+    'Campana profunda',
+    'Tono grave y reposado para descansos largos.',
+    SystemSoundType.alert,
+  ),
+  digitalZen(
+    'Zen digital',
+    'Secuencia moderna, corta y menos invasiva.',
+    SystemSoundType.alert,
+  ),
+  silent('Silencio', 'No reproducir sonido al finalizar.', null);
 
   const PomodoroCompletionSound(this.label, this.description, this.systemSound);
 
   final String label;
   final String description;
   final SystemSoundType? systemSound;
+
+  bool get isAudible => systemSound != null;
+}
+
+enum PomodoroVibrationPattern {
+  light,
+  normal,
+  double,
+  intense,
 }
 
 class AppNotification {
@@ -57,80 +93,25 @@ class AppNotification {
   final String? routePath;
 }
 
-class StatisticsReportRequest {
-  const StatisticsReportRequest({
-    required this.period,
-    this.from,
-    this.to,
-  });
-
-  final StatisticsReportPeriod period;
-  final DateTime? from;
-  final DateTime? to;
-
-  String get label {
-    return switch (period) {
-      StatisticsReportPeriod.day => 'Day',
-      StatisticsReportPeriod.week => 'Week',
-      StatisticsReportPeriod.month => 'Month',
-      StatisticsReportPeriod.year => 'Year',
-      StatisticsReportPeriod.range => 'Custom range',
-    };
-  }
-}
-
-class StatisticsTaskTotals {
-  const StatisticsTaskTotals({
-    required this.listed,
-    required this.inProgress,
-    required this.completed,
-  });
-
-  final int listed;
-  final int inProgress;
-  final int completed;
-
-  int get total => listed + inProgress + completed;
-  double get completionRatio => total == 0 ? 0 : completed / total;
-}
-
-class StatisticsCalendarDay {
-  const StatisticsCalendarDay({
-    required this.day,
-    required this.completionRatio,
-    required this.isEnded,
-    required this.totalTasks,
-  });
-
-  final DateTime day;
-  final double completionRatio;
-  final bool isEnded;
-  final int totalTasks;
-}
-
-class StatisticsReportData {
-  const StatisticsReportData({
-    required this.tasks,
-    required this.calendarDays,
-    required this.completedPomodoros,
-    required this.focusedSeconds,
-  });
-
-  final StatisticsTaskTotals tasks;
-  final List<StatisticsCalendarDay> calendarDays;
-  final int completedPomodoros;
-  final int focusedSeconds;
-
-  int get focusedMinutes => focusedSeconds ~/ 60;
-  int get progressPercent => (tasks.completionRatio * 100).round();
-}
-
 class AppSettingsController {
-  AppSettingsController({Directory? documentsDirectory})
-    : _documentsDirectoryOverride = documentsDirectory;
+  AppSettingsController({
+    Directory? documentsDirectory,
+    StatisticsReportDocumentRenderer? statisticsReportRenderer,
+    StatisticsReportFileWriter? statisticsReportFileWriter,
+  }) : _documentsDirectoryOverride = documentsDirectory,
+       _statisticsReportRenderer =
+           statisticsReportRenderer ?? const RawStatisticsPdfRenderer(),
+       _statisticsReportFileWriter =
+           statisticsReportFileWriter ??
+           LocalStatisticsReportFileWriter(
+             documentsDirectory: documentsDirectory,
+           );
 
   static const databaseBackupFileNames = [
-    'michidoro-settings.json',
+    'michifocus.sqlite',
+  ];
+
+  static const _legacyDatabaseBackupFileNames = [
     'michifocus_goals.sqlite',
     'michifocus_tasks.sqlite',
     'michifocus_pomodoro_sessions.sqlite',
@@ -151,6 +132,7 @@ class AppSettingsController {
   final FlutterSignal<AppTypographyPreset> typographyPreset = signal(
     AppTypographyPreset.moderna,
   );
+  final FlutterSignal<AppLanguage> language = signal(AppLanguage.spanish);
   final FlutterSignal<int> focusMinutes = signal(25);
   final FlutterSignal<int> shortBreakMinutes = signal(5);
   final FlutterSignal<int> longBreakMinutes = signal(15);
@@ -159,6 +141,8 @@ class AppSettingsController {
     PomodoroCompletionSound.softBell,
   );
   final FlutterSignal<bool> completionVibrationEnabled = signal(true);
+  final FlutterSignal<PomodoroVibrationPattern> completionVibrationPattern =
+      signal(PomodoroVibrationPattern.normal);
   final FlutterSignal<bool> autoStartBreak = signal(true);
   final FlutterSignal<bool> autoStartFocus = signal(false);
   final FlutterSignal<bool> notificationsEnabled = signal(true);
@@ -179,6 +163,8 @@ class AppSettingsController {
   Timer? _timer;
   SettingsRepository? _settingsRepository;
   final Directory? _documentsDirectoryOverride;
+  final StatisticsReportDocumentRenderer _statisticsReportRenderer;
+  final StatisticsReportFileWriter _statisticsReportFileWriter;
 
   Future<void> loadTimerPreferences(SettingsRepository repository) async {
     _settingsRepository = repository;
@@ -193,6 +179,7 @@ class AppSettingsController {
     longBreakFrequency.value = normalized.longBreakFrequency;
     completionSound.value = normalized.completionSound;
     completionVibrationEnabled.value = normalized.completionVibrationEnabled;
+    completionVibrationPattern.value = normalized.completionVibrationPattern;
     autoStartBreak.value = normalized.autoStartBreak;
     autoStartFocus.value = normalized.autoStartFocus;
     reportsDirectoryPath.value = normalized.reportsDirectoryPath;
@@ -200,7 +187,11 @@ class AppSettingsController {
     profileEmail.value = normalized.profileEmail;
     profileImagePath.value = normalized.profileImagePath;
     avatarIndex.value = normalized.avatarIndex;
+    themePreset.value = normalized.themePreset;
+    isDarkMode.value = normalized.isDarkMode;
+    fontScale.value = normalized.fontScale;
     typographyPreset.value = normalized.typographyPreset;
+    language.value = normalized.language;
     enabledStatisticsCharts.value = normalized.enabledStatisticsCharts;
     if (!isPomodoroRunning.value) {
       remainingSeconds.value = normalized.focusMinutes * 60;
@@ -215,6 +206,7 @@ class AppSettingsController {
       longBreakFrequency: longBreakFrequency.value,
       completionSound: completionSound.value,
       completionVibrationEnabled: completionVibrationEnabled.value,
+      completionVibrationPattern: completionVibrationPattern.value,
       autoStartBreak: autoStartBreak.value,
       autoStartFocus: autoStartFocus.value,
       reportsDirectoryPath: reportsDirectoryPath.value,
@@ -222,8 +214,12 @@ class AppSettingsController {
       profileEmail: profileEmail.value,
       profileImagePath: profileImagePath.value,
       avatarIndex: avatarIndex.value,
+      themePreset: themePreset.value,
+      isDarkMode: isDarkMode.value,
+      fontScale: fontScale.value,
       typographyPreset: typographyPreset.value,
       enabledStatisticsCharts: enabledStatisticsCharts.value,
+      language: language.value,
     ).normalized();
   }
 
@@ -255,12 +251,17 @@ class AppSettingsController {
   }
 
   void setProfileName(String value) {
-    final trimmed = value.trim();
-    profileName.value = trimmed.isEmpty ? 'Chriss' : trimmed;
+    if (profileName.value == value) {
+      return;
+    }
+    profileName.value = value;
   }
 
   void setProfileEmail(String value) {
-    profileEmail.value = value.trim();
+    if (profileEmail.value == value) {
+      return;
+    }
+    profileEmail.value = value;
   }
 
   void setProfileImagePath(String value) {
@@ -307,6 +308,13 @@ class AppSettingsController {
     completionVibrationEnabled.value = value;
   }
 
+  PomodoroVibrationPattern get selectedCompletionVibrationPattern =>
+      completionVibrationPattern.value;
+
+  set selectedCompletionVibrationPattern(PomodoroVibrationPattern value) {
+    completionVibrationPattern.value = value;
+  }
+
   Future<void> previewCompletionSound() {
     return playCompletionSound();
   }
@@ -316,10 +324,12 @@ class AppSettingsController {
   }
 
   Future<void> sendTestNotification({bool playFeedback = true}) async {
+    final scheduledAt = DateTime.now().add(const Duration(minutes: 25));
     addNotification(
-      title: 'Notificacion de prueba',
-      body: 'El tono seleccionado esta listo para tus recordatorios.',
-      routePath: '/settings/notifications',
+      title: 'Tarea programada',
+      body:
+          'Hoy a ${_formatTime(scheduledAt)} - Revisar tu siguiente bloque de enfoque.',
+      routePath: '/tasks',
     );
 
     if (playFeedback) {
@@ -351,6 +361,11 @@ class AppSettingsController {
     notifications.value = const [];
   }
 
+  String _formatTime(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> playCompletionFeedback() async {
     await Future.wait([
       playCompletionSound(),
@@ -359,12 +374,17 @@ class AppSettingsController {
   }
 
   Future<void> playCompletionSound() async {
-    final sound = completionSound.value.systemSound;
-    if (sound == null) {
+    final selectedSound = completionSound.value;
+    if (!selectedSound.isAudible) {
       return;
     }
 
-    await SystemSound.play(sound);
+    if (NativeFileManager.isAndroidExternalPickerAvailable) {
+      await NativeFileManager.playCompletionSound(selectedSound.name);
+      return;
+    }
+
+    await SystemSound.play(selectedSound.systemSound ?? SystemSoundType.alert);
   }
 
   Future<void> playCompletionVibration() async {
@@ -372,7 +392,18 @@ class AppSettingsController {
       return;
     }
 
-    await HapticFeedback.mediumImpact();
+    switch (completionVibrationPattern.value) {
+      case PomodoroVibrationPattern.light:
+        await HapticFeedback.lightImpact();
+      case PomodoroVibrationPattern.normal:
+        await HapticFeedback.mediumImpact();
+      case PomodoroVibrationPattern.double:
+        await HapticFeedback.lightImpact();
+        await Future<void>.delayed(const Duration(milliseconds: 140));
+        await HapticFeedback.mediumImpact();
+      case PomodoroVibrationPattern.intense:
+        await HapticFeedback.heavyImpact();
+    }
   }
 
   void togglePomodoro() {
@@ -408,305 +439,107 @@ class AppSettingsController {
     remainingSeconds.value = focusMinutes.value * 60;
   }
 
-  Future<void> downloadStatisticsPdf(
+  Future<StatisticsReportFile> downloadStatisticsPdf(
     StatisticsReportRequest request,
     StatisticsReportData data,
   ) async {
-    final directory = await _reportsDirectory();
-    final file = File('${directory.path}/michifocus-statistics.pdf');
-
-    await file.writeAsBytes(
-      _buildStatisticsPdf(
-        title: 'Reporte de rendimiento MichiFocus',
+    final bytes = _statisticsReportRenderer.render(
+      StatisticsReportDocument(
+        title: language.value == AppLanguage.english
+            ? 'MichiFocus Performance Report'
+            : 'Reporte de rendimiento MichiFocus',
         profileName: profileName.value,
         profileEmail: profileEmail.value,
-        period: request.label,
-        range: _formatRange(request),
+        periodLabel: _reportPeriodLabel(request),
         enabledCharts: enabledStatisticsCharts.value,
         data: data,
+        language: language.value,
       ),
-      flush: true,
     );
-    lastReportPath.value = file.path;
+    final reportFile = await _statisticsReportFileWriter.write(
+      bytes: bytes,
+      request: request,
+      generatedAt: data.generatedAt,
+      configuredDestination: reportsDirectoryPath.value,
+    );
+    lastReportPath.value = reportFile.displayPath;
+    return reportFile;
   }
 
-  String _formatRange(StatisticsReportRequest request) {
-    String format(DateTime date) =>
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-    if (request.period == StatisticsReportPeriod.range &&
-        request.from != null &&
-        request.to != null) {
-      return '${format(request.from!)} to ${format(request.to!)}';
+  String _reportPeriodLabel(StatisticsReportRequest request) {
+    if (language.value != AppLanguage.english) {
+      return request.label;
     }
 
-    final now = DateTime.now();
     return switch (request.period) {
-      StatisticsReportPeriod.day => format(now),
-      StatisticsReportPeriod.week =>
-        '${format(now.subtract(Duration(days: now.weekday - 1)))} to ${format(now.add(Duration(days: DateTime.sunday - now.weekday)))}',
-      StatisticsReportPeriod.month =>
-        '${now.year}-${now.month.toString().padLeft(2, '0')}',
-      StatisticsReportPeriod.year => '${now.year}',
+      StatisticsReportPeriod.day => 'Day',
+      StatisticsReportPeriod.week => 'Week',
+      StatisticsReportPeriod.month => 'Month',
+      StatisticsReportPeriod.year => 'Year',
       StatisticsReportPeriod.range => 'Custom range',
     };
   }
 
-  List<int> _buildStatisticsPdf({
-    required String title,
-    required String profileName,
-    required String profileEmail,
-    required String period,
-    required String range,
-    required Set<StatisticsChartType> enabledCharts,
-    required StatisticsReportData data,
-  }) {
-    final taskTotal = data.tasks.total;
-    final progress = data.progressPercent;
-    final focusedMinutes = data.focusedMinutes;
-    final coaching = _coachingPhrase(data.tasks.completionRatio);
-    final listedWidth = _chartWidth(data.tasks.listed, taskTotal);
-    final inProgressWidth = _chartWidth(data.tasks.inProgress, taskTotal);
-    final completedWidth = _chartWidth(data.tasks.completed, taskTotal);
-    final owner = profileName.trim().isEmpty ? 'Usuario' : profileName.trim();
-    final email = profileEmail.trim().isEmpty
-        ? 'Sin correo configurado'
-        : profileEmail.trim();
-    final chartNames = enabledCharts.map((chart) => chart.label).join(', ');
-    final content = StringBuffer()
-      ..writeln('0.95 0.98 0.91 rg 0 0 595 842 re f')
-      ..writeln('0.18 0.13 0.09 rg 0 760 595 82 re f')
-      ..writeln('0.47 0.61 0.37 rg 0 752 595 8 re f')
-      ..writeln('1 1 1 rg 44 786 12 12 re f')
-      ..writeln('BT /F1 20 Tf 68 792 Td (${_pdfText(title)}) Tj ET')
-      ..writeln(
-        'BT /F1 10 Tf 68 772 Td (${_pdfText(owner)} | ${_pdfText(email)}) Tj ET',
-      )
-      ..writeln('0.18 0.13 0.09 rg')
-      ..writeln(
-        'BT /F1 11 Tf 48 728 Td (Periodo: ${_pdfText(period)} | Rango: ${_pdfText(range)}) Tj ET',
-      )
-      ..writeln('0.99 0.99 0.97 rg 38 646 519 62 re f')
-      ..writeln('0.84 0.81 0.74 RG 38 646 519 62 re S')
-      ..writeln(
-        'BT /F1 12 Tf 52 686 Td (Tareas: $taskTotal  |  Completadas: ${data.tasks.completed}  |  Avance: $progress%) Tj ET',
-      )
-      ..writeln(
-        'BT /F1 12 Tf 52 666 Td (Pomodoros: ${data.completedPomodoros}  |  Minutos enfocados: $focusedMinutes) Tj ET',
-      )
-      ..writeln(
-        'BT /F1 9 Tf 52 650 Td (Graficos incluidos: ${_pdfText(chartNames)}) Tj ET',
-      );
+  Future<void> openReport(String path) {
+    return NativeFileManager.openFile(path: path);
+  }
 
-    var y = 612.0;
-    if (enabledCharts.contains(StatisticsChartType.circular)) {
-      content
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln('BT /F1 14 Tf 48 $y Td (Avance general) Tj ET')
-        ..writeln('0.90 0.90 0.86 rg 48 ${y - 28} 200 16 re f')
-        ..writeln(
-          '0.47 0.61 0.37 rg 48 ${y - 28} ${(progress.clamp(0, 100) / 100 * 200).toStringAsFixed(1)} 16 re f',
-        )
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln(
-          'BT /F1 10 Tf 262 ${y - 24} Td ($progress% completado) Tj ET',
-        );
-      y -= 58;
+  Future<String> exportDatabaseBackup({
+    Future<void> Function(String targetPath)? createDatabaseSnapshot,
+  }) async {
+    final appDirectory = await _applicationDocumentsDirectory();
+    final snapshot = File(
+      '${appDirectory.path}/.michifocus-export.sqlite',
+    );
+    if (snapshot.existsSync()) {
+      await snapshot.delete();
+    }
+    if (createDatabaseSnapshot != null) {
+      await createDatabaseSnapshot(snapshot.path);
     }
 
-    if (enabledCharts.intersection({
-      StatisticsChartType.stackedBars,
-      StatisticsChartType.horizontalBars,
-      StatisticsChartType.standardBars,
-    }).isNotEmpty) {
-      content
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln('BT /F1 14 Tf 48 $y Td (Estado de tareas) Tj ET')
-        ..writeln('BT /F1 10 Tf 48 ${y - 28} Td (Pendientes) Tj ET')
-        ..writeln('0.88 0.88 0.84 rg 150 ${y - 36} 260 14 re f')
-        ..writeln('0.90 0.32 0.32 rg 150 ${y - 36} $listedWidth 14 re f')
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln('BT /F1 10 Tf 426 ${y - 28} Td (${data.tasks.listed}) Tj ET')
-        ..writeln('BT /F1 10 Tf 48 ${y - 58} Td (En progreso) Tj ET')
-        ..writeln('0.88 0.88 0.84 rg 150 ${y - 66} 260 14 re f')
-        ..writeln('0.89 0.70 0.25 rg 150 ${y - 66} $inProgressWidth 14 re f')
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln(
-          'BT /F1 10 Tf 426 ${y - 58} Td (${data.tasks.inProgress}) Tj ET',
-        )
-        ..writeln('BT /F1 10 Tf 48 ${y - 88} Td (Completadas) Tj ET')
-        ..writeln('0.88 0.88 0.84 rg 150 ${y - 96} 260 14 re f')
-        ..writeln('0.10 0.56 0.33 rg 150 ${y - 96} $completedWidth 14 re f')
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln(
-          'BT /F1 10 Tf 426 ${y - 88} Td (${data.tasks.completed}) Tj ET',
+    final externalFolder = _externalReportsFolderReference();
+    if (externalFolder != null) {
+      if (snapshot.existsSync()) {
+        final saved = await NativeFileManager.saveFileToExternalFolder(
+          folderUri: externalFolder,
+          fileName: 'michifocus.sqlite',
+          mimeType: 'application/vnd.sqlite3',
+          bytes: await snapshot.readAsBytes(),
         );
-      y -= 126;
-    }
-
-    if (enabledCharts.contains(StatisticsChartType.groupedBars)) {
-      content
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln('BT /F1 14 Tf 48 $y Td (Foco y finalizacion) Tj ET')
-        ..writeln(
-          '0.20 0.20 0.20 rg 48 ${y - 34} ${(focusedMinutes.clamp(0, 600) / 600 * 220).toStringAsFixed(1)} 16 re f',
-        )
-        ..writeln(
-          '0.47 0.61 0.37 rg 48 ${y - 62} ${(data.completedPomodoros.clamp(0, 24) / 24 * 220).toStringAsFixed(1)} 16 re f',
-        )
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln(
-          'BT /F1 10 Tf 284 ${y - 30} Td ($focusedMinutes min de foco) Tj ET',
-        )
-        ..writeln(
-          'BT /F1 10 Tf 284 ${y - 58} Td (${data.completedPomodoros} pomodoros) Tj ET',
-        );
-      y -= 94;
-    }
-
-    if (enabledCharts.contains(StatisticsChartType.xy)) {
-      content
-        ..writeln('0.18 0.13 0.09 rg')
-        ..writeln('BT /F1 14 Tf 48 $y Td (Tendencia por calendario) Tj ET');
-      y -= 24;
-      for (final day in data.calendarDays.take(10)) {
-        final percent = (day.completionRatio * 100).round();
-        final barWidth = (day.completionRatio.clamp(0.0, 1.0) * 130)
-            .toStringAsFixed(1);
-        final status = day.isEnded ? 'cerrado' : 'abierto';
-        content
-          ..writeln(
-            'BT /F1 9 Tf 48 $y Td (${_pdfText(_formatDate(day.day))}: $percent% | ${day.totalTasks} tareas | $status) Tj ET',
-          )
-          ..writeln('0.90 0.90 0.86 rg 260 ${y - 3} 130 8 re f')
-          ..writeln('0.10 0.56 0.33 rg 260 ${y - 3} $barWidth 8 re f')
-          ..writeln('0.18 0.13 0.09 rg');
-        y -= 18;
+        await snapshot.delete();
+        lastReportPath.value = saved.displayPath;
+      } else {
+        lastReportPath.value =
+            await NativeFileManager.exportBackupToExternalFolder(
+              folderUri: externalFolder,
+              fileNames: databaseBackupFileNames,
+            );
       }
+      return lastReportPath.value;
     }
 
-    content
-      ..writeln('0.18 0.13 0.09 rg 38 54 519 62 re f')
-      ..writeln('1 1 1 rg')
-      ..writeln('BT /F1 14 Tf 52 92 Td (Recomendacion) Tj ET')
-      ..writeln(
-        'BT /F1 10 Tf 52 72 Td (${_pdfText(coaching)}) Tj ET',
-      );
-
-    return _pdfDocument(content.toString());
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  String _chartWidth(int value, int total) {
-    if (total <= 0) {
-      return '0.0';
-    }
-
-    return (value / total * 260).toStringAsFixed(1);
-  }
-
-  String _coachingPhrase(double ratio) {
-    if (ratio <= 0.2) {
-      return 'Empieza pequeno: elige una tarea pendiente y protege el siguiente bloque de foco.';
-    }
-
-    if (ratio <= 0.5) {
-      return 'Buen avance: manten una tarea en progreso y cierrala antes de sumar mas trabajo.';
-    }
-
-    if (ratio <= 0.7) {
-      return 'Progreso solido: tu plan funciona, ahora cierra la tarea de mayor valor.';
-    }
-
-    return 'Excelente ritmo: conserva este paso y programa una pausa de recuperacion.';
-  }
-
-  String _pdfText(String value) {
-    return value
-        .replaceAll(r'\', r'\\')
-        .replaceAll('(', r'\(')
-        .replaceAll(')', r'\)');
-  }
-
-  List<int> _pdfDocument(String stream) {
-    final objects = <String>[
-      '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n',
-      '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n',
-      '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n',
-      '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n',
-      '5 0 obj << /Length ${latin1.encode(stream).length} >> stream\n$stream\nendstream endobj\n',
-    ];
-    final buffer = StringBuffer('%PDF-1.4\n');
-    final offsets = <int>[0];
-    var length = latin1.encode(buffer.toString()).length;
-
-    for (final object in objects) {
-      offsets.add(length);
-      buffer.write(object);
-      length += latin1.encode(object).length;
-    }
-
-    final xrefOffset = length;
-    buffer
-      ..writeln('xref')
-      ..writeln('0 ${objects.length + 1}')
-      ..writeln('0000000000 65535 f ');
-    for (final offset in offsets.skip(1)) {
-      buffer.writeln('${offset.toString().padLeft(10, '0')} 00000 n ');
-    }
-    buffer
-      ..writeln('trailer << /Size ${objects.length + 1} /Root 1 0 R >>')
-      ..writeln('startxref')
-      ..writeln(xrefOffset)
-      ..write('%%EOF');
-
-    return latin1.encode(buffer.toString());
-  }
-
-  Future<void> downloadReport() async {
-    final directory = await _reportsDirectory();
-    final file = File('${directory.path}/michidoro-performance-report.txt');
-    final minutes = totalFocusSeconds.value ~/ 60;
-    final hours = minutes ~/ 60;
-    final remainingMinutes = minutes % 60;
-    final report =
-        '''
-MichiDoro Performance Report
-
-Completed tasks: ${completedTasks.value} / ${totalTasks.value}
-Completed Pomodoros: ${completedPomodoros.value}
-Focused time: ${hours}h ${remainingMinutes}m
-Focus session length: ${focusMinutes.value} minutes
-Short break: ${shortBreakMinutes.value} minutes
-Long break: ${longBreakMinutes.value} minutes
-''';
-
-    await file.writeAsString(report);
-    lastReportPath.value = file.path;
-  }
-
-  Future<void> exportDatabaseBackup() async {
     final directory = await _reportsDirectory();
     final backupDirectory = Directory('${directory.path}/michifocus-backup');
     if (!backupDirectory.existsSync()) {
       backupDirectory.createSync(recursive: true);
     }
 
-    final appDirectory = await _applicationDocumentsDirectory();
-
-    for (final fileName in databaseBackupFileNames) {
-      final source = File('${appDirectory.path}/$fileName');
-      if (!source.existsSync()) {
-        continue;
+    if (snapshot.existsSync()) {
+      await snapshot.copy('${backupDirectory.path}/michifocus.sqlite');
+      await snapshot.delete();
+    } else {
+      for (final fileName in databaseBackupFileNames) {
+        final source = File('${appDirectory.path}/$fileName');
+        if (!source.existsSync()) {
+          continue;
+        }
+        await source.copy('${backupDirectory.path}/$fileName');
       }
-
-      await source.copy('${backupDirectory.path}/$fileName');
     }
 
     lastReportPath.value = backupDirectory.path;
+    return backupDirectory.path;
   }
 
   Future<void> stageDatabaseBackupImport(String directoryPath) async {
@@ -715,14 +548,26 @@ Long break: ${longBreakMinutes.value} minutes
       throw const FileSystemException('La carpeta de backup no existe.');
     }
 
-    final importFiles = databaseBackupFileNames
-        .map((fileName) => File('${sourceDirectory.path}/$fileName'))
-        .where((file) => file.existsSync())
-        .toList(growable: false);
+    final importFiles =
+        [...databaseBackupFileNames, ..._legacyDatabaseBackupFileNames]
+            .map((fileName) => File('${sourceDirectory.path}/$fileName'))
+            .where((file) => file.existsSync())
+            .toList(growable: false);
 
     if (importFiles.isEmpty) {
       throw const FileSystemException(
         'La carpeta no contiene archivos de backup de MichiFocus.',
+      );
+    }
+
+    final sourceUnifiedDatabase = File(
+      '${sourceDirectory.path}/michifocus.sqlite',
+    );
+    if (sourceUnifiedDatabase.existsSync() &&
+        !await _isSQLiteDatabase(sourceUnifiedDatabase)) {
+      throw FileSystemException(
+        'La base de datos de backup no es un archivo SQLite valido.',
+        sourceUnifiedDatabase.path,
       );
     }
 
@@ -739,6 +584,21 @@ Long break: ${longBreakMinutes.value} minutes
       await source.copy('${pendingDirectory.path}/${_fileName(source.path)}');
     }
 
+    final pendingUnifiedDatabase = File(
+      '${pendingDirectory.path}/michifocus.sqlite',
+    );
+    if (pendingUnifiedDatabase.existsSync()) {
+      try {
+        await _validateUnifiedDatabase(pendingUnifiedDatabase);
+      } on Object catch (error) {
+        await pendingDirectory.delete(recursive: true);
+        throw FileSystemException(
+          'La base de datos no es compatible o esta danada: $error',
+          sourceUnifiedDatabase.path,
+        );
+      }
+    }
+
     lastReportPath.value = pendingDirectory.path;
   }
 
@@ -751,7 +611,23 @@ Long break: ${longBreakMinutes.value} minutes
       return false;
     }
 
-    for (final fileName in databaseBackupFileNames) {
+    final importsLegacyDatabases = _legacyDatabaseBackupFileNames.any(
+      (fileName) => File('${pendingDirectory.path}/$fileName').existsSync(),
+    );
+    final importsUnifiedDatabase = File(
+      '${pendingDirectory.path}/michifocus.sqlite',
+    ).existsSync();
+    if (importsLegacyDatabases && !importsUnifiedDatabase) {
+      final unifiedDatabase = File('${appDirectory.path}/michifocus.sqlite');
+      if (unifiedDatabase.existsSync()) {
+        await unifiedDatabase.delete();
+      }
+    }
+
+    for (final fileName in [
+      ...databaseBackupFileNames,
+      ..._legacyDatabaseBackupFileNames,
+    ]) {
       final source = File('${pendingDirectory.path}/$fileName');
       if (!source.existsSync()) {
         continue;
@@ -766,7 +642,8 @@ Long break: ${longBreakMinutes.value} minutes
 
   Future<Directory> _reportsDirectory() async {
     final configuredPath = reportsDirectoryPath.value.trim();
-    if (configuredPath.isNotEmpty) {
+    if (configuredPath.isNotEmpty &&
+        !NativeFileManager.isExternalFolderReference(configuredPath)) {
       final configuredDirectory = Directory(configuredPath);
       try {
         if (!configuredDirectory.existsSync()) {
@@ -810,6 +687,15 @@ Long break: ${longBreakMinutes.value} minutes
     return getApplicationDocumentsDirectory();
   }
 
+  String? _externalReportsFolderReference() {
+    final configuredPath = reportsDirectoryPath.value.trim();
+    if (NativeFileManager.isExternalFolderReference(configuredPath)) {
+      return configuredPath;
+    }
+
+    return null;
+  }
+
   Future<Directory> _applicationDocumentsDirectory() async {
     return _documentsDirectoryOverride ?? getApplicationDocumentsDirectory();
   }
@@ -817,6 +703,76 @@ Long break: ${longBreakMinutes.value} minutes
   String _fileName(String path) {
     final normalized = path.replaceAll(r'\', '/');
     return normalized.substring(normalized.lastIndexOf('/') + 1);
+  }
+
+  Future<bool> _isSQLiteDatabase(File file) async {
+    final randomAccessFile = await file.open();
+    try {
+      if (await randomAccessFile.length() < 16) {
+        return false;
+      }
+
+      final header = await randomAccessFile.read(16);
+      return ascii.decode(header, allowInvalid: true) ==
+          'SQLite format 3\u0000';
+    } finally {
+      await randomAccessFile.close();
+    }
+  }
+
+  Future<void> _validateUnifiedDatabase(File file) async {
+    final database = MichiFocusDatabase(NativeDatabase(file));
+    try {
+      final quickCheck = await database
+          .customSelect('PRAGMA quick_check')
+          .get();
+      if (quickCheck.length != 1 ||
+          quickCheck.single.data.values.single != 'ok') {
+        throw const FormatException('PRAGMA quick_check fallo.');
+      }
+
+      final foreignKeyIssues = await database
+          .customSelect('PRAGMA foreign_key_check')
+          .get();
+      if (foreignKeyIssues.isNotEmpty) {
+        throw const FormatException('Existen claves foraneas invalidas.');
+      }
+
+      final tableRows = await database
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+          )
+          .get();
+      final tableNames = tableRows
+          .map((row) => row.read<String>('name'))
+          .toSet();
+      const requiredTables = {
+        'goals',
+        'tasks',
+        'pomodoro_sessions',
+        'pomodoro_runtime',
+        'calendar_events',
+        'task_completion_events',
+        'reporting_metadata',
+      };
+      if (!tableNames.containsAll(requiredTables)) {
+        throw const FormatException('Faltan tablas requeridas.');
+      }
+
+      final versionRow = await database
+          .customSelect('PRAGMA user_version')
+          .getSingle();
+      if (versionRow.read<int>('user_version') != database.schemaVersion) {
+        throw const FormatException('Version de esquema no compatible.');
+      }
+
+      await database.customStatement(
+        'UPDATE pomodoro_runtime '
+        'SET is_running = 0, last_tick_at = NULL',
+      );
+    } finally {
+      await database.close();
+    }
   }
 }
 

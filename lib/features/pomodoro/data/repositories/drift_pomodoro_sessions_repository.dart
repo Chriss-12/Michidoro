@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:pomodoro_app_v1/features/pomodoro/data/datasources/pomodoro_sessions_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/repositories/pomodoro_sessions_repository.dart';
 
@@ -7,7 +7,6 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
   DriftPomodoroSessionsRepository(this._dao);
 
   final PomodoroSessionsDao _dao;
-  int _idSequence = 0;
 
   @override
   Future<List<PomodoroSession>> loadSessions() async {
@@ -24,11 +23,16 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
     String? goalId,
     String? taskId,
     int? startMoodScore,
+    PomodoroSessionStatus status = PomodoroSessionStatus.completed,
   }) async {
     final now = DateTime.now();
     final record = await _dao.insertSession(
       PomodoroSessionRecordsCompanion.insert(
-        id: _createLocalId(now),
+        id: _createSessionId(
+          startedAt: startedAt,
+          endedAt: endedAt,
+          taskId: taskId,
+        ),
         startedAt: startedAt,
         endedAt: endedAt,
         plannedSeconds: plannedSeconds,
@@ -36,7 +40,7 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
         goalId: Value(goalId),
         taskId: Value(taskId),
         startMoodScore: Value(startMoodScore),
-        status: PomodoroSessionStatus.completed.name,
+        status: status.name,
         createdAt: now,
       ),
     );
@@ -61,8 +65,14 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
     return _toDomain(record);
   }
 
-  String _createLocalId(DateTime now) {
-    return '${now.microsecondsSinceEpoch}-${_idSequence++}';
+  String _createSessionId({
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required String? taskId,
+  }) {
+    return '${taskId ?? 'free'}-'
+        '${startedAt.microsecondsSinceEpoch}-'
+        '${endedAt.microsecondsSinceEpoch}';
   }
 
   PomodoroSession _toDomain(PomodoroSessionRecord record) {
@@ -72,7 +82,7 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
       endedAt: record.endedAt,
       plannedSeconds: record.plannedSeconds,
       focusedSeconds: record.focusedSeconds,
-      status: PomodoroSessionStatus.completed,
+      status: PomodoroSessionStatus.values.byName(record.status),
       goalId: record.goalId,
       taskId: record.taskId,
       startMoodScore: record.startMoodScore,

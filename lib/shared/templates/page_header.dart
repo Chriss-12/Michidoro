@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
-import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart'
+    show AppNotification;
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
-import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
-import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
-import 'package:signals_flutter/signals_flutter.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class PageHeader extends StatelessWidget {
   const PageHeader({
@@ -85,6 +86,8 @@ class _BrandBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final settings = AppSettingsScope.of(context);
+    final profileName = settings.profileName.trim();
+    final brandLabel = profileName.isEmpty ? 'MichiFocus' : profileName;
 
     Widget leading;
     if (showBack) {
@@ -115,15 +118,28 @@ class _BrandBar extends StatelessWidget {
           child: Align(alignment: Alignment.centerLeft, child: leading),
         ),
         Expanded(
-          child: Text(
-            'MichiFocus',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: palette.tertiary,
-              fontSize: AppDesignTokens.sectionTitleFontSize,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
+          child: Tooltip(
+            message: context.tr(
+              'Abrir estadísticas por período',
+              'Open statistics by period',
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _showProfileQuickStats(context, settings),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  brandLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: palette.tertiary,
+                    fontSize: AppDesignTokens.sectionTitleFontSize,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -174,7 +190,7 @@ class _Avatar extends StatelessWidget {
     }
 
     return Tooltip(
-      message: 'Estadisticas rapidas',
+      message: context.tr('Estadísticas rápidas', 'Quick statistics'),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: () => _showProfileQuickStats(context, settings),
@@ -211,7 +227,15 @@ Future<void> _showProfileQuickStats(
   BuildContext context,
   AppSettingsScope settings,
 ) async {
-  var selectedRange = _ProfileStatsRange.day;
+  final today = DateTime.now();
+  var selection = _ProfileStatsSelection.today(today);
+  Future<StatisticsReportData> loadReport() {
+    return serviceLocator<GenerateStatisticsReport>()(
+      selection.reportRequest(today),
+    );
+  }
+
+  var reportFuture = loadReport();
 
   await showModalBottomSheet<void>(
     context: context,
@@ -223,87 +247,301 @@ Future<void> _showProfileQuickStats(
       return StatefulBuilder(
         builder: (sheetContext, setSheetState) {
           return SafeArea(
-            child: SignalBuilder(
-              builder: (sheetContext) {
-                final snapshot = _ProfileStatsSnapshot.fromControllers(
-                  range: selectedRange,
-                );
-
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        _Avatar(
-                          settings: settings,
-                          enableQuickStats: false,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                settings.profileName,
-                                style: Theme.of(
-                                  sheetContext,
-                                ).textTheme.titleMedium,
-                              ),
-                              if (settings.profileEmail.trim().isNotEmpty)
-                                Text(
-                                  settings.profileEmail,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color:
-                                            sheetContext.palette.textSecondary,
-                                      ),
-                                ),
-                            ],
+                    _Avatar(
+                      settings: settings,
+                      enableQuickStats: false,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            settings.profileName,
+                            style: Theme.of(
+                              sheetContext,
+                            ).textTheme.titleMedium,
                           ),
-                        ),
-                      ],
+                          if (settings.profileEmail.trim().isNotEmpty)
+                            Text(
+                              settings.profileEmail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(sheetContext).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: sheetContext.palette.textSecondary,
+                                  ),
+                            ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 18),
-                    SegmentedButton<_ProfileStatsRange>(
-                      segments: const [
-                        ButtonSegment(
-                          value: _ProfileStatsRange.day,
-                          label: Text('Dia'),
-                        ),
-                        ButtonSegment(
-                          value: _ProfileStatsRange.month,
-                          label: Text('Mes'),
-                        ),
-                        ButtonSegment(
-                          value: _ProfileStatsRange.year,
-                          label: Text('Anio'),
-                        ),
-                      ],
-                      selected: {selectedRange},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (selection) {
-                        setSheetState(() => selectedRange = selection.single);
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    _QuickMoodCard(snapshot: snapshot),
-                    const SizedBox(height: 12),
-                    _QuickTaskStats(snapshot: snapshot),
-                    const SizedBox(height: 12),
-                    _MotivationCard(message: snapshot.motivation),
                   ],
-                );
-              },
+                ),
+                const SizedBox(height: 18),
+                SegmentedButton<_ProfileStatsRange>(
+                  segments: [
+                    ButtonSegment(
+                      value: _ProfileStatsRange.day,
+                      label: Text(context.tr('Día', 'Day')),
+                    ),
+                    ButtonSegment(
+                      value: _ProfileStatsRange.month,
+                      label: Text(context.tr('Mes', 'Month')),
+                    ),
+                    ButtonSegment(
+                      value: _ProfileStatsRange.year,
+                      label: Text(context.tr('Año', 'Year')),
+                    ),
+                  ],
+                  selected: {selection.range},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (ranges) {
+                    setSheetState(() {
+                      selection = selection.forRange(ranges.single, today);
+                      reportFuture = loadReport();
+                    });
+                  },
+                ),
+                const SizedBox(height: 18),
+                _ProfilePeriodPicker(
+                  selection: selection,
+                  today: today,
+                  onChanged: (next) => setSheetState(() {
+                    selection = next;
+                    reportFuture = loadReport();
+                  }),
+                ),
+                const SizedBox(height: 18),
+                FutureBuilder<StatisticsReportData>(
+                  future: reportFuture,
+                  builder: (sheetContext, reportSnapshot) {
+                    if (reportSnapshot.connectionState !=
+                        ConnectionState.done) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    }
+                    if (reportSnapshot.hasError ||
+                        reportSnapshot.data == null) {
+                      return Column(
+                        children: [
+                          Text(
+                            context.tr(
+                              'No se pudieron cargar las estadísticas.',
+                              'Statistics could not be loaded.',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: () => setSheetState(
+                              () => reportFuture = loadReport(),
+                            ),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text(context.tr('Reintentar', 'Retry')),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final snapshot = _ProfileStatsSnapshot.fromReportData(
+                      selection: selection,
+                      report: reportSnapshot.data!,
+                    );
+                    return Column(
+                      children: [
+                        _QuickMoodCard(snapshot: snapshot),
+                        const SizedBox(height: 12),
+                        _QuickTaskStats(snapshot: snapshot),
+                        const SizedBox(height: 12),
+                        _MotivationCard(
+                          message: snapshot.motivation(sheetContext),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },
       );
     },
   );
+}
+
+class _ProfilePeriodPicker extends StatelessWidget {
+  const _ProfilePeriodPicker({
+    required this.selection,
+    required this.today,
+    required this.onChanged,
+  });
+
+  final _ProfileStatsSelection selection;
+  final DateTime today;
+  final ValueChanged<_ProfileStatsSelection> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = switch (selection.range) {
+      _ProfileStatsRange.day => List<int>.generate(
+        DateUtils.getDaysInMonth(today.year, today.month),
+        (index) => index + 1,
+      ),
+      _ProfileStatsRange.month => List<int>.generate(12, (index) => index + 1),
+      _ProfileStatsRange.year => [today.year, today.year - 1],
+    };
+    final value = switch (selection.range) {
+      _ProfileStatsRange.day => selection.day,
+      _ProfileStatsRange.month => selection.month,
+      _ProfileStatsRange.year => selection.year,
+    };
+
+    return DropdownButtonFormField<int>(
+      value: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: switch (selection.range) {
+          _ProfileStatsRange.day => context.tr(
+            'Día del mes actual',
+            'Day of the current month',
+          ),
+          _ProfileStatsRange.month => context.tr(
+            'Mes del año actual',
+            'Month of the current year',
+          ),
+          _ProfileStatsRange.year => context.tr('Año', 'Year'),
+        },
+        prefixIcon: const Icon(Icons.calendar_today_outlined),
+      ),
+      items: [
+        for (final option in values)
+          DropdownMenuItem<int>(
+            value: option,
+            child: Text(_optionLabel(context, option)),
+          ),
+      ],
+      onChanged: (next) {
+        if (next == null) {
+          return;
+        }
+
+        onChanged(
+          switch (selection.range) {
+            _ProfileStatsRange.day => selection.copyWith(day: next),
+            _ProfileStatsRange.month => selection.copyWith(month: next),
+            _ProfileStatsRange.year => selection.copyWith(year: next),
+          },
+        );
+      },
+    );
+  }
+
+  String _optionLabel(BuildContext context, int value) {
+    return switch (selection.range) {
+      _ProfileStatsRange.day =>
+        '$value ${context.tr('de', 'of')} '
+            '${_profileMonthName(context, today.month)}',
+      _ProfileStatsRange.month => _profileMonthName(context, value),
+      _ProfileStatsRange.year => '${context.tr('Año', 'Year')} $value',
+    };
+  }
+}
+
+class _ProfileStatsSelection {
+  const _ProfileStatsSelection({
+    required this.range,
+    required this.day,
+    required this.month,
+    required this.year,
+  });
+
+  factory _ProfileStatsSelection.today(DateTime today) {
+    return _ProfileStatsSelection(
+      range: _ProfileStatsRange.day,
+      day: today.day,
+      month: today.month,
+      year: today.year,
+    );
+  }
+
+  final _ProfileStatsRange range;
+  final int day;
+  final int month;
+  final int year;
+
+  _ProfileStatsSelection copyWith({
+    _ProfileStatsRange? range,
+    int? day,
+    int? month,
+    int? year,
+  }) {
+    return _ProfileStatsSelection(
+      range: range ?? this.range,
+      day: day ?? this.day,
+      month: month ?? this.month,
+      year: year ?? this.year,
+    );
+  }
+
+  _ProfileStatsSelection forRange(
+    _ProfileStatsRange nextRange,
+    DateTime today,
+  ) {
+    return _ProfileStatsSelection(
+      range: nextRange,
+      day: today.day,
+      month: today.month,
+      year: today.year,
+    );
+  }
+
+  StatisticsReportRequest reportRequest(DateTime today) {
+    final period = switch (range) {
+      _ProfileStatsRange.day => StatisticsReportPeriod.day,
+      _ProfileStatsRange.month => StatisticsReportPeriod.month,
+      _ProfileStatsRange.year => StatisticsReportPeriod.year,
+    };
+    final anchor = switch (range) {
+      _ProfileStatsRange.day => DateTime(today.year, today.month, day),
+      _ProfileStatsRange.month => DateTime(today.year, month),
+      _ProfileStatsRange.year => DateTime(year),
+    };
+    return StatisticsReportRequest(period: period, anchor: anchor);
+  }
+
+  String label(BuildContext context) {
+    return switch (range) {
+      _ProfileStatsRange.day =>
+        '$day ${context.tr('de', 'of')} ${_profileMonthName(context, month)}',
+      _ProfileStatsRange.month => '${_profileMonthName(context, month)} $year',
+      _ProfileStatsRange.year => '${context.tr('Año', 'Year')} $year',
+    };
+  }
+}
+
+String _profileMonthName(BuildContext context, int month) {
+  return [
+    context.tr('Enero', 'January'),
+    context.tr('Febrero', 'February'),
+    context.tr('Marzo', 'March'),
+    context.tr('Abril', 'April'),
+    context.tr('Mayo', 'May'),
+    context.tr('Junio', 'June'),
+    context.tr('Julio', 'July'),
+    context.tr('Agosto', 'August'),
+    context.tr('Septiembre', 'September'),
+    context.tr('Octubre', 'October'),
+    context.tr('Noviembre', 'November'),
+    context.tr('Diciembre', 'December'),
+  ][month - 1];
 }
 
 class _QuickMoodCard extends StatelessWidget {
@@ -317,9 +555,12 @@ class _QuickMoodCard extends StatelessWidget {
 
     return _QuickStatsTile(
       icon: Icons.self_improvement_rounded,
-      title: 'Como te has sentido',
-      value: snapshot.moodLabel,
-      subtitle: '${snapshot.reflectionCount} registros',
+      title: context.tr('Cómo te has sentido', 'How you have felt'),
+      value: snapshot.moodLabel(context),
+      subtitle: context.tr(
+        '${snapshot.reflectionCount} registros',
+        '${snapshot.reflectionCount} entries',
+      ),
       color: palette.primary,
     );
   }
@@ -336,25 +577,25 @@ class _QuickTaskStats extends StatelessWidget {
       children: [
         _QuickStatsTile(
           icon: Icons.playlist_add_check_rounded,
-          title: 'Pendientes',
+          title: context.tr('Pendientes', 'Pending'),
           value: '${snapshot.pendingTasks}',
-          subtitle: snapshot.rangeLabel,
+          subtitle: snapshot.rangeLabel(context),
           color: context.palette.secondary,
         ),
         const SizedBox(height: 8),
         _QuickStatsTile(
           icon: Icons.pending_actions_rounded,
-          title: 'En progreso',
+          title: context.tr('En progreso', 'In progress'),
           value: '${snapshot.inProgressTasks}',
-          subtitle: snapshot.rangeLabel,
+          subtitle: snapshot.rangeLabel(context),
           color: const Color(0xFFE3B341),
         ),
         const SizedBox(height: 8),
         _QuickStatsTile(
           icon: Icons.task_alt_rounded,
-          title: 'Completadas',
+          title: context.tr('Completadas', 'Completed'),
           value: '${snapshot.completedTasks}',
-          subtitle: snapshot.rangeLabel,
+          subtitle: snapshot.rangeLabel(context),
           color: context.palette.primary,
         ),
       ],
@@ -448,7 +689,7 @@ class _QuickStatsTile extends StatelessWidget {
 
 class _ProfileStatsSnapshot {
   const _ProfileStatsSnapshot({
-    required this.range,
+    required this.selection,
     required this.pendingTasks,
     required this.inProgressTasks,
     required this.completedTasks,
@@ -456,102 +697,68 @@ class _ProfileStatsSnapshot {
     required this.reflectionCount,
   });
 
-  factory _ProfileStatsSnapshot.fromControllers({
-    required _ProfileStatsRange range,
+  factory _ProfileStatsSnapshot.fromReportData({
+    required _ProfileStatsSelection selection,
+    required StatisticsReportData report,
   }) {
-    final tasksController = serviceLocator<TasksController>();
-    final pomodoroController = serviceLocator<PomodoroController>();
-    final now = DateTime.now();
-    final bounds = _profileRangeBounds(range, now);
-    final tasks = tasksController.tasks.value.where((task) {
-      final date = task.scheduledDate ?? task.createdAt;
-      return !_dateOnly(date).isBefore(bounds.start) &&
-          !_dateOnly(date).isAfter(bounds.end);
-    });
-    final moodScores = pomodoroController.sessions.value
-        .where((session) {
-          final date = _dateOnly(session.endedAt);
-          return !date.isBefore(bounds.start) && !date.isAfter(bounds.end);
-        })
-        .map((session) => session.endMoodScore ?? session.startMoodScore)
-        .whereType<int>()
-        .toList(growable: false);
-    final averageMood = moodScores.isEmpty
-        ? null
-        : moodScores.reduce((first, second) => first + second) /
-              moodScores.length;
-    final summary = TaskStatusSummary.fromTasks(tasks);
-
     return _ProfileStatsSnapshot(
-      range: range,
-      pendingTasks: summary.listed,
-      inProgressTasks: summary.inProgress,
-      completedTasks: summary.completed,
-      averageMood: averageMood,
-      reflectionCount: moodScores.length,
+      selection: selection,
+      pendingTasks: report.tasks.listed,
+      inProgressTasks: report.tasks.inProgress,
+      completedTasks: report.tasks.completed,
+      averageMood: report.moodAverage,
+      reflectionCount: report.moodSampleCount,
     );
   }
 
-  final _ProfileStatsRange range;
+  final _ProfileStatsSelection selection;
   final int pendingTasks;
   final int inProgressTasks;
   final int completedTasks;
   final double? averageMood;
   final int reflectionCount;
 
-  String get rangeLabel {
-    return switch (range) {
-      _ProfileStatsRange.day => 'Hoy',
-      _ProfileStatsRange.month => 'Este mes',
-      _ProfileStatsRange.year => 'Este anio',
-    };
+  String rangeLabel(BuildContext context) {
+    return selection.label(context);
   }
 
-  String get moodLabel {
+  String moodLabel(BuildContext context) {
     final mood = averageMood;
     if (mood == null) {
-      return 'Sin datos';
+      return context.tr('Sin datos', 'No data');
     }
 
     return '${mood.toStringAsFixed(1)}/5';
   }
 
-  String get motivation {
+  String motivation(BuildContext context) {
     final mood = averageMood;
     if (mood == null) {
-      return 'Registra tu proximo enfoque y el panel empezara a mostrar tu ritmo real.';
+      return context.tr(
+        'Registra tu próximo enfoque y el panel empezará a mostrar tu ritmo real.',
+        'Log your next focus session and the panel will start showing your actual pace.',
+      );
     }
 
     if (mood < 2.5) {
-      return 'Baja la friccion: una tarea pequena y un descanso honesto pueden cambiar el dia.';
+      return context.tr(
+        'Baja la fricción: una tarea pequeña y un descanso honesto pueden cambiar el día.',
+        'Reduce friction: a small task and a proper break can change your day.',
+      );
     }
 
     if (mood < 4) {
-      return 'Vas estable. Cierra una tarea antes de abrir otra y protege ese avance.';
+      return context.tr(
+        'Vas estable. Cierra una tarea antes de abrir otra y protege ese avance.',
+        'You are steady. Finish one task before starting another and protect that progress.',
+      );
     }
 
-    return 'Buen ritmo. Aprovecha esta energia para terminar lo importante y cerrar con calma.';
+    return context.tr(
+      'Buen ritmo. Aprovecha esta energía para terminar lo importante y cerrar con calma.',
+      'Good pace. Use this energy to finish what matters and wrap up calmly.',
+    );
   }
-}
-
-DateTimeRange _profileRangeBounds(_ProfileStatsRange range, DateTime now) {
-  final today = _dateOnly(now);
-
-  return switch (range) {
-    _ProfileStatsRange.day => DateTimeRange(start: today, end: today),
-    _ProfileStatsRange.month => DateTimeRange(
-      start: DateTime(today.year, today.month),
-      end: DateTime(today.year, today.month + 1, 0),
-    ),
-    _ProfileStatsRange.year => DateTimeRange(
-      start: DateTime(today.year),
-      end: DateTime(today.year, 12, 31),
-    ),
-  };
-}
-
-DateTime _dateOnly(DateTime date) {
-  return DateTime(date.year, date.month, date.day);
 }
 
 class _NotificationCenter extends StatelessWidget {
@@ -567,7 +774,7 @@ class _NotificationCenter extends StatelessWidget {
     final notifications = settings.notifications;
 
     return PopupMenuButton<Object>(
-      tooltip: 'Centro de notificaciones',
+      tooltip: context.tr('Centro de notificaciones', 'Notification center'),
       offset: const Offset(0, 36),
       onSelected: (value) {
         if (value == _clearAction) {
@@ -588,7 +795,7 @@ class _NotificationCenter extends StatelessWidget {
             PopupMenuItem<Object>(
               enabled: false,
               child: Text(
-                'Sin notificaciones',
+                context.tr('Sin notificaciones', 'No notifications'),
                 style: TextStyle(color: palette.textSecondary),
               ),
             ),
@@ -605,14 +812,14 @@ class _NotificationCenter extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      notification.title,
+                      _localizedNotificationTitle(context, notification.title),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      notification.body,
+                      _localizedNotificationBody(context, notification.body),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -631,13 +838,15 @@ class _NotificationCenter extends StatelessWidget {
               ),
             ),
           const PopupMenuDivider(),
-          const PopupMenuItem<Object>(
+          PopupMenuItem<Object>(
             value: _clearAction,
             child: Row(
               children: [
-                Icon(Icons.done_all_rounded, size: 18),
-                SizedBox(width: 10),
-                Text('Limpiar notificaciones'),
+                const Icon(Icons.done_all_rounded, size: 18),
+                const SizedBox(width: 10),
+                Text(
+                  context.tr('Limpiar notificaciones', 'Clear notifications'),
+                ),
               ],
             ),
           ),
@@ -667,4 +876,55 @@ class _NotificationCenter extends StatelessWidget {
 
     return '$hour:$minute';
   }
+}
+
+String _localizedNotificationTitle(BuildContext context, String title) {
+  return switch (title) {
+    'Tarea programada' => context.tr('Tarea programada', 'Scheduled task'),
+    'Tarea programada para hoy' => context.tr(
+      'Tarea programada para hoy',
+      'Task scheduled for today',
+    ),
+    'Tareas programadas para hoy' => context.tr(
+      'Tareas programadas para hoy',
+      'Tasks scheduled for today',
+    ),
+    _ => title,
+  };
+}
+
+String _localizedNotificationBody(BuildContext context, String body) {
+  final singleTask = RegExp(r'^Tienes pendiente: (.*)\.$').firstMatch(body);
+  if (singleTask != null) {
+    final taskName = singleTask.group(1)!;
+    return context.tr(
+      'Tienes pendiente: $taskName.',
+      'Pending task: $taskName.',
+    );
+  }
+
+  final multipleTasks = RegExp(
+    r'^Tienes (\d+) tareas pendientes\. Empieza por: (.*)\.$',
+  ).firstMatch(body);
+  if (multipleTasks != null) {
+    final count = multipleTasks.group(1)!;
+    final taskName = multipleTasks.group(2)!;
+    return context.tr(
+      'Tienes $count tareas pendientes. Empieza por: $taskName.',
+      'You have $count pending tasks. Start with: $taskName.',
+    );
+  }
+
+  final testNotification = RegExp(
+    r'^Hoy a (.+) - Revisar tu siguiente bloque de enfoque\.$',
+  ).firstMatch(body);
+  if (testNotification != null) {
+    final time = testNotification.group(1)!;
+    return context.tr(
+      'Hoy a $time - Revisar tu siguiente bloque de enfoque.',
+      'Today at $time - Review your next focus block.',
+    );
+  }
+
+  return body;
 }

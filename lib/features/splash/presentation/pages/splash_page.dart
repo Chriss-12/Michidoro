@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key, this.autoNavigate = true});
@@ -112,9 +113,10 @@ class _SplashPageState extends State<SplashPage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Enfocate una cosa a la vez',
+                  context.tr('Alcanza tus objetivos', 'Reach your goals'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: palette.textSecondary,
+                    fontStyle: FontStyle.italic,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

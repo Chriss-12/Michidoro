@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:pomodoro_app_v1/features/tasks/data/datasources/tasks_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart'
     as domain;
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
@@ -132,6 +132,22 @@ class DriftTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<domain.Task?> updateTaskPlanning({
+    required String id,
+    required String? goalId,
+    required int durationMinutes,
+  }) async {
+    final record = await _dao.updatePlanning(
+      id: id,
+      goalId: goalId,
+      durationMinutes: durationMinutes,
+      updatedAt: DateTime.now(),
+    );
+
+    return record == null ? null : _toDomain(record);
+  }
+
+  @override
   Future<void> deleteTask(String id) {
     return _dao.deleteById(id);
   }
@@ -149,6 +165,7 @@ class DriftTasksRepository implements TasksRepository {
       scheduledDate: record.scheduledDate,
       goalId: record.goalId,
       durationMinutes: record.durationMinutes,
+      legacyCompletionUnknown: record.legacyCompletionUnknown,
     );
   }
 

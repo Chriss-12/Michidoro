@@ -296,6 +296,32 @@ class TasksController {
     _replaceTask(updatedTask);
   }
 
+  Future<bool> updateTaskPlanning({
+    required String id,
+    required String? goalId,
+    required int durationMinutes,
+  }) async {
+    if (durationMinutes <= 0 || durationMinutes > 24 * 60) {
+      validationMessage.value =
+          'La duracion debe estar entre 1 y 1440 minutos.';
+      return false;
+    }
+
+    final updatedTask = await _repository.updateTaskPlanning(
+      id: id,
+      goalId: goalId,
+      durationMinutes: durationMinutes,
+    );
+    if (updatedTask == null) {
+      validationMessage.value = 'No se pudo actualizar la tarea.';
+      return false;
+    }
+
+    _replaceTask(updatedTask);
+    validationMessage.value = null;
+    return true;
+  }
+
   Future<void> moveTaskToDay({
     required String id,
     required DateTime scheduledDate,

@@ -22,5 +22,11 @@ abstract class TasksRepository {
 
   Future<Task?> assignTaskToGoal(String id, String? goalId);
 
+  Future<Task?> updateTaskPlanning({
+    required String id,
+    required String? goalId,
+    required int durationMinutes,
+  });
+
   Future<void> deleteTask(String id);
 }

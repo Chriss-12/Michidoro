@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:pomodoro_app_v1/shared/templates/app_shell.dart';
 import 'package:pomodoro_app_v1/shared/templates/page_header.dart';
@@ -20,9 +21,12 @@ class ThemeSettingsPage extends StatelessWidget {
       child: ListView(
         padding: AppCardPaddings.detailPage,
         children: [
-          const PageHeader(
-            title: 'Theme',
-            subtitle: 'Change colors, background, icons, and navbar.',
+          PageHeader(
+            title: context.tr('Tema', 'Theme'),
+            subtitle: context.tr(
+              'Cambia colores, fondo, iconos y navegación.',
+              'Change colors, background, icons, and navigation.',
+            ),
             showBack: true,
           ),
           Padding(
@@ -116,14 +120,14 @@ class _ThemeOption extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      preset.label,
+                      _themeLabel(context, preset),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      preset.description,
+                      _themeDescription(context, preset),
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ],
@@ -138,5 +142,71 @@ class _ThemeOption extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _themeLabel(BuildContext context, AppThemePreset preset) {
+    return switch (preset) {
+      AppThemePreset.natureFocus => context.tr(
+        'Enfoque natural',
+        'Nature Focus',
+      ),
+      AppThemePreset.forestOperations => context.tr(
+        'Bosque operativo',
+        'Forest Operations',
+      ),
+      AppThemePreset.slateIndigo => context.tr(
+        'Pizarra índigo',
+        'Slate Indigo',
+      ),
+      AppThemePreset.tealGraphite => context.tr(
+        'Verde azulado y grafito',
+        'Teal Graphite',
+      ),
+      AppThemePreset.graphiteNight => context.tr(
+        'Noche grafito',
+        'Graphite Night',
+      ),
+      AppThemePreset.sunshineAurora => context.tr(
+        'Aurora soleada',
+        'Sunshine Aurora',
+      ),
+      AppThemePreset.sunsetTide => context.tr(
+        'Marea al atardecer',
+        'Sunset Tide',
+      ),
+    };
+  }
+
+  String _themeDescription(BuildContext context, AppThemePreset preset) {
+    return switch (preset) {
+      AppThemePreset.natureFocus => context.tr(
+        'Tonos botánicos suaves en verde y crema.',
+        'Soft botanical green and cream tones.',
+      ),
+      AppThemePreset.forestOperations => context.tr(
+        'Tonos firmes de bosque y cielo.',
+        'Grounded forest and sky tones.',
+      ),
+      AppThemePreset.slateIndigo => context.tr(
+        'Tonos intensos de índigo.',
+        'Deep indigo command tones.',
+      ),
+      AppThemePreset.tealGraphite => context.tr(
+        'Tonos limpios de verde azulado y grafito.',
+        'Clean teal and graphite tones.',
+      ),
+      AppThemePreset.graphiteNight => context.tr(
+        'Tonos oscuros de grafito y esmeralda.',
+        'Dark graphite and emerald tones.',
+      ),
+      AppThemePreset.sunshineAurora => context.tr(
+        'Tonos cálidos de sol y agua.',
+        'Warm sunshine and aqua tones.',
+      ),
+      AppThemePreset.sunsetTide => context.tr(
+        'Tonos cálidos de atardecer y marea.',
+        'Warm sunset and tide tones.',
+      ),
+    };
   }
 }

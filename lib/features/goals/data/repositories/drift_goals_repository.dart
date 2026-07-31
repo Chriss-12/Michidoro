@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:pomodoro_app_v1/features/goals/data/datasources/goals_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/repositories/goals_repository.dart';
 

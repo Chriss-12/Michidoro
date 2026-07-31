@@ -11,6 +11,7 @@ abstract class PomodoroSessionsRepository {
     String? goalId,
     String? taskId,
     int? startMoodScore,
+    PomodoroSessionStatus status = PomodoroSessionStatus.completed,
   });
 
   Future<PomodoroSession> updateSessionReflection({

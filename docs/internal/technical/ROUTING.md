@@ -4,8 +4,10 @@ Use `go_router` as the routing boundary. Keep route definitions discoverable and
 
 ## Settings utility routes
 
-- `/settings/directory-picker` opens the in-app local folder selector used by
-  Settings Reports for report folder selection and database backup import.
+- `/settings/directory-picker` opens the in-app local folder selector used as a
+  fallback when Android/system folder selection is unavailable.
+- `/settings/local-image-picker` opens the in-app local image selector used as a
+  fallback when Android gallery or system file selection is unavailable.
 
 ## Required checks
 

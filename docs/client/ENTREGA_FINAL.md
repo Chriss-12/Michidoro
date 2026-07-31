@@ -20,6 +20,7 @@ MichiFocus entrega una experiencia offline-first para planificar objetivos, gest
 | Reportes con nombre, correo y gráficos seleccionados | Incluido |
 | Carpeta configurable para reportes | Incluido |
 | Backup local con exportación e importación | Incluido |
+| Perfil con nombre, correo y foto local | Incluido |
 | Arranque inicial sin logo cuadrado | Incluido |
 | Persistencia local | Incluido |
 

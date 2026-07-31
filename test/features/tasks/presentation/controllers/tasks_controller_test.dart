@@ -121,6 +121,35 @@ void main() {
       expect(task.goalId, isNull);
     });
 
+    test('updates task planning atomically and validates duration', () async {
+      final controller = TasksController(repository: _MemoryTasksRepository());
+      await controller.createPlannedTask(
+        rawTitle: 'Plan editable',
+        scheduledDate: DateTime(2026, 7, 29),
+        goalId: 'goal-1',
+        durationMinutes: 45,
+      );
+      final id = controller.tasks.value.single.id;
+
+      final invalid = await controller.updateTaskPlanning(
+        id: id,
+        goalId: null,
+        durationMinutes: 0,
+      );
+      expect(invalid, isFalse);
+      expect(controller.tasks.value.single.goalId, 'goal-1');
+      expect(controller.tasks.value.single.durationMinutes, 45);
+
+      final saved = await controller.updateTaskPlanning(
+        id: id,
+        goalId: null,
+        durationMinutes: 73,
+      );
+      expect(saved, isTrue);
+      expect(controller.tasks.value.single.goalId, isNull);
+      expect(controller.tasks.value.single.durationMinutes, 73);
+    });
+
     test('exposes quick tasks and planned tasks by day', () async {
       final controller = TasksController(repository: _MemoryTasksRepository());
       final scheduledDate = DateTime(2026, 7, 11);
@@ -398,6 +427,22 @@ class _MemoryTasksRepository implements TasksRepository {
       (task) => task.copyWith(
         goalId: goalId,
         clearGoalId: goalId == null,
+      ),
+    );
+  }
+
+  @override
+  Future<Task?> updateTaskPlanning({
+    required String id,
+    required String? goalId,
+    required int durationMinutes,
+  }) async {
+    return _updateTask(
+      id,
+      (task) => task.copyWith(
+        goalId: goalId,
+        clearGoalId: goalId == null,
+        durationMinutes: durationMinutes,
       ),
     );
   }

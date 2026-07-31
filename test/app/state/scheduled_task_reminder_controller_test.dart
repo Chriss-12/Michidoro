@@ -5,6 +5,7 @@ import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_pa
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 
 void main() {
   group('ScheduledTaskReminderController', () {
@@ -72,6 +73,34 @@ void main() {
       );
 
       expect(settingsController.notifications.value, hasLength(1));
+    });
+
+    test('uses English without translating user task titles', () async {
+      final settingsController = AppSettingsController()
+        ..language.value = AppLanguage.english;
+      final tasksController =
+          TasksController(repository: _FakeTasksRepository())
+            ..tasks.value = [
+              Task(
+                id: 'task-english',
+                title: 'Preparar informe',
+                createdAt: DateTime(2026, 7, 17),
+                scheduledDate: DateTime(2026, 7, 18),
+              ),
+            ];
+      final reminderController = ScheduledTaskReminderController(
+        settingsController: settingsController,
+        tasksController: tasksController,
+      );
+
+      await reminderController.checkNow(
+        now: DateTime(2026, 7, 18, 9),
+        playFeedback: false,
+      );
+
+      final notification = settingsController.notifications.value.single;
+      expect(notification.title, 'Task scheduled for today');
+      expect(notification.body, 'Pending: Preparar informe.');
     });
 
     test('does not notify when notifications are disabled', () async {
@@ -150,6 +179,15 @@ class _FakeTasksRepository implements TasksRepository {
 
   @override
   Future<Task?> updateTaskTitle(String id, String title) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Task?> updateTaskPlanning({
+    required String id,
+    required String? goalId,
+    required int durationMinutes,
+  }) {
     throw UnimplementedError();
   }
 }

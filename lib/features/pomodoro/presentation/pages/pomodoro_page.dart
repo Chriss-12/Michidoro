@@ -11,10 +11,11 @@ import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_runtime_state.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
-import 'package:pomodoro_app_v1/features/settings/presentation/pages/pomodoro_time_settings_page.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -132,7 +133,7 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Cierre de enfoque',
+                    context.tr('Cierre de enfoque', 'Focus wrap-up'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -140,7 +141,10 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Como te sientes despues de esta sesion?',
+              context.tr(
+                '¿Cómo te sientes después de esta sesión?',
+                'How do you feel after this session?',
+              ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),
@@ -150,16 +154,16 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
             ),
             const SizedBox(height: 14),
             SegmentedButton<bool>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: false,
-                  icon: Icon(Icons.check_circle_outline_rounded),
-                  label: Text('Todo bien'),
+                  icon: const Icon(Icons.check_circle_outline_rounded),
+                  label: Text(context.tr('Todo bien', 'All good')),
                 ),
                 ButtonSegment(
                   value: true,
-                  icon: Icon(Icons.visibility_off_outlined),
-                  label: Text('Me distraje'),
+                  icon: const Icon(Icons.visibility_off_outlined),
+                  label: Text(context.tr('Me distraje', 'I got distracted')),
                 ),
               ],
               selected: {_wasDistracted},
@@ -172,7 +176,7 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Minutos aproximados',
+                      context.tr('Minutos aproximados', 'Approximate minutes'),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
@@ -212,7 +216,9 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
                         }
                       },
                 icon: const Icon(Icons.save_alt_rounded),
-                label: const Text('Guardar reflexion'),
+                label: Text(
+                  context.tr('Guardar reflexión', 'Save reflection'),
+                ),
               ),
             ),
           ],
@@ -240,7 +246,7 @@ class _MoodScoreSelector extends StatelessWidget {
         for (var score = 1; score <= 5; score += 1) ...[
           Expanded(
             child: Tooltip(
-              message: '$score de 5',
+              message: context.tr('$score de 5', '$score out of 5'),
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => onChanged(score),
@@ -285,62 +291,99 @@ class _TimerRingSection extends StatelessWidget {
     final runtime = PomodoroRuntimeScope.of(context);
     final minutes = runtime.remainingSeconds ~/ 60;
     final seconds = runtime.remainingSeconds % 60;
-    final totalSeconds = runtime.currentPhaseSeconds;
-    final progress = totalSeconds <= 0
-        ? 0.0
-        : 1 - (runtime.remainingSeconds / totalSeconds).clamp(0.0, 1.0);
+    final progress = runtime.timerProgress;
     final timeLabel =
         '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: RepaintBoundary(
-          child: CustomPaint(
-            painter: _TimerRingPainter(
-              palette: palette,
-              progress: progress,
-            ),
-            child: _TimerFace(
-              timeLabel: timeLabel,
-              phaseLabel: _phaseTitle(runtime.phase),
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _TimerRingPainter(
+                  palette: palette,
+                  progress: progress,
+                ),
+                child: _TimerFace(
+                  timeLabel: timeLabel,
+                  phaseLabel: _phaseTitle(context, runtime.phase),
+                ),
+              ),
             ),
           ),
-        ),
+          if (runtime.taskEstimatedSeconds != null) ...[
+            const SizedBox(height: 12),
+            _TaskPlanInfoButton(runtime: runtime),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _TimerControlsSection extends StatelessWidget {
+class _TimerControlsSection extends StatefulWidget {
   const _TimerControlsSection();
+
+  @override
+  State<_TimerControlsSection> createState() => _TimerControlsSectionState();
+}
+
+class _TimerControlsSectionState extends State<_TimerControlsSection> {
+  bool _isOpeningMaximumConcentration = false;
 
   @override
   Widget build(BuildContext context) {
     final runtime = PomodoroRuntimeScope.of(context);
+    final controller = serviceLocator<PomodoroController>();
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _CircleAction(
-          icon: Icons.replay_rounded,
-          onPressed: runtime.onReset,
-          outline: true,
-        ),
-        _CircleAction(
-          icon: runtime.isRunning
-              ? Icons.pause_rounded
-              : Icons.play_arrow_rounded,
-          onPressed: () => _handleStartPressed(context, runtime),
-          large: true,
-        ),
-        _CircleAction(
-          icon: Icons.more_vert_rounded,
-          onPressed: () => context.push(PomodoroTimeSettingsPage.routePath),
-          muted: true,
-        ),
-      ],
+    return SignalBuilder(
+      builder: (context) {
+        final maximumConcentrationEnabled =
+            controller.maximumConcentrationEnabled.value;
+        if (maximumConcentrationEnabled &&
+            runtime.hasStartedRuntime &&
+            !_isOpeningMaximumConcentration &&
+            GoRouterState.of(context).uri.path == PomodoroPage.routePath) {
+          _isOpeningMaximumConcentration = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!mounted) {
+              return;
+            }
+            await context.push<void>(PomodoroFullscreenPage.routePath);
+            if (mounted) {
+              _isOpeningMaximumConcentration = false;
+            }
+          });
+        }
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _CircleAction(
+              icon: Icons.replay_rounded,
+              onPressed: runtime.onReset,
+              outline: true,
+            ),
+            _CircleAction(
+              icon: runtime.isRunning
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              onPressed: () => _handleStartPressed(context, runtime),
+              large: true,
+            ),
+            _FocusDisplayMenuButton(
+              isFullscreen: false,
+              maximumConcentrationEnabled: maximumConcentrationEnabled,
+              maximumConcentrationActive: false,
+              onMaximumConcentrationChanged: (enabled) =>
+                  controller.maximumConcentrationMode = enabled,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -357,7 +400,11 @@ class _FocusLifecycleActionsSection extends StatelessWidget {
       hasElapsedPhase: runtime.remainingSeconds < runtime.currentPhaseSeconds,
       onDiscard: runtime.onDiscard,
       onRestart: runtime.onRestart,
-      onFinishEarly: () => unawaited(runtime.onFinishEarly()),
+      onFinishEarly: () => unawaited(
+        runtime.phase == PomodoroPhase.focus
+            ? runtime.onStopForNow()
+            : runtime.onFinishEarly(),
+      ),
     );
   }
 }
@@ -378,12 +425,15 @@ class _TimerStatsSection extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: _TimerStat(label: 'Hoy', value: focusedLabel),
+            child: _TimerStat(
+              label: context.tr('Hoy', 'Today'),
+              value: focusedLabel,
+            ),
           ),
           const SizedBox(width: 30),
           Expanded(
             child: _TimerStat(
-              label: 'Sesiones',
+              label: context.tr('Sesiones', 'Sessions'),
               value: '${runtime.completedPomodoros}',
             ),
           ),
@@ -436,13 +486,17 @@ class _ActiveFocusContextCard extends StatelessWidget {
                     children: [
                       Text(
                         taskTitle == null
-                            ? 'Este Pomodoro suma a'
-                            : 'Enfoque actual',
+                            ? context.tr(
+                                'Este Pomodoro suma a',
+                                'This Pomodoro counts toward',
+                              )
+                            : context.tr('Enfoque actual', 'Current focus'),
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         _focusContextLabel(
+                          context: context,
                           taskTitle: taskTitle,
                           goal: goal,
                         ),
@@ -457,7 +511,10 @@ class _ActiveFocusContextCard extends StatelessWidget {
                 ),
                 if (onCompleteTask != null)
                   IconButton(
-                    tooltip: 'Marcar tarea completada',
+                    tooltip: context.tr(
+                      'Marcar tarea completada',
+                      'Mark task as completed',
+                    ),
                     onPressed: onCompleteTask,
                     icon: const Icon(Icons.done_all_rounded),
                   ),
@@ -472,22 +529,27 @@ class _ActiveFocusContextCard extends StatelessWidget {
 }
 
 String _focusContextLabel({
+  required BuildContext context,
   required String? taskTitle,
   required ProductivityGoal? goal,
 }) {
-  final goalLabel = goal == null ? 'Sin objetivo' : goal.title;
+  final goalLabel = goal == null
+      ? context.tr('Sin objetivo', 'No goal')
+      : goal.title;
   if (taskTitle == null) {
-    return goal == null ? 'Sin objetivo' : _goalLabel(goal);
+    return goal == null
+        ? context.tr('Sin objetivo', 'No goal')
+        : _goalLabel(context, goal);
   }
 
   return '$taskTitle - $goalLabel';
 }
 
-String _phaseTitle(PomodoroPhase phase) {
+String _phaseTitle(BuildContext context, PomodoroPhase phase) {
   return switch (phase) {
-    PomodoroPhase.focus => 'MODO ENFOQUE',
-    PomodoroPhase.shortBreak => 'DESCANSO CORTO',
-    PomodoroPhase.longBreak => 'DESCANSO LARGO',
+    PomodoroPhase.focus => context.tr('MODO ENFOQUE', 'FOCUS MODE'),
+    PomodoroPhase.shortBreak => context.tr('DESCANSO CORTO', 'SHORT BREAK'),
+    PomodoroPhase.longBreak => context.tr('DESCANSO LARGO', 'LONG BREAK'),
   };
 }
 
@@ -516,7 +578,7 @@ class _FocusLifecycleActions extends StatelessWidget {
         children: [
           Expanded(
             child: _CompactLifecycleButton(
-              label: 'Descartar',
+              label: context.tr('Descartar', 'Discard'),
               icon: Icons.close_rounded,
               onPressed: hasElapsedPhase ? onDiscard : null,
             ),
@@ -524,7 +586,7 @@ class _FocusLifecycleActions extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _CompactLifecycleButton(
-              label: 'Reiniciar',
+              label: context.tr('Reiniciar', 'Restart'),
               icon: Icons.replay_rounded,
               onPressed: onRestart,
             ),
@@ -532,7 +594,9 @@ class _FocusLifecycleActions extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _CompactLifecycleButton(
-              label: isBreak ? 'Saltar' : 'Terminar',
+              label: isBreak
+                  ? context.tr('Saltar', 'Skip')
+                  : context.tr('Terminar', 'Finish'),
               icon: Icons.flag_rounded,
               onPressed: hasElapsedPhase ? onFinishEarly : null,
               filled: true,
@@ -618,12 +682,20 @@ Future<void> _showGoalPicker({
             shrinkWrap: true,
             children: [
               Text(
-                'Objetivo del Pomodoro',
+                sheetContext.tr(
+                  'Objetivo del Pomodoro',
+                  'Pomodoro goal',
+                ),
                 style: Theme.of(sheetContext).textTheme.headlineSmall,
               ),
               const SizedBox(height: 6),
               Text(
-                'Elige un objetivo fechado en calendario o deja este Pomodoro sin objetivo.',
+                sheetContext.tr(
+                  'Elige un objetivo fechado en el calendario o deja este '
+                      'Pomodoro sin objetivo.',
+                  'Choose a goal scheduled in the calendar or leave this '
+                      'Pomodoro without a goal.',
+                ),
                 style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -631,7 +703,7 @@ Future<void> _showGoalPicker({
               const SizedBox(height: 14),
               ListTile(
                 leading: const Icon(Icons.not_interested_rounded),
-                title: const Text('Sin objetivo'),
+                title: Text(sheetContext.tr('Sin objetivo', 'No goal')),
                 onTap: () {
                   onSelectGoal(null);
                   Navigator.of(sheetContext).pop();
@@ -641,7 +713,7 @@ Future<void> _showGoalPicker({
                 ListTile(
                   leading: Icon(Icons.flag_rounded, color: palette.primary),
                   title: Text(goal.title),
-                  subtitle: Text(_goalLabel(goal)),
+                  subtitle: Text(_goalLabel(sheetContext, goal)),
                   onTap: () {
                     onSelectGoal(goal.id);
                     Navigator.of(sheetContext).pop();
@@ -655,12 +727,16 @@ Future<void> _showGoalPicker({
   );
 }
 
-String _goalLabel(ProductivityGoal goal) {
+String _goalLabel(BuildContext context, ProductivityGoal goal) {
   final date = goal.targetDate;
   final dateLabel = date == null
-      ? 'Sin fecha'
-      : '${date.day.toString().padLeft(2, '0')}/'
-            '${date.month.toString().padLeft(2, '0')}';
+      ? context.tr('Sin fecha', 'No date')
+      : context.tr(
+          '${date.day.toString().padLeft(2, '0')}/'
+              '${date.month.toString().padLeft(2, '0')}',
+          '${date.month.toString().padLeft(2, '0')}/'
+              '${date.day.toString().padLeft(2, '0')}',
+        );
 
   return '${goal.title} - ${goal.completedSessions}/${goal.targetSessions} - '
       '$dateLabel';
@@ -696,12 +772,15 @@ Future<void> _handleStartPressed(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Empezar enfoque',
+                    context.tr('Empezar enfoque', 'Start focus'),
                     style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Antes de iniciar, registra como te sientes del 1 al 5.',
+                    context.tr(
+                      'Antes de iniciar, registra cómo te sientes del 1 al 5.',
+                      'Before starting, rate how you feel from 1 to 5.',
+                    ),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: palette.textSecondary,
                     ),
@@ -718,7 +797,9 @@ Future<void> _handleStartPressed(
                     child: FilledButton.icon(
                       onPressed: () => Navigator.of(context).pop(true),
                       icon: const Icon(Icons.fullscreen_rounded),
-                      label: const Text('Pantalla completa'),
+                      label: Text(
+                        context.tr('Pantalla completa', 'Full screen'),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -727,7 +808,9 @@ Future<void> _handleStartPressed(
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.of(context).pop(false),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Iniciar normal'),
+                      label: Text(
+                        context.tr('Iniciar normal', 'Start normally'),
+                      ),
                     ),
                   ),
                 ],
@@ -746,7 +829,9 @@ Future<void> _handleStartPressed(
   pomodoroController.setFocusStartMoodScore(selectedMoodScore);
   runtime.onPlayPause();
 
-  if (startFullscreen && context.mounted) {
+  if (startFullscreen &&
+      !pomodoroController.maximumConcentrationEnabled.value &&
+      context.mounted) {
     await context.push<void>(PomodoroFullscreenPage.routePath);
   }
 }
@@ -761,6 +846,9 @@ class PomodoroFullscreenPage extends StatefulWidget {
 }
 
 class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
+  bool _hasShownMaximumConcentration = false;
+  bool _isClosingMaximumConcentration = false;
+
   @override
   void initState() {
     super.initState();
@@ -769,6 +857,10 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
 
   @override
   void dispose() {
+    final controller = serviceLocator<PomodoroController>();
+    if (controller.maximumConcentrationEnabled.value) {
+      controller.maximumConcentrationMode = false;
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -777,48 +869,76 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final runtime = PomodoroRuntimeScope.of(context);
-    final minutes = runtime.remainingSeconds ~/ 60;
-    final seconds = runtime.remainingSeconds % 60;
-    final totalSeconds = runtime.currentPhaseSeconds;
-    final progress = totalSeconds <= 0
-        ? 0.0
-        : 1 - (runtime.remainingSeconds / totalSeconds).clamp(0.0, 1.0);
-    final timeLabel =
-        '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final controller = serviceLocator<PomodoroController>();
 
-    return Scaffold(
-      backgroundColor: palette.background,
-      body: DecoratedBox(
-        decoration: palette.appBackgroundDecoration,
-        child: SafeArea(
+    return SignalBuilder(
+      builder: (context) {
+        final maximumConcentrationEnabled =
+            controller.maximumConcentrationEnabled.value;
+        final maximumConcentrationActive =
+            maximumConcentrationEnabled && runtime.hasStartedRuntime;
+        if (maximumConcentrationActive) {
+          _hasShownMaximumConcentration = true;
+        } else if (_hasShownMaximumConcentration &&
+            !_isClosingMaximumConcentration) {
+          _isClosingMaximumConcentration = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && context.canPop()) {
+              context.pop();
+            }
+          });
+        }
+
+        final minutes = runtime.remainingSeconds ~/ 60;
+        final seconds = runtime.remainingSeconds % 60;
+        final progress = runtime.timerProgress;
+        final timeLabel =
+            '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        final content = SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             child: Column(
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton.filledTonal(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close_fullscreen_rounded),
-                  ),
-                ),
-                const Spacer(),
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _TimerRingPainter(
-                        palette: palette,
-                        progress: progress,
-                      ),
-                      child: _TimerFace(
-                        timeLabel: timeLabel,
-                        phaseLabel: _phaseTitle(runtime.phase),
-                      ),
+                const SizedBox(height: 48),
+                Expanded(
+                  child: GestureDetector(
+                    key: const Key('maximumConcentrationExitArea'),
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: maximumConcentrationActive
+                        ? () => controller.maximumConcentrationMode = false
+                        : null,
+                    child: Column(
+                      children: [
+                        const Spacer(),
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: _TimerRingPainter(
+                                palette: palette,
+                                progress: progress,
+                                maximumConcentration:
+                                    maximumConcentrationActive,
+                              ),
+                              child: _TimerFace(
+                                timeLabel: timeLabel,
+                                phaseLabel: _phaseTitle(context, runtime.phase),
+                                maximumConcentration:
+                                    maximumConcentrationActive,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!maximumConcentrationActive &&
+                            runtime.taskEstimatedSeconds != null) ...[
+                          const SizedBox(height: 12),
+                          _TaskPlanInfoButton(runtime: runtime),
+                        ],
+                        const Spacer(),
+                      ],
                     ),
                   ),
                 ),
-                const Spacer(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -826,6 +946,7 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
                       icon: Icons.replay_rounded,
                       onPressed: runtime.onReset,
                       outline: true,
+                      maximumConcentration: maximumConcentrationActive,
                     ),
                     _CircleAction(
                       icon: runtime.isRunning
@@ -833,28 +954,59 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
                           : Icons.play_arrow_rounded,
                       onPressed: runtime.onPlayPause,
                       large: true,
+                      maximumConcentration: maximumConcentrationActive,
                     ),
-                    _CircleAction(
-                      icon: Icons.close_rounded,
-                      onPressed: () => context.pop(),
-                      muted: true,
+                    _FocusDisplayMenuButton(
+                      isFullscreen: true,
+                      maximumConcentrationEnabled: maximumConcentrationEnabled,
+                      maximumConcentrationActive: maximumConcentrationActive,
+                      onMaximumConcentrationChanged: (enabled) =>
+                          controller.maximumConcentrationMode = enabled,
                     ),
                   ],
                 ),
               ],
             ),
           ),
-        ),
-      ),
+        );
+
+        return Scaffold(
+          backgroundColor: maximumConcentrationActive
+              ? _maximumConcentrationBlack
+              : palette.background,
+          body: maximumConcentrationActive
+              ? ColoredBox(
+                  key: const Key('maximumConcentrationSurface'),
+                  color: _maximumConcentrationBlack,
+                  child: content,
+                )
+              : DecoratedBox(
+                  decoration: palette.appBackgroundDecoration,
+                  child: content,
+                ),
+        );
+      },
     );
   }
 }
 
+const _maximumConcentrationBlack = Color(0xFF000000);
+const _maximumConcentrationPrimary = Color(0xFFC8C8C8);
+const _maximumConcentrationSecondary = Color(0xFF7C7C7C);
+const _maximumConcentrationTrack = Color(0xFF242424);
+const _maximumConcentrationSurface = Color(0xFF101010);
+const _maximumConcentrationBorder = Color(0xFF383838);
+
 class _TimerFace extends StatelessWidget {
-  const _TimerFace({required this.timeLabel, required this.phaseLabel});
+  const _TimerFace({
+    required this.timeLabel,
+    required this.phaseLabel,
+    this.maximumConcentration = false,
+  });
 
   final String timeLabel;
   final String phaseLabel;
+  final bool maximumConcentration;
 
   @override
   Widget build(BuildContext context) {
@@ -872,7 +1024,9 @@ class _TimerFace extends StatelessWidget {
                 timeLabel,
                 maxLines: 1,
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  color: palette.primary,
+                  color: maximumConcentration
+                      ? _maximumConcentrationPrimary
+                      : palette.primary,
                   fontSize: AppDesignTokens.timerFontSize - 2,
                   fontWeight: FontWeight.w400,
                   letterSpacing: 0,
@@ -886,7 +1040,9 @@ class _TimerFace extends StatelessWidget {
                 phaseLabel,
                 maxLines: 1,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: palette.textSecondary,
+                  color: maximumConcentration
+                      ? _maximumConcentrationSecondary
+                      : palette.textSecondary,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0,
                 ),
@@ -899,11 +1055,212 @@ class _TimerFace extends StatelessWidget {
   }
 }
 
+class _TaskPlanInfoButton extends StatelessWidget {
+  const _TaskPlanInfoButton({required this.runtime});
+
+  final PomodoroRuntimeScope runtime;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      tooltip: context.tr('Ver detalles del plan', 'View plan details'),
+      onPressed: () => _showTaskPlanDetails(context, runtime),
+      icon: const Icon(Icons.info_outline_rounded),
+    );
+  }
+}
+
+Future<void> _showTaskPlanDetails(
+  BuildContext context,
+  PomodoroRuntimeScope runtime,
+) {
+  final planLabel = _taskPlanLabel(context, runtime);
+  final progressLabel = _taskProgressLabel(runtime);
+  final nextStepLabel = _nextStepLabel(context, runtime);
+  final projectedElapsedLabel = _projectedElapsedLabel(context, runtime);
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: context.palette.surface,
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: AppCardPaddings.standard,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                sheetContext.tr('Detalles del plan', 'Plan details'),
+                style: Theme.of(sheetContext).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 12),
+              if (planLabel != null)
+                _TaskPlanDetailRow(
+                  icon: Icons.view_agenda_outlined,
+                  label: planLabel,
+                ),
+              if (progressLabel != null)
+                _TaskPlanDetailRow(
+                  icon: Icons.donut_large_rounded,
+                  label: progressLabel,
+                ),
+              if (nextStepLabel != null)
+                _TaskPlanDetailRow(
+                  icon: Icons.skip_next_rounded,
+                  label: nextStepLabel,
+                ),
+              if (projectedElapsedLabel != null)
+                _TaskPlanDetailRow(
+                  icon: Icons.schedule_rounded,
+                  label: projectedElapsedLabel,
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TaskPlanDetailRow extends StatelessWidget {
+  const _TaskPlanDetailRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: palette.primary),
+      title: Text(
+        label,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: palette.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+String? _taskPlanLabel(
+  BuildContext context,
+  PomodoroRuntimeScope runtime,
+) {
+  if (runtime.taskEstimatedSeconds == null) {
+    return null;
+  }
+  return context.tr(
+    'BLOQUE ${runtime.currentBlockIndex} DE ${runtime.totalBlocks}',
+    'BLOCK ${runtime.currentBlockIndex} OF ${runtime.totalBlocks}',
+  );
+}
+
+String? _taskProgressLabel(PomodoroRuntimeScope runtime) {
+  final estimatedSeconds = runtime.taskEstimatedSeconds;
+  if (estimatedSeconds == null || estimatedSeconds <= 0) {
+    return null;
+  }
+  final focusedMinutes = runtime.taskFocusedSeconds ~/ 60;
+  final estimatedMinutes = estimatedSeconds ~/ 60;
+  final percentage = ((runtime.taskFocusedSeconds / estimatedSeconds) * 100)
+      .clamp(0, 100)
+      .round();
+  return '$focusedMinutes/$estimatedMinutes min · $percentage%';
+}
+
+String? _nextStepLabel(
+  BuildContext context,
+  PomodoroRuntimeScope runtime,
+) {
+  if (runtime.taskEstimatedSeconds == null) {
+    return null;
+  }
+  if (runtime.phase != PomodoroPhase.focus) {
+    if (runtime.planMode == PomodoroPlanMode.continuous &&
+        runtime.currentBlockIndex < runtime.totalBlocks) {
+      return context.tr(
+        'Después: bloque ${runtime.currentBlockIndex + 1}',
+        'Next: block ${runtime.currentBlockIndex + 1}',
+      );
+    }
+    return context.tr('Después: finalizar por ahora', 'Next: finish for now');
+  }
+  final hasBreak =
+      runtime.planMode == PomodoroPlanMode.singleBlock ||
+      runtime.currentBlockIndex < runtime.totalBlocks;
+  if (!hasBreak) {
+    return context.tr('Último bloque del plan', 'Last block in the plan');
+  }
+  return context.tr(
+    'Después: descanso de ${runtime.cadenceBreakMinutes} min',
+    'Next: ${runtime.cadenceBreakMinutes} min break',
+  );
+}
+
+String? _projectedElapsedLabel(
+  BuildContext context,
+  PomodoroRuntimeScope runtime,
+) {
+  final estimatedSeconds = runtime.taskEstimatedSeconds;
+  if (estimatedSeconds == null || estimatedSeconds <= 0) {
+    return null;
+  }
+
+  final taskFocusRemaining = math.max(
+    0,
+    estimatedSeconds - runtime.taskFocusedSeconds,
+  );
+  var projectedSeconds = runtime.remainingSeconds;
+
+  if (runtime.phase == PomodoroPhase.focus) {
+    if (runtime.planMode == PomodoroPlanMode.continuous) {
+      final remainingBreaks = math.max(
+        0,
+        runtime.totalBlocks - runtime.currentBlockIndex,
+      );
+      projectedSeconds =
+          taskFocusRemaining +
+          remainingBreaks * runtime.cadenceBreakMinutes * 60;
+    } else if (taskFocusRemaining > runtime.remainingSeconds) {
+      projectedSeconds += runtime.cadenceBreakMinutes * 60;
+    }
+  } else if (runtime.planMode == PomodoroPlanMode.continuous) {
+    final futureBreaks = math.max(
+      0,
+      runtime.totalBlocks - runtime.currentBlockIndex - 1,
+    );
+    projectedSeconds +=
+        taskFocusRemaining + futureBreaks * runtime.cadenceBreakMinutes * 60;
+  }
+
+  final projectedMinutes = math.max(1, (projectedSeconds / 60).ceil());
+  final label = runtime.planMode == PomodoroPlanMode.singleBlock
+      ? context.tr('Sesión restante', 'Session remaining')
+      : context.tr('Plan restante', 'Plan remaining');
+  return context.tr(
+    '$label: ~$projectedMinutes min de reloj',
+    '$label: ~$projectedMinutes min elapsed time',
+  );
+}
+
 class _TimerRingPainter extends CustomPainter {
-  const _TimerRingPainter({required this.palette, required this.progress});
+  const _TimerRingPainter({
+    required this.palette,
+    required this.progress,
+    this.maximumConcentration = false,
+  });
 
   final AppPalette palette;
   final double progress;
+  final bool maximumConcentration;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -911,13 +1268,21 @@ class _TimerRingPainter extends CustomPainter {
     final ring = rect.deflate(12);
     final strokeWidth = size.width * 0.055;
     final track = Paint()
-      ..color = palette.primaryMuted.withValues(alpha: 0.55)
+      ..color = maximumConcentration
+          ? _maximumConcentrationTrack
+          : palette.primaryMuted.withValues(alpha: 0.55)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
     final progressPaint = Paint()
       ..shader = SweepGradient(
-        colors: [palette.secondarySoft, palette.primary, palette.secondarySoft],
+        colors: maximumConcentration
+            ? const [
+                _maximumConcentrationSecondary,
+                _maximumConcentrationPrimary,
+                _maximumConcentrationSecondary,
+              ]
+            : [palette.secondarySoft, palette.primary, palette.secondarySoft],
         stops: const [0, 0.7, 1],
       ).createShader(ring)
       ..style = PaintingStyle.stroke
@@ -937,7 +1302,9 @@ class _TimerRingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _TimerRingPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.palette != palette;
+    return oldDelegate.progress != progress ||
+        oldDelegate.palette != palette ||
+        oldDelegate.maximumConcentration != maximumConcentration;
   }
 }
 
@@ -947,14 +1314,14 @@ class _CircleAction extends StatelessWidget {
     required this.onPressed,
     this.large = false,
     this.outline = false,
-    this.muted = false,
+    this.maximumConcentration = false,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
   final bool large;
   final bool outline;
-  final bool muted;
+  final bool maximumConcentration;
 
   @override
   Widget build(BuildContext context) {
@@ -966,13 +1333,21 @@ class _CircleAction extends StatelessWidget {
       dimension: size,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: large ? palette.primary : palette.surface,
+          color: maximumConcentration
+              ? _maximumConcentrationSurface
+              : large
+              ? palette.primary
+              : palette.surface,
           shape: BoxShape.circle,
           border: Border.all(
-            color: outline ? palette.primary : palette.neutralSoft,
+            color: maximumConcentration
+                ? _maximumConcentrationBorder
+                : outline
+                ? palette.primary
+                : palette.neutralSoft,
             width: outline ? 1.4 : 1,
           ),
-          boxShadow: large
+          boxShadow: large && !maximumConcentration
               ? [
                   BoxShadow(
                     color: palette.primary.withValues(alpha: 0.3),
@@ -985,12 +1360,170 @@ class _CircleAction extends StatelessWidget {
         child: IconButton(
           onPressed: onPressed,
           icon: Icon(icon, size: large ? 44 : 34),
-          color: large
+          color: maximumConcentration
+              ? _maximumConcentrationPrimary
+              : large
               ? colorScheme.onPrimary
-              : palette.primary.withValues(alpha: muted ? 0.75 : 1),
+              : palette.primary,
         ),
       ),
     );
+  }
+}
+
+enum _FocusDisplayAction { toggleFullscreen, toggleMaximumConcentration }
+
+class _FocusDisplayMenuButton extends StatelessWidget {
+  const _FocusDisplayMenuButton({
+    required this.isFullscreen,
+    required this.maximumConcentrationEnabled,
+    required this.maximumConcentrationActive,
+    required this.onMaximumConcentrationChanged,
+  });
+
+  final bool isFullscreen;
+  final bool maximumConcentrationEnabled;
+  final bool maximumConcentrationActive;
+  final ValueChanged<bool> onMaximumConcentrationChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return SizedBox.square(
+      dimension: 82,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: maximumConcentrationActive
+              ? _maximumConcentrationSurface
+              : palette.surface,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: maximumConcentrationActive
+                ? _maximumConcentrationBorder
+                : palette.neutralSoft,
+          ),
+        ),
+        child: IconButton(
+          tooltip: context.tr(
+            'Opciones de visualización',
+            'Display options',
+          ),
+          icon: Icon(
+            Icons.more_vert_rounded,
+            size: 34,
+            color: maximumConcentrationActive
+                ? _maximumConcentrationPrimary
+                : palette.primary.withValues(alpha: 0.75),
+          ),
+          onPressed: () => unawaited(_showDisplayMenu(context)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDisplayMenu(BuildContext context) async {
+    final button = context.findRenderObject();
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (button is! RenderBox || overlay is! RenderBox) {
+      return;
+    }
+
+    final router = GoRouter.of(context);
+    final palette = context.palette;
+    final fullscreenLabel = isFullscreen
+        ? context.tr('Salir de pantalla completa', 'Exit full screen')
+        : context.tr('Ver en pantalla completa', 'View full screen');
+    final buttonRect = Rect.fromPoints(
+      button.localToGlobal(Offset.zero, ancestor: overlay),
+      button.localToGlobal(
+        button.size.bottomRight(Offset.zero),
+        ancestor: overlay,
+      ),
+    );
+
+    final action = await showMenu<_FocusDisplayAction>(
+      context: context,
+      position: RelativeRect.fromRect(
+        buttonRect,
+        Offset.zero & overlay.size,
+      ),
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 320),
+      color: maximumConcentrationActive
+          ? _maximumConcentrationSurface
+          : palette.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        if (!maximumConcentrationActive)
+          PopupMenuItem<_FocusDisplayAction>(
+            value: _FocusDisplayAction.toggleFullscreen,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isFullscreen
+                      ? Icons.close_fullscreen_rounded
+                      : Icons.fullscreen_rounded,
+                ),
+                const SizedBox(width: 12),
+                Flexible(child: Text(fullscreenLabel)),
+              ],
+            ),
+          ),
+        PopupMenuItem<_FocusDisplayAction>(
+          value: _FocusDisplayAction.toggleMaximumConcentration,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.tr(
+                    'Máxima concentración',
+                    'Maximum concentration',
+                  ),
+                  style: maximumConcentrationActive
+                      ? const TextStyle(color: _maximumConcentrationPrimary)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Switch(
+                value: maximumConcentrationEnabled,
+                onChanged: (_) => Navigator.of(context).pop(
+                  _FocusDisplayAction.toggleMaximumConcentration,
+                ),
+                activeColor: maximumConcentrationActive
+                    ? _maximumConcentrationPrimary
+                    : null,
+                activeTrackColor: maximumConcentrationActive
+                    ? _maximumConcentrationSecondary
+                    : null,
+                inactiveThumbColor: maximumConcentrationActive
+                    ? _maximumConcentrationSecondary
+                    : null,
+                inactiveTrackColor: maximumConcentrationActive
+                    ? _maximumConcentrationTrack
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (action == null) {
+      return;
+    }
+
+    if (action == _FocusDisplayAction.toggleMaximumConcentration) {
+      onMaximumConcentrationChanged(!maximumConcentrationEnabled);
+      return;
+    }
+
+    if (isFullscreen) {
+      router.pop();
+      return;
+    }
+
+    await router.push<void>(PomodoroFullscreenPage.routePath);
   }
 }
 

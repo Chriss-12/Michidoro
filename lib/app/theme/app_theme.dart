@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
 
@@ -39,6 +40,59 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.gradientStart,
     required this.gradientEnd,
   });
+
+  factory AppPalette.fromPreset(
+    AppThemePreset preset, {
+    required bool isDark,
+  }) {
+    if (isDark && preset == AppThemePreset.graphiteNight) {
+      return graphiteNight;
+    }
+
+    final palette = switch (preset) {
+      AppThemePreset.natureFocus => natureFocus,
+      AppThemePreset.forestOperations => forestOperations,
+      AppThemePreset.slateIndigo => slateIndigo,
+      AppThemePreset.tealGraphite => tealGraphite,
+      AppThemePreset.graphiteNight => graphiteNight,
+      AppThemePreset.sunshineAurora => sunshineAurora,
+      AppThemePreset.sunsetTide => sunsetTide,
+    };
+
+    return isDark ? AppPalette._darkVariant(palette) : palette;
+  }
+
+  factory AppPalette._darkVariant(AppPalette source) {
+    final primary = _withMinimumLightness(source.primary, 0.58);
+    final secondary = _withMinimumLightness(source.secondary, 0.62);
+    final background = _darkTone(source.gradientEnd, 0.07);
+    final surface = _darkTone(source.primary, 0.13);
+    final textPrimary = Color.lerp(source.textPrimary, Colors.white, 0.88)!;
+    final textSecondary = Color.lerp(textPrimary, primary, 0.22)!;
+    final neutral = Color.lerp(surface, Colors.white, 0.22)!;
+    final neutralSoft = Color.lerp(surface, Colors.white, 0.13)!;
+
+    return AppPalette(
+      primary: primary,
+      primaryMuted: Color.lerp(surface, primary, 0.28)!,
+      secondary: secondary,
+      secondarySoft: Color.lerp(surface, secondary, 0.18)!,
+      tertiary: _withMinimumLightness(source.tertiary, 0.76),
+      neutral: neutral,
+      neutralSoft: neutralSoft,
+      background: background,
+      surface: surface,
+      glass: surface.withValues(alpha: 0.9),
+      textPrimary: textPrimary,
+      textSecondary: textSecondary,
+      accentPeach: _withMinimumLightness(source.accentPeach, 0.7),
+      navSelectedBackground: Color.lerp(surface, primary, 0.4)!,
+      navSelectedIcon: Colors.white,
+      navUnselectedIcon: textPrimary,
+      gradientStart: _darkTone(source.gradientStart, 0.1),
+      gradientEnd: _darkTone(source.gradientEnd, 0.15),
+    );
+  }
 
   final Color primary;
   final Color primaryMuted;
@@ -113,7 +167,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     surface: Color(0xFF1E293B),
     glass: Color(0xDC1E293B),
     textPrimary: Color(0xFFE2E8F0),
-    textSecondary: Color(0xFF2A466C),
+    textSecondary: Color(0xFFC0CDE0),
     accentPeach: Color(0xFFCBD5E1),
     navSelectedBackground: Color(0x3D38BDF8),
     navSelectedIcon: Color(0xFFF8FAFC),
@@ -146,7 +200,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   static const graphiteNight = AppPalette(
     primary: Color(0xFF158974),
     primaryMuted: Color(0xFF252A33),
-    secondary: Color(0xFF042C08),
+    secondary: Color(0xFF2DD4BF),
     secondarySoft: Color(0xFF111419),
     tertiary: Color(0xFFD1D5DB),
     neutral: Color(0xFF303641),
@@ -206,20 +260,20 @@ class AppPalette extends ThemeExtension<AppPalette> {
     gradientEnd: Color(0xFF263456),
   );
 
-  static AppPalette fromPreset(AppThemePreset preset, {required bool isDark}) {
-    if (isDark) {
-      return graphiteNight;
+  static Color _withMinimumLightness(Color color, double minimum) {
+    final hsl = HSLColor.fromColor(color);
+    if (hsl.lightness >= minimum) {
+      return color;
     }
+    return hsl.withLightness(minimum).toColor();
+  }
 
-    return switch (preset) {
-      AppThemePreset.natureFocus => natureFocus,
-      AppThemePreset.forestOperations => forestOperations,
-      AppThemePreset.slateIndigo => slateIndigo,
-      AppThemePreset.tealGraphite => tealGraphite,
-      AppThemePreset.graphiteNight => graphiteNight,
-      AppThemePreset.sunshineAurora => sunshineAurora,
-      AppThemePreset.sunsetTide => sunsetTide,
-    };
+  static Color _darkTone(Color color, double lightness) {
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withSaturation(hsl.saturation.clamp(0.18, 0.48))
+        .withLightness(lightness)
+        .toColor();
   }
 
   BoxDecoration get appBackgroundDecoration {
@@ -344,16 +398,42 @@ class AppTheme {
   static ThemeData dark() =>
       fromPreset(AppThemePreset.natureFocus, isDark: true);
 
+  static SystemUiOverlayStyle systemOverlayStyle(
+    AppThemePreset preset, {
+    required bool isDark,
+  }) {
+    final palette = AppPalette.fromPreset(preset, isDark: isDark);
+    final statusIcons = _iconBrightnessFor(palette.gradientStart);
+    final navigationIcons = _iconBrightnessFor(palette.surface);
+
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: statusIcons,
+      statusBarBrightness: statusIcons == Brightness.light
+          ? Brightness.dark
+          : Brightness.light,
+      systemNavigationBarColor: palette.surface,
+      systemNavigationBarIconBrightness: navigationIcons,
+      systemNavigationBarDividerColor: palette.neutralSoft,
+    );
+  }
+
   static ThemeData _buildTheme({
     required AppPalette palette,
     required Brightness brightness,
     required double fontScale,
     required AppTypographyPreset typographyPreset,
   }) {
+    final onPrimary = _higherContrastForeground(
+      palette.primary,
+      palette.textPrimary,
+      Colors.white,
+    );
     final colorScheme = ColorScheme.fromSeed(
       seedColor: palette.primary,
       brightness: brightness,
       primary: palette.primary,
+      onPrimary: onPrimary,
       secondary: palette.secondary,
       tertiary: palette.tertiary,
       surface: palette.surface,
@@ -374,6 +454,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      fontFamily: typographyPreset.fontFamily,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: palette.background,
       textTheme:
@@ -398,9 +479,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: palette.primary,
-          foregroundColor: brightness == Brightness.dark
-              ? Colors.black
-              : Colors.white,
+          foregroundColor: colorScheme.onPrimary,
           elevation: 0,
           shape: roundedRectangle,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -458,6 +537,7 @@ class AppTheme {
 
           return TextStyle(
             color: color,
+            fontFamily: typographyPreset.fontFamily,
             fontSize: AppFontSizes.navigationLabel * fontScale,
             fontWeight: FontWeight.w600,
           );
@@ -471,6 +551,31 @@ class AppTheme {
         }),
       ),
     );
+  }
+
+  static Color _higherContrastForeground(
+    Color background,
+    Color first,
+    Color second,
+  ) {
+    final firstContrast = _contrastRatio(background, first);
+    final secondContrast = _contrastRatio(background, second);
+    return firstContrast >= secondContrast ? first : second;
+  }
+
+  static double _contrastRatio(Color first, Color second) {
+    final lighter = first.computeLuminance() >= second.computeLuminance()
+        ? first
+        : second;
+    final darker = identical(lighter, first) ? second : first;
+    return (lighter.computeLuminance() + 0.05) /
+        (darker.computeLuminance() + 0.05);
+  }
+
+  static Brightness _iconBrightnessFor(Color background) {
+    return background.computeLuminance() > 0.36
+        ? Brightness.dark
+        : Brightness.light;
   }
 }
 

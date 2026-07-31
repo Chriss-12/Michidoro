@@ -10,8 +10,11 @@ MichiFocus funciona sin conexión y organiza el trabajo alrededor de objetivos, 
 4. Creá un objetivo para ese día.
 5. Agregá tareas planificadas o mové tareas rápidas al día seleccionado.
 6. Tocá **Empezar Pomodoro** desde una tarea.
-7. Trabajá en **Focus** y marcá la tarea como completada al terminar.
-8. Revisá el avance en **Home**, **Goals** y **Calendario**. En **Goals**, el bloque **Progreso general** resume las métricas principales por filas.
+7. Usá **Iniciar/Continuar tarea** para completar el tiempo pendiente con
+   descansos automáticos, o elegí un Pomodoro único.
+8. En **Personalizado**, definí enfoque y descanso y decidí si se aplican a un
+   solo bloque o a todo el plan.
+9. Revisá el avance en **Home**, **Goals** y **Calendario**. En **Goals**, el bloque **Progreso general** resume las métricas principales por filas.
 
 ## Reportes
 
@@ -23,7 +26,9 @@ MichiFocus funciona sin conexión y organiza el trabajo alrededor de objetivos, 
 
 ## Configuración útil
 
+- En **Settings** podés editar tu nombre, correo y seleccionar una foto local.
 - En **Settings > Tiempos de Enfoque** ajustá duración de enfoque y descansos.
-- En **Settings > Reportes** podés seleccionar la carpeta donde se guardan los PDF, exportar un backup e importar una copia previa.
+- En **Settings > Reportes** podés seleccionar la carpeta de los PDF y exportar
+  o importar un único archivo `michifocus.sqlite` con toda la base de datos.
 - En **Settings > Notificaciones** elegí el tono y usá el botón de prueba. Si la app está abierta, las tareas planificadas para hoy pueden avisarte con ese tono.
 - La app mantiene la información localmente en el dispositivo.

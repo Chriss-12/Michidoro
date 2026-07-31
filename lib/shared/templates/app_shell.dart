@@ -6,6 +6,7 @@ import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart'
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/pages/pomodoro_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/settings_page.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/pages/tasks_page.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/templates/page_header.dart';
 
 class AppShell extends StatelessWidget {
@@ -61,31 +62,31 @@ class AppShell extends StatelessWidget {
               context.go(routes[index]);
             }
           },
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home_rounded),
+              label: context.tr('Inicio', 'Home'),
             ),
             NavigationDestination(
-              icon: Icon(Icons.checklist_rounded),
-              selectedIcon: Icon(Icons.checklist_rounded),
-              label: 'Tasks',
+              icon: const Icon(Icons.checklist_rounded),
+              selectedIcon: const Icon(Icons.checklist_rounded),
+              label: context.tr('Tareas', 'Tasks'),
             ),
             NavigationDestination(
-              icon: Icon(Icons.timer_outlined),
-              selectedIcon: Icon(Icons.timer_rounded),
-              label: 'Focus',
+              icon: const Icon(Icons.timer_outlined),
+              selectedIcon: const Icon(Icons.timer_rounded),
+              label: context.tr('Enfoque', 'Focus'),
             ),
             NavigationDestination(
-              icon: Icon(Icons.flag_outlined),
-              selectedIcon: Icon(Icons.flag_rounded),
-              label: 'Goals',
+              icon: const Icon(Icons.flag_outlined),
+              selectedIcon: const Icon(Icons.flag_rounded),
+              label: context.tr('Objetivos', 'Goals'),
             ),
             NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings_rounded),
+              label: context.tr('Ajustes', 'Settings'),
             ),
           ],
         ),

@@ -606,6 +606,8 @@ Verification:
   local profile image path, and avatar choice.
 - 2026-07-18: The top-right avatar uses the configured local image when the
   file exists, or the configured profile name/avatar initials otherwise.
+- 2026-07-18: Settings Profile now includes an in-app local image picker for
+  accessible image files, so the photo path does not need to be typed manually.
 - 2026-07-18: Settings typography now exposes `moderna`, `serio`, and `normal`
   options and persists the selected font preset locally.
 - 2026-07-18: Settings Reports can still reset to Downloads/default and now
@@ -791,6 +793,542 @@ Verification:
 Tracks:
 - `REQ-V3-009`
 - `REQ-V3-011`
+
+## Proposed roadmap - Productivity V4
+
+Status:
+Proposed. This roadmap captures native-device enhancements requested after V3.
+Do not implement code until the relevant requirement is approved, especially
+when a milestone needs new dependencies, Android permission changes, or device
+access.
+
+Priority rule:
+Start with native dependency and permission decisions, then implement system
+notifications, then native selectors, then APK/device validation.
+
+User priority override:
+Implement V4-M4 before other proposed V4 work once `REQ-DB-001` is approved.
+The persistence migration protects existing local relationships and does not
+require a native dependency, Android configuration change, or backend service.
+
+### V4-M0 - Native Capability Decisions
+
+Priority: 0
+
+Status: In Progress
+
+Objective:
+Decide which native packages, permissions, and platform behaviors are allowed
+before touching Android configuration or adding dependencies.
+
+Grouped scope:
+- Native local notification option.
+- Native file/folder/image picker option.
+- Android permission and scoped-storage review.
+- Offline-first and local privacy review.
+
+Deliverables:
+- [ ] Approved or rejected dependency list.
+- [ ] Android permission list documented.
+- [ ] Implementation constraints documented.
+- [ ] Traceability updated.
+
+Tracks:
+- `REQ-V4-001`
+
+### V4-M1 - System Notifications While App Is Closed
+
+Priority: 1
+
+Status: Proposed
+
+Objective:
+Promote scheduled task reminders from in-app reminders to system notifications
+that can fire while the app is closed.
+
+Grouped scope:
+- Local notification scheduling.
+- Notification permission flow.
+- Selected tone behavior where supported.
+- Notification tap routing back into the app.
+- Duplicate reminder prevention.
+
+Deliverables:
+- [ ] Scheduled task creates a system notification.
+- [ ] Notification opens the relevant app context.
+- [ ] Existing in-app notification center still works.
+- [ ] Offline-first behavior is preserved.
+- [ ] Flutter checks and Android device smoke test pass.
+
+Tracks:
+- `REQ-V4-002`
+
+### V4-M2 - Native File, Folder, and Image Pickers
+
+Priority: 2
+
+Status: Proposed
+
+Objective:
+Use native platform selection flows for profile photos, report folders, and
+database backup import/export where supported.
+
+Grouped scope:
+- Native profile image picker.
+- Native report folder picker or platform-safe equivalent.
+- Native backup import/export selection.
+- Fallback to current in-app selectors when native selection is unavailable.
+
+Deliverables:
+- [ ] Profile photo selection uses native picker behavior.
+- [ ] Report folder selection uses native picker behavior where possible.
+- [ ] Backup import/export selection uses native picker behavior where possible.
+- [ ] Existing V3 local selector fallback remains usable.
+- [ ] File access errors are clear to the user.
+
+Tracks:
+- `REQ-V4-003`
+
+### V4-M2.1 - Settings External Pickers for Profile and Reports
+
+Priority: 2.1
+
+Status: Implemented
+
+Objective:
+Make `Settings -> Perfil` and `Settings -> Reportes` use Android/system
+selection flows instead of the current in-app local path selectors.
+
+Why now:
+V3 verified local selectors without new dependencies, but the desired Android
+experience is to let the user choose photos, folders, and backup locations from
+the device's normal gallery or file manager.
+
+Grouped scope:
+- Profile photo selection from `Settings -> Perfil`.
+- Report output folder selection from `Settings -> Reportes`.
+- Backup import source selection from `Settings -> Reportes`.
+- Backup export destination messaging in `Settings -> Reportes`.
+- Clear fallback/error behavior when the platform picker is unavailable.
+
+Deliverables:
+- [x] Profile photo selection opens the Android gallery or external file picker.
+- [x] Report output folder selection opens an external folder/file manager flow.
+- [x] Backup import opens an external file/folder manager flow.
+- [x] Backup export clearly tells the user which folder will receive the backup.
+- [x] Existing V3 in-app selector fallback remains usable if native selection is
+  unavailable.
+- [x] Required Flutter checks and APK build pass.
+- [ ] Android device smoke validation passes.
+
+Planning notes:
+- 2026-07-19: User approved implementing this slice directly. Implementation
+  uses an Android platform channel and system intents, with no new package,
+  backend, Android Gradle, or manifest permission change.
+- Android scoped-storage behavior was handled through persisted tree URI
+  permissions for external folders.
+- Preserve offline-first behavior and keep all selected paths/files local to the
+  device.
+
+Verification:
+- 2026-07-19: `dart format lib test` passed.
+- 2026-07-19: `flutter analyze` passed.
+- 2026-07-19: focused `app_settings_controller` tests passed.
+- 2026-07-19: full `flutter test` passed with 76 tests.
+- 2026-07-19: debug APK build passed using JDK 17.
+- Android install/launch and picker smoke validation remain pending on a real
+  device before this milestone can move to `Verified`.
+
+Tracks:
+- `REQ-V4-003`
+
+### V4-M3 - Android APK and Device Validation
+
+Priority: 3
+
+Status: Proposed
+
+Objective:
+Validate the app on the target Android device and prepare release delivery with
+real install/launch evidence.
+
+Grouped scope:
+- APK build.
+- Device detection.
+- Install validation.
+- Launch validation.
+- Smoke tests for Home, Planning, Focus, Settings, Reports, and Notifications.
+
+Deliverables:
+- [ ] APK builds with the selected build type.
+- [ ] APK installs on the target device.
+- [ ] App launches without immediate exit.
+- [ ] Key flows are smoke-tested on device.
+- [ ] Device-specific issues are fixed or documented.
+
+Tracks:
+- `REQ-V4-001`
+
+### V4-M4 - Unified SQLite Database and Referential Integrity
+
+Priority: 0 by explicit user priority
+
+Status: Implemented
+
+Objective:
+Consolidate Goals, Tasks, Pomodoro sessions, and calendar events into one
+local Drift/SQLite database and make their valid references enforceable by
+SQLite foreign keys.
+
+Why now:
+The current separate database files can only express task/goal/session links
+through application code. A shared database is required before adding more
+persistence behavior that depends on reliable joins, deletion rules, reports,
+or backup/import.
+
+Grouped scope:
+- One `michifocus.sqlite` production database.
+- Shared Drift database lifecycle with feature-owned repositories and DAOs.
+- Foreign keys, delete rules, indexes, and connection-level enforcement.
+- Atomic migration from the four existing SQLite files.
+- Unified backup/export and backward-compatible import migration.
+- Regression coverage for persistence and user flows that consume the data.
+
+Deliverables:
+- [x] Proposed schema and delete rules approved.
+- [x] Existing local data is backed up and migrated atomically.
+- [x] SQLite foreign-key constraints are enabled and tested.
+- [x] Goal deletion detaches, rather than deletes, child tasks and sessions.
+- [x] Task deletion detaches, rather than deletes, completed sessions.
+- [x] New installs and restored backups use one Drift database file.
+- [ ] Drift code generation, analyzer, focused migration tests, and full test
+  suite pass.
+- [ ] ERD, database documentation, requirements, and traceability contain
+  verified implementation evidence.
+
+Out of scope:
+- Remote storage, synchronization, accounts, or any backend.
+- Moving local JSON preferences to SQLite.
+- Changing task, goal, session, or calendar user workflows.
+
+Verification plan:
+- Fresh-install schema and foreign-key enforcement test.
+- Migration fixture containing linked and deliberately broken legacy rows.
+- Delete-rule tests for goal/task/session history.
+- Backup/export then import round-trip test.
+- `dart run build_runner build --delete-conflicting-outputs`.
+- `dart format` for changed Dart files, `flutter analyze`, focused persistence
+  tests, and the full `flutter test` suite.
+
+Risks:
+- Migration must be crash-safe and preserve a path back to the current files.
+- Existing backup folders must remain importable.
+- Enabling foreign keys requires every Drift connection to opt in explicitly.
+
+Tracks:
+- `REQ-DB-001`
+
+Verification:
+- 2026-07-20: Drift code generation, `flutter analyze`, and full `flutter test`
+  passed with 77 tests.
+- Remaining before `Verified`: automated legacy-file migration fixture and
+  manual migration on an installation containing real existing data.
+
+### V4-M5 - Executive SQLite-Backed PDF Reports
+
+Priority: 0 by explicit user priority
+
+Status: Verified
+
+Objective:
+Make every Settings report a shareable executive PDF in US Letter format whose
+task and Pomodoro statistics are read from the unified SQLite database when the
+file is exported.
+
+Grouped scope:
+- Executive header with profile name, reporting period, and generated date.
+- Task status, Pomodoro count, and focused-time statistics.
+- US Letter layout that fits on one page.
+- Direct repository reads at export time.
+- Preserve selected dashboard-chart visibility rules and local file export.
+
+Deliverables:
+- [x] Requirement and acceptance criteria approved.
+- [x] Source-of-truth gap identified in the report audit.
+- [x] General report action exports an executive PDF.
+- [x] Statistics report reads SQLite repositories at export time.
+- [x] PDF page uses US Letter dimensions.
+- [x] Focused tests, analyzer, and full test suite pass.
+- [x] Requirement and traceability are updated with verified evidence.
+
+Verification:
+- 2026-07-21: report unit tests passed.
+- 2026-07-21: `flutter analyze` passed with no issues.
+- 2026-07-21: full `flutter test` passed with 77 tests.
+
+Tracks:
+- `REQ-V4-005`
+
+## Proposed roadmap - Productivity V5
+
+Status:
+In Progress. V5-M0 through V5-M2 are verified and V5-M3 is in device
+verification.
+
+Priority rule:
+V5-M0, V5-M1, and V5-M2 are verified. V5-M3 is the next recommended milestone
+and must be completed before adding more report types or visualizations. Its
+implementation should proceed through the quality gates below rather than as
+one large change.
+
+### V5-M0 - Spanish Year Terminology
+
+Priority: 0
+
+Status: Verified
+
+Objective:
+Replace visible `Anio`/`anio` text with the correct `Año` label throughout the
+application.
+
+Deliverables:
+- [x] Audit all user-visible year labels.
+- [x] Replace visible labels without changing internal keys or identifiers.
+- [x] Verify selectors, headers, reports, dialogs, and empty states.
+- [x] Run focused tests and Flutter quality checks.
+
+Verification:
+- 2026-07-28: The profile statistics selector and yearly summary now display
+  `Año`; the internal `year` enum and date logic were preserved.
+- 2026-07-28: `rg` inventory found no remaining visible `Anio`/`anio` labels.
+- 2026-07-28: `flutter analyze` passed.
+- 2026-07-28: Full `flutter test` passed with 86 tests.
+- 2026-07-28: Visual hardening bundled all three fonts for offline Android,
+  verified Sora/Merriweather differences and global save on-device, persisted
+  theme color and text scale, corrected dark-system contrast, and fitted the
+  day/week/month/year selector to the available width.
+
+Tracks:
+- `REQ-V5-001`
+
+### V5-M1 - Global Typography Preview and Save
+
+Priority: 1
+
+Status: Verified
+
+Objective:
+Let the user preview typography choices and apply the selected choice
+globally only after pressing `Guardar`.
+
+Deliverables:
+- [x] Typography selection shows a representative preview text.
+- [x] Draft typography remains unapplied while the user is choosing.
+- [x] `Guardar` applies the typography across the app.
+- [x] Leaving without saving keeps the previous applied typography.
+- [x] The applied selection persists across restarts.
+- [x] Focused widget/state tests and Flutter quality checks pass.
+
+Verification:
+- 2026-07-28: Settings typography now uses a local draft, a representative
+  preview, and an explicit `Guardar` action before changing the global theme.
+- 2026-07-28: Focused Settings controller tests passed with 17 tests.
+- 2026-07-28: Widget coverage passed for preview-before-save and global state
+  after save.
+- 2026-07-28: `flutter analyze` passed.
+- 2026-07-28: Full `flutter test` passed with 86 tests.
+
+Tracks:
+- `REQ-V5-002`
+
+### V5-M2 - Profile Header and Day/Month/Year Navigation
+
+Priority: 2
+
+Status: Verified
+
+Objective:
+Show the selected profile name only in the entry header brand area and provide
+a presentable selector for navigating by day, month, or year.
+
+Deliverables:
+- [x] Entry header replaces `MichiFocus` with the selected profile name.
+- [x] Empty profile names use a stable fallback.
+- [x] Tapping the header name opens `Día`, `Mes`, and `Año` options.
+- [x] Day selection is constrained to the current month.
+- [x] Month selection is constrained to the current year.
+- [x] Year selection supports the current and previous available years.
+- [x] The selected period updates the relevant content.
+- [x] Responsive widget tests and Flutter quality checks pass.
+
+Verification:
+- 2026-07-28: The entry header now displays the selected profile name and
+  opens quick statistics when tapped; other `MichiFocus` brand references were
+  preserved.
+- 2026-07-28: Day, month, and year selectors use bounded local options and
+  update the statistics period label and data range.
+- 2026-07-28: Widget coverage passed for header tap and day/month/year mode
+  changes.
+- 2026-07-28: `flutter analyze` passed.
+- 2026-07-28: Full `flutter test` passed with 86 tests.
+
+Tracks:
+- `REQ-V5-003`
+
+### V5-M3 - Unified and Trustworthy Reporting Engine
+
+Priority: 3
+
+Status: In Progress
+
+Objective:
+Create one reliable, efficient, and maintainable offline reporting pipeline for
+quick statistics and PDF exports, with explicit historical semantics and
+end-to-end SQLite verification.
+
+Why now:
+The current report path reads current SQLite data, but duplicates calculation
+rules, filters complete tables in memory, cannot reliably date historical task
+completion, and manually lays every chart on one PDF page. Adding more reports
+before correcting this foundation would increase ambiguity and rework.
+
+Grouped scope:
+- Metric dictionary and exact local `[start, end)` range contract.
+- Honest treatment of task completion history and legacy records.
+- Backward-compatible Drift migration and indexes when required.
+- Range-aware repository queries and SQL aggregation.
+- Shared report snapshot use case for quick views and exports.
+- Separate PDF renderer and report file writer.
+- Period-aware chart aggregation, dynamic scales, wrapping, and pagination.
+- Collision-resistant report filenames and explicit write errors.
+- SQLite-to-PDF integration coverage and Android export smoke validation.
+- Reconciliation of legacy report/PDF requirement documents with the active
+  V2/V3/V4/V5 contracts.
+
+Implementation slices:
+1. **V5-M3.0 - Metric and architecture contract**
+   - Approve formulas, date sources, range boundaries, legacy-data behavior,
+     package choice, and responsibility boundaries.
+2. **V5-M3.1 - Historical data and query layer**
+   - Add only the approved persistence migration, repository range APIs,
+     indexes, and in-memory Drift fixtures.
+3. **V5-M3.2 - Shared snapshot engine**
+   - Implement one tested use case for totals, trends, mood, focus time, and
+     period-aware aggregation.
+4. **V5-M3.3 - Robust PDF and file output**
+   - Implement valid multi-page US Letter output, wrapping, Spanish text,
+     dynamic charts, unique naming, and explicit storage errors.
+5. **V5-M3.4 - Integration and device verification**
+   - Verify SQLite-to-PDF behavior, rendered pages, full quality gates, APK,
+     and Android day/month/year exports.
+
+Deliverables:
+- [x] Metric dictionary defines every exported value and historical limitation.
+- [ ] The measurable baseline in `docs/internal/technical/REPORTING.md` is
+      implemented without weakening its fixture, timing, query, or PDF targets.
+- [x] One immutable resolved range is used from query through PDF labels.
+- [x] Historical completion data is accurate or explicitly unavailable; it is
+      never inferred silently.
+- [x] Report repository queries only the selected range through Drift.
+- [x] Quick statistics and PDF export share the same snapshot engine.
+- [x] Chart grain and scale adapt to day, month, year, and custom periods.
+- [ ] PDF pages do not overlap, clip, truncate silently, or lose Spanish text.
+- [x] Each export has a unique, descriptive filename.
+- [x] Storage failures produce a clear error instead of a success message.
+- [x] Backup import/export behavior remains compatible and unchanged.
+- [x] Integration coverage seeds unified SQLite and verifies generated metrics.
+- [ ] Rendered PDF inspection covers all charts, long text, and multiple pages.
+- [ ] Android exports for day, month, and year open successfully.
+- [x] Active report/PDF requirements and traceability no longer contradict one
+      another.
+
+Verification:
+- 2026-07-28: V5-M3.0 through V5-M3.3 are implemented. Remaining release
+  evidence belongs to V5-M3.4, so the milestone remains `In Progress`.
+- Schema 1 to 2 migration preserves legacy completions as unknown and does not
+  fabricate completion events.
+- Automated fixtures cover local half-open ranges, reversed dates, leap day,
+  empty periods, bounded grains, exact task/session/completion metrics,
+  mood/distraction formulas, indexed query plans on 20,000 tasks and 50,000
+  sessions, SQLite-to-PDF generation, multi-page output, write failures, and
+  100 distinct sequential files.
+- 2026-07-28: targeted formatting and `flutter analyze` passed; the complete
+  `flutter test` suite passed with 104 tests after the adversarial fixes.
+- 2026-07-28: the corrected debug APK built with JDK 17, installed successfully
+  over the existing app while preserving data, and launched on the connected
+  Android device. The Home dashboard and header quick statistics were visually
+  checked for day, month, current year, and previous year without clipping or
+  overlap.
+- 2026-07-28: Android exports created distinct day, month, year, and maximum
+  five-year custom-range PDFs with all charts enabled. A stale-scope defect
+  that produced a blank success path was corrected so the export callback
+  returns the path that was actually written.
+- 2026-07-28: the empty day PDF rendered as two valid US Letter pages and the
+  maximum custom range (`2021-07-29` through `2026-07-28`) rendered as three
+  valid US Letter pages at 144 DPI. All five inspected pages preserve Spanish
+  accents and show no clipping, overlap, blank page, or lost bucket.
+- 2026-07-28: after the device correction, `flutter analyze` and the complete
+  `flutter test` suite passed again with 104 tests.
+- 2026-07-28: report export now returns separate display and opening
+  references. The success notice exposes `Abrir`; Android grants a temporary
+  read-only `content://` URI through a narrowly scoped `FileProvider`. A newly
+  generated day report opened successfully in the installed PDF viewer and
+  displayed the expected two-page report.
+- Remaining V5-M3.4 evidence: repeat the viewer smoke for month, year, and
+  custom reports, render the extreme long-profile fixture, and record one
+  warm-up plus ten measured runs for each p95 budget.
+- Required implementation gates: Drift code generation when applicable,
+  `dart format`, `flutter analyze`, focused persistence/report tests, complete
+  `flutter test`, PDF structural and rendered-page checks, debug APK build, and
+  Android export/open smoke tests.
+- Standard verification volume: 20,000 tasks, 50,000 completed sessions, and
+  five years of local data.
+- Android p95 budgets after one warm-up and ten measured runs: quick statistics
+  <= 500 ms, report snapshot <= 1,000 ms, complete PDF generation/save
+  <= 3,000 ms.
+- Correctness budget: zero expected-value mismatches and 100% reconciliation
+  between headline totals and chart buckets.
+- PDF budget: valid US Letter pages, no clipping/overlap in the required
+  rendered fixtures, and 100 unique files from 100 rapid exports.
+
+Dependencies and decisions:
+- Explicit approval is required before adding or replacing a PDF package.
+- Persistence work requires a reviewed migration and a defined policy for
+  legacy completed tasks that have no trustworthy completion timestamp.
+- Performance acceptance should verify bounded/indexed query behavior rather
+  than use a fragile device-specific millisecond threshold.
+
+Tracks:
+- `REQ-V5-004`
+
+### V5-M4 - Global Spanish and English Language
+
+Priority: 4
+
+Status: Verified
+
+Objective:
+Provide an offline, globally applied language preference for Spanish and
+English.
+
+Deliverables:
+- [x] Settings provides a presentable Español/English selector.
+- [x] Language changes rebuild every visible application surface.
+- [x] The selected language persists across application restarts.
+- [x] Dynamic states, dialogs, notifications, and report UI are localized.
+- [x] Focused localization tests and Flutter quality checks pass.
+- [x] Both languages pass Android visual inspection.
+
+Verification:
+- `flutter analyze` and the full 137-test suite passed on 2026-07-29.
+- Release APK build and installation passed.
+- Spanish and English were visually inspected on Android; English persisted
+  after restart, and Spanish was restored and persisted after the final
+  restart.
+
+Tracks:
+- `REQ-SET-006`
+- `docs/internal/technical/REPORTING.md`
 
 ## Deprecated legacy milestones
 
@@ -1423,3 +1961,372 @@ Verification evidence:
 - 2026-07-05 Android verification attempt: `adb devices` reported no
   connected devices, so hardware scroll verification could not be completed.
 - Android profile/manual scroll verification remains pending before `Verified`.
+
+## V6 - Recoverable Task Focus Plans
+
+Status:
+Implemented on 2026-07-29. Automated checks, APK install/launch, accessible
+Android hierarchy, and small-screen golden references passed. The manual
+Android theme/typography/active-state visual matrix remains before Verified.
+
+### V6-M0 - Continuous Task Plan and Recoverable Pomodoro
+
+Status: Implemented
+
+Objective:
+Turn a planned task duration into a clear sequence of focus and break blocks,
+allow one-block alternatives, and preserve exclusive timer ownership across
+navigation, background execution, and process recreation.
+
+Tracks:
+- `REQ-V6-001`
+- `REQ-V6-002`
+- `REQ-V6-003`
+- `REQ-V6-004`
+- `REQ-V6-005`
+
+Deliverables:
+- [x] Product behavior and minute-based formulas approved
+- [x] Persistence and architecture impact inspected
+- [x] Planning edit supports duration and full-width actions
+- [x] Pending, In Progress, and Completed transitions are automatic
+- [x] Predefined recommendation and custom projection are implemented
+- [x] Continue runs or resumes the complete remaining plan
+- [x] Predefined/custom single-block execution is implemented
+- [x] Block X of N and task percentage are visible in Pomodoro
+- [x] One active owner is enforced across all task entry points
+- [x] Active runtime survives process recreation
+- [x] Unified backup validation covers the new schema/runtime
+- [x] Automated visual verification completed
+- [ ] Manual Android theme/typography/state visual matrix completed
+
+Approved behavior:
+- Planned task duration is net focus time; breaks are additional elapsed time.
+- Recommendation calculations use whole completed minutes by flooring the sum
+  of task-focused seconds once.
+- The last focus block is shortened to the remaining task minutes.
+- Continue resumes an exact partial phase or runs the remaining plan
+  automatically.
+- A predefined/custom single Pomodoro runs one focus plus its break and then
+  stops.
+- A paused or resting Pomodoro still owns the single global timer.
+- Starting another task requires returning to the owner or explicitly stopping
+  and switching.
+- The final focus block completes the task automatically and has no mandatory
+  trailing break.
+
+Implementation slices:
+1. **V6-M0.0 - Contract and tests**
+   - Stable block-plan value objects, minute formulas, recommendation ranking,
+     and status/ownership invariants.
+2. **V6-M0.1 - Task planning edit**
+   - Atomic objective/duration update, arbitrary imported duration support, and
+     responsive full-width actions.
+3. **V6-M0.2 - Runtime persistence and ownership**
+   - Unified schema migration, runtime repository, restoration, and switch
+     guard.
+4. **V6-M0.3 - Continuous and single-block execution**
+   - Start/Continue/Resume/Stop-for-now state machine, automatic blocks, custom
+     cadence, and final-block truncation.
+5. **V6-M0.4 - Presentation and verification**
+   - Block/progress projection, recommendation tags, tests, analyzer, backup
+     compatibility, APK build/install, and visual inspection.
+
+Quality gates:
+- [x] Requirement and milestone approved before implementation
+- [x] No new package or backend dependency planned
+- [x] Drift migration and generated schema verified
+- [x] Imported databases validated before replacement
+- [x] Controller and repository tests cover process restoration and exclusivity
+- [x] Widget tests cover editing, custom projection, and block progress
+- [x] `dart format lib test`
+- [x] `flutter analyze`
+- [x] Full `flutter test`
+- [x] Debug and release APK build/install/launch
+- [ ] Android visual inspection
+
+Required docs:
+- [x] `docs/internal/requirements/REQ-PRODUCTIVITY_V6.md`
+- [x] `docs/internal/tracking/MILESTONES.md`
+- [x] `docs/internal/tracking/TRACEABILITY_MATRIX.md`
+- [x] `docs/internal/technical/DATABASE.md`
+- [x] Relevant client documentation
+
+Verification evidence:
+- `dart run build_runner build --delete-conflicting-outputs` regenerated the
+  unified Drift schema at version 3.
+- `flutter analyze` passed with no issues.
+- Full `flutter test` passed with 134 tests.
+- Golden references cover the custom `45/10` projection for a 120-minute task
+  and the total-progress timer ring at 390 x 844.
+- 2026-07-29 visual correction keeps only countdown and phase inside the ring;
+  an accessible information button below it opens the block, task progress,
+  next step, and elapsed projection. Updated golden references and the full
+  134-test suite passed.
+- Debug and 62.1 MB release APKs built successfully. The release APK installed
+  and launched on Android API 33; the accessible hierarchy exposed the
+  expected app content.
+- Both available headless emulators returned a black framebuffer even for the
+  Android launcher. Manual screenshot-based theme/state inspection therefore
+  remains pending and prevents moving the milestone to Verified.
+
+## Proposed roadmap - Productivity V7
+
+Status:
+V7-M0 is implemented, V7-M1/V7-M2 are verified, and V7-M2.1 is implemented on
+2026-07-31. V7-M3 remains proposed.
+
+Priority rule:
+Build the normal fullscreen/menu foundation first, then maximum concentration
+and its safe exits, and finally relocate completion vibration into Settings.
+This order keeps the higher-risk immersive behavior on top of one shared,
+tested fullscreen lifecycle.
+
+### V7-M0 - Focus Menu and Normal Fullscreen
+
+Priority: 0
+
+Status: Implemented
+
+Objective:
+Remove configuration navigation from the Focus three-dot action and make that
+action open a small popup menu beside the button for presentation controls.
+
+Deliverables:
+- [x] Replace the direct Pomodoro-settings action with a small, compact popup
+      menu anchored to the three-dot button.
+- [x] Do not use a new page, large panel, or bottom sheet for this menu.
+- [x] Show `Ver en pantalla completa` in normal view.
+- [x] Show `Salir de pantalla completa` in normal fullscreen.
+- [x] Preserve the selected theme in normal fullscreen.
+- [x] Keep timer state unchanged across both transitions.
+- [x] Add Spanish/English and accessibility coverage.
+
+Verification:
+- `dart format` and `flutter analyze` passed.
+- Focused widget navigation and the full 137-test suite passed.
+- The release APK built, installed, and launched on Android.
+- Physical popup screenshots remain pending because the connected device was
+  locked during inspection; V7-M0 remains `Implemented` until that visual check
+  passes.
+
+Tracks:
+- `REQ-V7-001`
+
+### V7-M1 - Maximum Concentration and Its Exit Controls
+
+Priority: 1
+
+Status: Verified
+
+Depends on:
+- `V7-M0`
+
+Objective:
+Add a black immersive Focus mode that starts with the Pomodoro and can always
+be exited without affecting the timer. The double-tap gesture exists
+specifically to leave maximum concentration after that mode has started.
+
+Deliverables:
+- [x] Add the `Máxima concentración` switch to the three-dot menu.
+- [x] Allow the switch to arm the mode before start or enter it during an
+      active Pomodoro.
+- [x] Show only Focus essentials over a black fullscreen background.
+- [x] Use pure black with subdued white/gray ring, text, borders, and buttons
+      in an Always On Display visual style; do not reuse bright theme colors.
+- [x] Keep the three-dot menu available inside maximum concentration.
+- [x] Once maximum concentration is active, exit and disable only that mode
+      with a double tap on a non-interactive area of the black screen.
+- [x] Give double tap no special action outside maximum concentration.
+- [x] Exit and disable the mode by turning off its menu switch.
+- [x] Keep the Pomodoro running or paused exactly as it was after either exit.
+- [x] Exit automatically when the runtime stops, is discarded, or completes.
+- [x] Restore Android system UI reliably and cover gesture/control conflicts.
+
+Persistence decision:
+- The switch is ephemeral presentation state and is not persisted across
+  process recreation.
+
+Verification:
+- `flutter analyze` passed without issues; the full suite passed with 139 tests.
+- Controller and widget tests cover lifecycle, arming, both exits, direct switch
+  taps, unchanged paused time, and the pure-black mobile golden.
+- The release APK built and installed successfully.
+- Android physical inspection passed for the compact English menu, active and
+  paused AOD visuals, double-tap exit, direct switch exit, continued timing,
+  and system UI restoration.
+
+Tracks:
+- `REQ-V7-002`
+
+### V7-M2 - Completion Vibration in Settings
+
+Priority: 2
+
+Status: Verified
+
+Objective:
+Expose the existing completion-vibration preference in Settings and remove its
+ownership from Focus configuration.
+
+Implementation decision:
+- Reuse `AppSettingsController.completionVibrationEnabled`, its existing
+  callback, preview action, and `completionVibrationEnabled` Settings JSON key.
+- Do not add state, packages, database columns, or schema migrations.
+
+Deliverables:
+- [x] Add `Vibrar al finalizar` / `Vibrate when finished` to Settings.
+- [x] Reuse one completion-vibration state and callback.
+- [x] Persist and restore the value through `michidoro-settings.json`.
+- [x] Vibrate after focus and break completion when enabled, including silent
+      sound mode.
+- [x] Remove the duplicate/old vibration control from Focus configuration.
+- [x] Verify enabled, disabled, restart, and silent-sound behavior on Android.
+
+Verification:
+- `dart format`, clean `flutter analyze`, and the full 140-test suite passed.
+- Release APK build/install passed.
+- Android inspection verified responsive English/Spanish presentation, preview
+  haptic feedback, enabled/disabled control states, and restart persistence.
+
+Tracks:
+- `REQ-V7-003`
+- `REQ-POMO-007`
+- `REQ-SET-002`
+
+### V7-M2.1 - Selectable Completion Vibration Patterns
+
+Priority: 2
+
+Status: Implemented
+
+Objective:
+Replace the fixed single completion haptic with a user-selectable local pattern
+without changing the existing vibration switch or Pomodoro business state.
+
+Implementation decision:
+- Add `Suave`, `Normal`, `Doble`, and `Intensa` using Flutter platform haptics.
+- Keep `Normal` as the compatibility default for existing Settings JSON files.
+- Persist one enum name in `michidoro-settings.json`; do not change SQLite,
+  Android Gradle, or dependencies.
+
+Deliverables:
+- [x] Add a localized vibration-pattern selector to both Settings surfaces.
+- [x] Use the selected pattern for preview and completion feedback.
+- [x] Save and restore the selected pattern with a safe legacy fallback.
+- [ ] Verify every pattern, the disabled state, restart persistence, and layout.
+
+Verification:
+- Controller, JSON round-trip/legacy fallback, and bilingual widget coverage
+  passed; the full suite passed with 144 tests and the analyzer is clean.
+- The 64.1 MB release APK built and installed on device `3bbacc93`.
+- Physical pattern selection, haptic comparison, restart, and layout inspection
+  remain pending because the connected device is locked with a user pattern.
+
+Tracks:
+- `REQ-V7-004`
+- `REQ-POMO-007`
+- `REQ-SET-002`
+
+### V7-M3 - Integrated Verification
+
+Priority: 3
+
+Status: Proposed
+
+Objective:
+Verify that immersive presentation changes remain recoverable and do not alter
+Pomodoro business state.
+
+Quality gates:
+- [ ] Widget tests cover dynamic fullscreen labels and both maximum-mode exits.
+- [ ] Controller/state tests cover arming, active entry, pause, completion, and
+      vibration persistence.
+- [ ] Tests prove display transitions do not change timer or task progress.
+- [ ] `dart format` passes for changed Dart files.
+- [ ] `flutter analyze` passes.
+- [ ] Full `flutter test` passes.
+- [ ] Release APK builds, installs, and launches.
+- [ ] Android visual inspection covers normal fullscreen, running/paused
+      maximum concentration, double-tap exit, switch exit, and Spanish/English.
+
+Tracks:
+- `REQ-V7-001`
+- `REQ-V7-002`
+- `REQ-V7-003`
+
+## Proposed roadmap - Productivity V8
+
+Status:
+Proposed. Start only after V7 integrated verification is complete and the
+first-run content/design is approved.
+
+### V8-M0 - First-Run Onboarding
+
+Priority: 0
+
+Status: Proposed
+
+Objective:
+Introduce MichiDoro through a short, useful onboarding sequence that appears
+only on a fresh installation, can be skipped at any point, and leads directly
+into the working app.
+
+Product distinction:
+- Keep the current native and Flutter splash/loading experience brief on every
+  launch.
+- Show onboarding after splash only when the app has never been used on that
+  installation.
+- Do not present onboarding again after either `Omitir` or successful completion.
+
+Proposed sequence:
+1. **Organiza tu día** - tasks, goals, planning, and calendar in one local flow.
+2. **Enfócate con intención** - task estimates, automatic focus/break blocks,
+   continuation, and maximum concentration.
+3. **Entiende tu progreso** - completion progress, local statistics, reports,
+   backup/export, and offline-first privacy.
+4. **Hazlo tuyo** - language, theme, typography, sounds, and vibration, followed
+   by `Empezar a usar MichiDoro`.
+
+Interaction requirements:
+- [ ] Show a clear progress indicator and concise Spanish/English copy.
+- [ ] Provide `Atrás`, `Continuar`, and a visible `Omitir` action.
+- [ ] Make `Omitir` immediately persist completion and open Home.
+- [ ] Make the final action persist completion before opening Home.
+- [ ] Preserve system back behavior without trapping the user or replaying a
+      completed onboarding.
+- [ ] Use responsive, accessible layouts with no clipped text at supported font
+      scales.
+- [ ] Use theme and typography settings already loaded at startup.
+
+Persistence and migration decision:
+- Store a versioned local marker such as `completedOnboardingVersion` in
+  `michidoro-settings.json`; do not add an SQLite table.
+- Treat installations that already contain MichiDoro settings/data when this
+  feature ships as already onboarded, so an update does not masquerade as a
+  first launch.
+- A future onboarding version may be shown only through an explicit product
+  decision; changing copy alone must not replay it.
+
+Quality gates:
+- [ ] Fresh-install routing is `Splash -> Onboarding -> Home`.
+- [ ] Returning-install routing is `Splash -> Home`.
+- [ ] Skip and finish each persist before navigation and survive process restart.
+- [ ] Existing-install migration does not show onboarding unexpectedly.
+- [ ] Widget tests cover every page, progress, back, skip, finish, Spanish, and
+      English.
+- [ ] Controller/repository tests cover missing, completed, invalid, and future
+      marker values.
+- [ ] `dart format`, `flutter analyze`, and full `flutter test` pass.
+- [ ] Release APK build/install and Android fresh/returning-install inspection
+      pass without erasing the user's real data.
+
+Non-goals:
+- Account creation, cloud sync, paywall, permissions, or data collection.
+- Replacing the launcher/native splash or turning onboarding into advertising.
+- Replaying onboarding on every update.
+
+Traceability impact:
+- Create and approve `REQ-V8-001` before implementation.
+- Update routing, Settings JSON, UI guidance, client manual, and traceability
+  only when implementation begins and verified behavior exists.

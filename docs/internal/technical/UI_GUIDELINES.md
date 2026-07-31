@@ -11,6 +11,14 @@ Build Material 3 UI with clear spacing, accessible labels, responsive layouts, a
 - Typography presets are user-facing Settings choices. Keep the categories
   `moderna`, `serio`, and `normal` mapped through `AppTypographyPreset` instead
   of hardcoding font families in individual widgets.
+- User-selectable fonts must be bundled in the APK; do not rely on runtime font
+  downloads or system-family substitution.
+- Theme presets must keep status/navigation bar icon brightness and interactive
+  control contrast aligned with the active palette.
+- Theme presets must remain visually distinct in both light and dark mode;
+  enabling dark mode must not replace every preset with one shared palette.
+- Keep the Pomodoro ring center limited to the current countdown and phase.
+  Task-plan metadata belongs in the information action directly below the ring.
 
 ## Required checks
 

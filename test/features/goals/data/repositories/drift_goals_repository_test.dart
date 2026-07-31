@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pomodoro_app_v1/features/goals/data/datasources/goals_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/goals/data/repositories/drift_goals_repository.dart';
 
 void main() {
@@ -12,7 +12,7 @@ void main() {
         'michifocus_goals_test',
       );
       final file = File('${directory.path}/goals.sqlite');
-      var database = GoalsDatabase(NativeDatabase(file));
+      var database = MichiFocusDatabase(NativeDatabase(file));
       var repository = DriftGoalsRepository(GoalsDao(database));
 
       addTearDown(() async {
@@ -33,7 +33,7 @@ void main() {
       );
       await database.close();
 
-      database = GoalsDatabase(NativeDatabase(file));
+      database = MichiFocusDatabase(NativeDatabase(file));
       repository = DriftGoalsRepository(GoalsDao(database));
 
       final goals = await repository.loadGoals();
@@ -49,7 +49,7 @@ void main() {
     test(
       'updates progress and deletes goals through the repository boundary',
       () async {
-        final database = GoalsDatabase(NativeDatabase.memory());
+        final database = MichiFocusDatabase(NativeDatabase.memory());
         final repository = DriftGoalsRepository(GoalsDao(database));
 
         addTearDown(database.close);

@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_runtime_state.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_task_plan.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/domain/repositories/pomodoro_runtime_repository.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/repositories/pomodoro_sessions_repository.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 
@@ -46,6 +49,35 @@ void main() {
       expect(controller.sessions.value, isEmpty);
     });
 
+    test('maximum concentration survives pause and clears on discard', () {
+      final controller = PomodoroController(
+        repository: _MemoryPomodoroSessionsRepository(),
+      )..maximumConcentrationMode = true;
+
+      expect(controller.hasStartedRuntime.value, isFalse);
+      controller
+        ..start()
+        ..pause();
+      expect(controller.hasStartedRuntime.value, isTrue);
+      expect(controller.maximumConcentrationEnabled.value, isTrue);
+
+      controller.discardSession();
+      expect(controller.hasStartedRuntime.value, isFalse);
+      expect(controller.maximumConcentrationEnabled.value, isFalse);
+    });
+
+    test('maximum concentration clears when the active task is released', () {
+      final controller =
+          PomodoroController(
+              repository: _MemoryPomodoroSessionsRepository(),
+            )
+            ..selectTask(taskId: 'task-1', taskTitle: 'Task')
+            ..maximumConcentrationMode = true
+            ..clearSelectedTask();
+
+      expect(controller.maximumConcentrationEnabled.value, isFalse);
+    });
+
     test('restarts a task Pomodoro from zero and keeps it running', () async {
       final controller = PomodoroController(
         repository: _MemoryPomodoroSessionsRepository(),
@@ -80,7 +112,93 @@ void main() {
       );
     });
 
-    test('finishes early and stores only elapsed focus seconds', () async {
+    test(
+      'synchronizes running focus time after returning from background',
+      () async {
+        final clock = _FakeClock(DateTime(2026, 1, 1, 9));
+        final controller = PomodoroController(
+          repository: _MemoryPomodoroSessionsRepository(),
+          focusMinutes: 10,
+          now: clock.now,
+        )..start();
+
+        clock.advance(const Duration(minutes: 2));
+        await controller.synchronizeWithClock();
+
+        expect(controller.isRunning.value, isTrue);
+        expect(controller.currentPhase, PomodoroPhase.focus);
+        expect(controller.remainingSeconds.value, 8 * 60);
+        expect(controller.completedPomodoros.value, 0);
+      },
+    );
+
+    test(
+      'completes focus and advances break time after background resume',
+      () async {
+        final clock = _FakeClock(DateTime(2026, 1, 1, 9));
+        final repository = _MemoryPomodoroSessionsRepository();
+        final controller =
+            PomodoroController(
+                repository: repository,
+                now: clock.now,
+              )
+              ..setFocusSeconds(60)
+              ..setShortBreakSeconds(20)
+              ..start();
+
+        clock.advance(const Duration(seconds: 70));
+        await controller.synchronizeWithClock();
+
+        expect(controller.isRunning.value, isTrue);
+        expect(controller.currentPhase, PomodoroPhase.shortBreak);
+        expect(controller.remainingSeconds.value, 10);
+        expect(controller.completedPomodoros.value, 1);
+        expect(repository.sessions.single.focusedSeconds, 60);
+        expect(repository.sessions.single.startedAt, DateTime(2026, 1, 1, 9));
+        expect(
+          repository.sessions.single.endedAt,
+          DateTime(2026, 1, 1, 9, 1),
+        );
+      },
+    );
+
+    test(
+      'continues into the next focus when auto-start focus is enabled',
+      () async {
+        final clock = _FakeClock(DateTime(2026, 1, 1, 9));
+        final repository = _MemoryPomodoroSessionsRepository();
+        final controller =
+            PomodoroController(
+                repository: repository,
+                autoStartFocus: true,
+                now: clock.now,
+              )
+              ..setFocusSeconds(60)
+              ..setShortBreakSeconds(20)
+              ..start();
+
+        clock.advance(const Duration(seconds: 140));
+        await controller.synchronizeWithClock();
+
+        expect(controller.currentPhase, PomodoroPhase.shortBreak);
+        expect(controller.completedPomodoros.value, 2);
+        expect(repository.sessions.last.startedAt, DateTime(2026, 1, 1, 9));
+        expect(
+          repository.sessions.last.endedAt,
+          DateTime(2026, 1, 1, 9, 1),
+        );
+        expect(
+          repository.sessions.first.startedAt,
+          DateTime(2026, 1, 1, 9, 1, 20),
+        );
+        expect(
+          repository.sessions.first.endedAt,
+          DateTime(2026, 1, 1, 9, 2, 20),
+        );
+      },
+    );
+
+    test('stops for now and stores only elapsed focus seconds', () async {
       final repository = _MemoryPomodoroSessionsRepository();
       final controller = PomodoroController(
         repository: repository,
@@ -90,13 +208,14 @@ void main() {
       controller.remainingSeconds.value = 540;
       await controller.finishEarly();
 
-      expect(controller.isRunning.value, isTrue);
-      expect(controller.currentPhase, PomodoroPhase.shortBreak);
-      expect(controller.remainingSeconds.value, 300);
-      expect(controller.completedPomodoros.value, 1);
+      expect(controller.isRunning.value, isFalse);
+      expect(controller.currentPhase, PomodoroPhase.focus);
+      expect(controller.remainingSeconds.value, 600);
+      expect(controller.completedPomodoros.value, 0);
       expect(controller.totalFocusSeconds.value, 60);
       expect(repository.sessions.single.focusedSeconds, 60);
       expect(repository.sessions.single.plannedSeconds, 600);
+      expect(repository.sessions.single.status, PomodoroSessionStatus.partial);
     });
 
     test('finishes a break and returns to the next focus', () async {
@@ -271,6 +390,52 @@ void main() {
       expect(repository.sessions.single.taskId, 'task-1');
     });
 
+    test('tracks timer progress against active task estimate', () async {
+      final controller =
+          PomodoroController(repository: _MemoryPomodoroSessionsRepository())
+            ..selectTask(
+              taskId: 'task-1',
+              taskTitle: 'Preparar informe',
+              estimatedSeconds: 90 * 60,
+            )
+            ..start();
+
+      controller.remainingSeconds.value = 20 * 60;
+
+      expect(controller.elapsedTaskFocusSeconds, 5 * 60);
+      expect(controller.timerProgress, closeTo(5 / 90, 0.001));
+    });
+
+    test(
+      'keeps estimated task progress across focus and break cycles',
+      () async {
+        final controller =
+            PomodoroController(
+                repository: _MemoryPomodoroSessionsRepository(),
+                autoStartBreak: false,
+              )
+              ..selectTask(
+                taskId: 'task-1',
+                taskTitle: 'Preparar informe',
+                estimatedSeconds: 90 * 60,
+              )
+              ..start();
+
+        controller.remainingSeconds.value = 1;
+        await controller.tick();
+
+        expect(controller.currentPhase, PomodoroPhase.shortBreak);
+        expect(controller.elapsedTaskFocusSeconds, 25 * 60);
+        expect(controller.timerProgress, closeTo(25 / 90, 0.001));
+
+        await controller.completeBreak();
+
+        expect(controller.currentPhase, PomodoroPhase.focus);
+        expect(controller.remainingSeconds.value, 25 * 60);
+        expect(controller.timerProgress, closeTo(25 / 90, 0.001));
+      },
+    );
+
     test('stores focus reflection without a distraction note', () async {
       final repository = _MemoryPomodoroSessionsRepository();
       final controller =
@@ -340,7 +505,178 @@ void main() {
 
       expect(controller.selectedGoalId, isNull);
     });
+
+    test('runs a continuous 120 minute task as 45, 45, and 30', () async {
+      final repository = _MemoryPomodoroSessionsRepository();
+      final completedTasks = <String>[];
+      final controller = PomodoroController(repository: repository)
+        ..onTaskPlanCompleted = (taskId) async {
+          completedTasks.add(taskId);
+        };
+
+      final prepared = await controller.prepareTaskPlan(
+        taskId: 'task-120',
+        taskTitle: 'Trabajo largo',
+        estimatedMinutes: 120,
+        cadence: const PomodoroCadence(
+          focusMinutes: 45,
+          breakMinutes: 10,
+        ),
+        mode: PomodoroPlanMode.continuous,
+      );
+
+      expect(prepared, isTrue);
+      expect(controller.totalBlocks.value, 3);
+      expect(controller.currentBlockIndex.value, 1);
+      expect(controller.remainingSeconds.value, 45 * 60);
+
+      controller.start();
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+      expect(controller.currentPhase, PomodoroPhase.shortBreak);
+
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+      expect(controller.currentBlockIndex.value, 2);
+      expect(controller.currentPhase, PomodoroPhase.focus);
+      expect(controller.remainingSeconds.value, 45 * 60);
+
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+      expect(controller.currentBlockIndex.value, 3);
+      expect(controller.remainingSeconds.value, 30 * 60);
+
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+
+      expect(repository.sessions, hasLength(3));
+      expect(
+        repository.sessions.map((session) => session.focusedSeconds).toSet(),
+        {45 * 60, 30 * 60},
+      );
+      expect(
+        repository.sessions.fold<int>(
+          0,
+          (total, session) => total + session.focusedSeconds,
+        ),
+        120 * 60,
+      );
+      expect(completedTasks, ['task-120']);
+      expect(controller.hasActiveRuntime.value, isFalse);
+      expect(controller.selectedTaskId, isNull);
+    });
+
+    test('single block stops after its associated break', () async {
+      final repository = _MemoryPomodoroSessionsRepository();
+      final controller = PomodoroController(repository: repository);
+
+      await controller.prepareTaskPlan(
+        taskId: 'task-1',
+        taskTitle: 'Un bloque',
+        estimatedMinutes: 120,
+        cadence: const PomodoroCadence(
+          focusMinutes: 45,
+          breakMinutes: 10,
+        ),
+        mode: PomodoroPlanMode.singleBlock,
+      );
+      controller.start();
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+      expect(controller.currentPhase, PomodoroPhase.shortBreak);
+
+      controller.remainingSeconds.value = 1;
+      await controller.tick();
+
+      expect(repository.sessions.single.focusedSeconds, 45 * 60);
+      expect(controller.isRunning.value, isFalse);
+      expect(controller.hasActiveRuntime.value, isFalse);
+      expect(controller.selectedTaskId, isNull);
+    });
+
+    test('does not replace another task that owns the timer', () async {
+      final controller = PomodoroController(
+        repository: _MemoryPomodoroSessionsRepository(),
+      );
+      await controller.prepareTaskPlan(
+        taskId: 'task-1',
+        taskTitle: 'Primera',
+        estimatedMinutes: 60,
+        cadence: const PomodoroCadence(
+          focusMinutes: 25,
+          breakMinutes: 5,
+        ),
+        mode: PomodoroPlanMode.continuous,
+      );
+
+      final secondPrepared = await controller.prepareTaskPlan(
+        taskId: 'task-2',
+        taskTitle: 'Segunda',
+        estimatedMinutes: 60,
+        cadence: const PomodoroCadence(
+          focusMinutes: 25,
+          breakMinutes: 5,
+        ),
+        mode: PomodoroPlanMode.continuous,
+      );
+
+      expect(secondPrepared, isFalse);
+      expect(controller.selectedTaskId, 'task-1');
+    });
+
+    test('restores a running task and reconciles elapsed time', () async {
+      final clock = _FakeClock(DateTime(2026, 7, 29, 9));
+      final sessionsRepository = _MemoryPomodoroSessionsRepository();
+      final runtimeRepository = _MemoryPomodoroRuntimeRepository();
+      final first = PomodoroController(
+        repository: sessionsRepository,
+        runtimeRepository: runtimeRepository,
+        now: clock.now,
+      );
+      await first.prepareTaskPlan(
+        taskId: 'task-1',
+        taskTitle: 'Recuperable',
+        estimatedMinutes: 60,
+        cadence: const PomodoroCadence(
+          focusMinutes: 25,
+          breakMinutes: 5,
+        ),
+        mode: PomodoroPlanMode.continuous,
+      );
+      first.start();
+      await first.checkpointRuntime();
+      first.dispose();
+
+      clock.advance(const Duration(seconds: 75));
+      final restored = PomodoroController(
+        repository: sessionsRepository,
+        runtimeRepository: runtimeRepository,
+        now: clock.now,
+      );
+      addTearDown(restored.dispose);
+      await restored.initialize();
+
+      expect(restored.selectedTaskId, 'task-1');
+      expect(restored.isRunning.value, isTrue);
+      expect(restored.remainingSeconds.value, (25 * 60) - 75);
+      expect(restored.currentBlockIndex.value, 1);
+      expect(restored.totalBlocks.value, 3);
+    });
   });
+}
+
+class _FakeClock {
+  _FakeClock(this._now);
+
+  DateTime _now;
+
+  DateTime now() => _now;
+
+  void advance(Duration duration) {
+    _now = _now.add(duration);
+  }
 }
 
 class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
@@ -363,6 +699,7 @@ class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
     String? goalId,
     String? taskId,
     int? startMoodScore,
+    PomodoroSessionStatus status = PomodoroSessionStatus.completed,
   }) async {
     final session = PomodoroSession(
       id: (_nextId++).toString(),
@@ -370,7 +707,7 @@ class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
       endedAt: endedAt,
       plannedSeconds: plannedSeconds,
       focusedSeconds: focusedSeconds,
-      status: PomodoroSessionStatus.completed,
+      status: status,
       goalId: goalId,
       taskId: taskId,
       startMoodScore: startMoodScore,
@@ -394,5 +731,22 @@ class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
     );
     _sessions[index] = updated;
     return updated;
+  }
+}
+
+class _MemoryPomodoroRuntimeRepository implements PomodoroRuntimeRepository {
+  PomodoroRuntimeState? state;
+
+  @override
+  Future<void> clear() async {
+    state = null;
+  }
+
+  @override
+  Future<PomodoroRuntimeState?> load() async => state;
+
+  @override
+  Future<void> save(PomodoroRuntimeState state) async {
+    this.state = state;
   }
 }

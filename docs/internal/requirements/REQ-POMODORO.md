@@ -202,8 +202,8 @@ Checklist:
 Acceptance criteria:
 - [x] The user can choose a completion sound from atmospheric Pomodoro settings.
 - [x] The user can preview the selected completion sound before saving or leaving the screen.
-- [x] The user can enable or disable completion vibration from atmospheric Pomodoro settings.
-- [x] The user can preview completion vibration before saving or leaving the screen.
+- [x] The user can enable or disable completion vibration from Settings notifications.
+- [x] The user can preview completion vibration from the same Settings control.
 - [x] The selected sound and vibration preference are stored in local app state.
 - [x] A selected non-silent sound plays and enabled vibration runs when a Pomodoro session completes.
 - [x] The implementation remains offline-first and does not add new dependencies.
@@ -213,5 +213,7 @@ Notes:
 - Approved and implemented on 2026-07-04 as `M4.1`.
 - Implemented with local Flutter `SystemSound` and `HapticFeedback` to avoid adding audio packages.
 - Available options: `Campana suave`, `Toque breve`, and `Silencio`.
-- Completion vibration is enabled by default and can be disabled from atmospheric settings.
+- Completion vibration is enabled by default and can be disabled from Settings.
+- V7-M2 moved vibration ownership out of Focus without changing the existing
+  state, feedback behavior, or local JSON key.
 - Verification evidence: targeted settings/controller tests passed; full `flutter test` passed.

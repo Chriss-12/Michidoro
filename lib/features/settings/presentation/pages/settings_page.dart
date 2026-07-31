@@ -1,14 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
+import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
-import 'package:pomodoro_app_v1/features/settings/presentation/pages/directory_picker_page.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -26,6 +28,8 @@ class SettingsPage extends StatelessWidget {
         SizedBox(height: 26),
         _AppearanceCard(),
         SizedBox(height: 26),
+        _LanguageCard(),
+        SizedBox(height: 26),
         _FocusTimesCard(),
         SizedBox(height: 26),
         _ReportsCard(),
@@ -38,13 +42,35 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends StatefulWidget {
   const _ProfileCard();
+
+  @override
+  State<_ProfileCard> createState() => _ProfileCardState();
+}
+
+class _ProfileCardState extends State<_ProfileCard> {
+  TextEditingController? _nameController;
+  TextEditingController? _emailController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final settings = AppSettingsScope.of(context);
+    _nameController ??= TextEditingController(text: settings.profileName);
+    _emailController ??= TextEditingController(text: settings.profileEmail);
+  }
+
+  @override
+  void dispose() {
+    _nameController?.dispose();
+    _emailController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final colorScheme = Theme.of(context).colorScheme;
     final settings = AppSettingsScope.of(context);
     final image = _profileImage(settings.profileImagePath);
 
@@ -55,96 +81,96 @@ class _ProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 48,
-                  backgroundColor: palette.primaryMuted,
-                  foregroundImage: image,
-                  child: image == null
-                      ? Text(
-                          _avatarLabel(settings),
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: palette.primary,
-                                fontWeight: FontWeight.w900,
-                              ),
-                        )
-                      : null,
-                ),
-                Positioned(
-                  right: -10,
-                  bottom: -10,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: palette.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.edit_rounded,
-                      color: colorScheme.onPrimary,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
+            CircleAvatar(
+              radius: 48,
+              backgroundColor: palette.primaryMuted,
+              foregroundImage: image,
+              child: image == null
+                  ? Text(
+                      _avatarLabel(settings),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: palette.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    )
+                  : null,
             ),
-            const SizedBox(height: 38),
-            const _FieldLabel('Nombre de usuario'),
+            const SizedBox(height: 24),
+            _FieldLabel(context.tr('Nombre de usuario', 'Username')),
             TextFormField(
-              key: ValueKey('profile-name-${settings.profileName}'),
-              initialValue: settings.profileName,
-              onChanged: settings.onProfileNameChanged,
+              controller: _nameController,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.person_outline_rounded),
               ),
             ),
             const SizedBox(height: 18),
-            const _FieldLabel('Correo electrónico'),
+            _FieldLabel(context.tr('Correo electrónico', 'Email')),
             TextFormField(
-              key: ValueKey('profile-email-${settings.profileEmail}'),
-              initialValue: settings.profileEmail,
+              controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              onChanged: settings.onProfileEmailChanged,
               decoration: const InputDecoration(
                 hintText: 'tu-correo@ejemplo.com',
                 prefixIcon: Icon(Icons.alternate_email_rounded),
               ),
             ),
             const SizedBox(height: 18),
-            const _FieldLabel('Foto local'),
-            TextFormField(
-              key: ValueKey('profile-image-${settings.profileImagePath}'),
-              initialValue: settings.profileImagePath,
-              onChanged: settings.onProfileImagePathChanged,
-              decoration: const InputDecoration(
-                hintText: r'C:\Users\TuUsuario\Pictures\foto.png',
-                prefixIcon: Icon(Icons.image_outlined),
+            _FieldLabel(context.tr('Foto local', 'Local photo')),
+            if (settings.profileImagePath.trim().isNotEmpty) ...[
+              Text(
+                settings.profileImagePath,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
+              const SizedBox(height: 10),
+            ],
+            Row(
               children: [
-                for (var index = 0; index < 4; index++)
-                  ChoiceChip(
-                    label: Text(_avatarLabelForIndex(index)),
-                    selected: settings.avatarIndex == index,
-                    onSelected: (_) => settings.onAvatarChanged(index),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final path = await _selectProfileImage(
+                        context,
+                      );
+                      if (path == null || !context.mounted) {
+                        return;
+                      }
+
+                      settings.onProfileImagePathChanged(path);
+                    },
+                    icon: const Icon(Icons.image_search_rounded),
+                    label: Text(
+                      context.tr('Seleccionar foto', 'Select photo'),
+                    ),
                   ),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  tooltip: context.tr('Quitar foto', 'Remove photo'),
+                  onPressed: settings.profileImagePath.trim().isEmpty
+                      ? null
+                      : () => settings.onProfileImagePathChanged(''),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Perfil actualizado.')),
-                );
-              },
-              child: const Text('Guardar cambios'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  settings.onProfileNameChanged(_nameController?.text ?? '');
+                  settings.onProfileEmailChanged(_emailController?.text ?? '');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        context.tr('Perfil actualizado.', 'Profile updated.'),
+                      ),
+                    ),
+                  );
+                },
+                child: Text(context.tr('Guardar cambios', 'Save changes')),
+              ),
             ),
           ],
         ),
@@ -153,6 +179,10 @@ class _ProfileCard extends StatelessWidget {
   }
 
   ImageProvider? _profileImage(String path) {
+    if (NativeFileManager.isExternalFolderReference(path)) {
+      return null;
+    }
+
     if (path.trim().isEmpty) {
       return null;
     }
@@ -170,16 +200,34 @@ class _ProfileCard extends StatelessWidget {
       return settings.profileName.trim().characters.first.toUpperCase();
     }
 
-    return _avatarLabelForIndex(settings.avatarIndex);
+    return 'U';
   }
 
-  String _avatarLabelForIndex(int index) {
-    return switch (index) {
-      0 => 'C',
-      1 => 'CH',
-      2 => 'P',
-      _ => 'A',
-    };
+  Future<String?> _selectProfileImage(
+    BuildContext context,
+  ) async {
+    try {
+      final externalPath = await NativeFileManager.pickProfileImage();
+      if (externalPath != null && externalPath.trim().isNotEmpty) {
+        return externalPath;
+      }
+    } on PlatformException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ??
+                  context.tr(
+                    'No se pudo abrir la galería.',
+                    'The gallery could not be opened.',
+                  ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return null;
   }
 }
 
@@ -196,28 +244,27 @@ class _AppearanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             icon: Icons.palette_outlined,
-            title: 'Apariencia',
+            title: context.tr('Apariencia', 'Appearance'),
           ),
           const SizedBox(height: 18),
           _ModeTile(
-            label: 'Modo Claro',
+            label: context.tr('Modo claro', 'Light mode'),
             value: !settings.isDarkMode,
             onChanged: (value) => settings.onDarkModeChanged(!value),
           ),
           const SizedBox(height: 14),
           _ModeTile(
-            label: 'Modo Oscuro',
+            label: context.tr('Modo oscuro', 'Dark mode'),
             value: settings.isDarkMode,
             onChanged: settings.onDarkModeChanged,
-            disabled: true,
           ),
           const SizedBox(height: 18),
           _TextScaleControl(settings: settings),
           const SizedBox(height: 18),
           Text(
-            'Tema de color',
+            context.tr('Tema de color', 'Color theme'),
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 10),
@@ -227,14 +274,14 @@ class _AppearanceCard extends StatelessWidget {
             children: [
               for (final preset in AppThemePreset.values)
                 ChoiceChip(
-                  label: Text(preset.label),
+                  label: Text(_themeLabel(context, preset)),
                   selected: settings.themePreset == preset,
                   onSelected: (_) => settings.onThemeChanged(preset),
                   selectedColor: palette.primaryMuted,
                   checkmarkColor: palette.primary,
                   labelStyle: TextStyle(
                     color: settings.themePreset == preset
-                        ? palette.primary
+                        ? palette.textPrimary
                         : palette.textSecondary,
                     fontWeight: settings.themePreset == preset
                         ? FontWeight.w700
@@ -245,7 +292,10 @@ class _AppearanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Tema actual: ${settings.themePreset.label}',
+            context.tr(
+              'Tema actual: ${_themeLabel(context, settings.themePreset)}',
+              'Current theme: ${_themeLabel(context, settings.themePreset)}',
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
@@ -253,6 +303,39 @@ class _AppearanceCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _themeLabel(BuildContext context, AppThemePreset preset) {
+    return switch (preset) {
+      AppThemePreset.natureFocus => context.tr(
+        'Enfoque natural',
+        'Nature Focus',
+      ),
+      AppThemePreset.forestOperations => context.tr(
+        'Bosque operativo',
+        'Forest Operations',
+      ),
+      AppThemePreset.slateIndigo => context.tr(
+        'Pizarra índigo',
+        'Slate Indigo',
+      ),
+      AppThemePreset.tealGraphite => context.tr(
+        'Verde azulado y grafito',
+        'Teal Graphite',
+      ),
+      AppThemePreset.graphiteNight => context.tr(
+        'Noche grafito',
+        'Graphite Night',
+      ),
+      AppThemePreset.sunshineAurora => context.tr(
+        'Aurora soleada',
+        'Sunshine Aurora',
+      ),
+      AppThemePreset.sunsetTide => context.tr(
+        'Marea al atardecer',
+        'Sunset Tide',
+      ),
+    };
   }
 }
 
@@ -272,7 +355,7 @@ class _TextScaleControl extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Tamaño general',
+                context.tr('Tamaño general', 'General size'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
@@ -295,12 +378,73 @@ class _TextScaleControl extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Compacto', style: Theme.of(context).textTheme.labelSmall),
-            Text('Normal', style: Theme.of(context).textTheme.labelSmall),
-            Text('Grande', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              context.tr('Compacto', 'Compact'),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            Text(
+              context.tr('Normal', 'Normal'),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            Text(
+              context.tr('Grande', 'Large'),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _LanguageCard extends StatelessWidget {
+  const _LanguageCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final settings = AppSettingsScope.of(context);
+
+    return GlassCard(
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle(
+            icon: Icons.language_rounded,
+            title: context.tr('Idioma', 'Language'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            context.tr(
+              'Elige el idioma que se usará en toda la aplicación.',
+              'Choose the language used throughout the app.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<AppLanguage>(
+            segments: const [
+              ButtonSegment(
+                value: AppLanguage.spanish,
+                icon: Icon(Icons.translate_rounded),
+                label: Text('Español'),
+              ),
+              ButtonSegment(
+                value: AppLanguage.english,
+                icon: Icon(Icons.language_rounded),
+                label: Text('English'),
+              ),
+            ],
+            selected: {settings.language},
+            onSelectionChanged: (selection) {
+              settings.onLanguageChanged(selection.single);
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -317,13 +461,13 @@ class _FocusTimesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             icon: Icons.timer_outlined,
-            title: 'Tiempos de Enfoque',
+            title: context.tr('Tiempos de enfoque', 'Focus times'),
           ),
           const SizedBox(height: 22),
           _InlineSlider(
-            label: 'Sesión de Enfoque',
+            label: context.tr('Sesión de enfoque', 'Focus session'),
             value: settings.focusMinutes,
             min: 5,
             max: 90,
@@ -331,7 +475,7 @@ class _FocusTimesCard extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _InlineSlider(
-            label: 'Descanso Corto',
+            label: context.tr('Descanso corto', 'Short break'),
             value: settings.shortBreakMinutes,
             min: 1,
             max: 20,
@@ -339,7 +483,7 @@ class _FocusTimesCard extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _InlineSlider(
-            label: 'Descanso Largo',
+            label: context.tr('Descanso largo', 'Long break'),
             value: settings.longBreakMinutes,
             min: 5,
             max: 45,
@@ -359,21 +503,35 @@ class _ReportsCard extends StatelessWidget {
     final settings = AppSettingsScope.of(context);
     final palette = context.palette;
     final currentPath = settings.reportsDirectoryPath.trim();
+    final usesExternalFolder = NativeFileManager.isExternalFolderReference(
+      currentPath,
+    );
 
     return GlassCard(
       padding: AppCardPaddings.compact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             icon: Icons.folder_open_rounded,
-            title: 'Reportes',
+            title: context.tr('Reportes', 'Reports'),
           ),
           const SizedBox(height: 12),
           Text(
             currentPath.isEmpty
-                ? 'Los PDF se guardan en Descargas cuando esta disponible.'
-                : 'Carpeta actual: $currentPath',
+                ? context.tr(
+                    'Los PDF se guardan en Descargas cuando está disponible.',
+                    'PDF files are saved in Downloads when available.',
+                  )
+                : usesExternalFolder
+                ? context.tr(
+                    'Carpeta externa seleccionada desde el gestor del sistema.',
+                    'External folder selected in the system file manager.',
+                  )
+                : context.tr(
+                    'Carpeta actual: $currentPath',
+                    'Current folder: $currentPath',
+                  ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
@@ -383,9 +541,8 @@ class _ReportsCard extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final path = await context.push<String>(
-                  DirectoryPickerPage.routePath,
-                  extra: currentPath,
+                final path = await _selectReportsFolder(
+                  context,
                 );
                 if (path == null || !context.mounted) {
                   return;
@@ -393,13 +550,18 @@ class _ReportsCard extends StatelessWidget {
 
                 settings.onReportsDirectoryPathChanged(path);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Carpeta de reportes seleccionada.'),
+                  SnackBar(
+                    content: Text(
+                      context.tr(
+                        'Carpeta de reportes seleccionada.',
+                        'Reports folder selected.',
+                      ),
+                    ),
                   ),
                 );
               },
               icon: const Icon(Icons.folder_open_rounded),
-              label: const Text('Seleccionar carpeta'),
+              label: Text(context.tr('Seleccionar carpeta', 'Select folder')),
             ),
           ),
           const SizedBox(height: 12),
@@ -410,14 +572,19 @@ class _ReportsCard extends StatelessWidget {
                 await settings.onUseDefaultReportsDirectory();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Carpeta de reportes configurada.'),
+                    SnackBar(
+                      content: Text(
+                        context.tr(
+                          'Carpeta de reportes configurada.',
+                          'Reports folder configured.',
+                        ),
+                      ),
                     ),
                   );
                 }
               },
               icon: const Icon(Icons.download_rounded),
-              label: const Text('Usar Descargas'),
+              label: Text(context.tr('Usar Descargas', 'Use Downloads')),
             ),
           ),
           const SizedBox(height: 12),
@@ -425,17 +592,31 @@ class _ReportsCard extends StatelessWidget {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () async {
-                await settings.onExportDatabaseBackup();
+                final destination = await _exportDatabaseBackup(
+                  context,
+                  settings,
+                );
+                if (destination == null || !context.mounted) {
+                  return;
+                }
+
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Backup de base de datos exportado.'),
+                    SnackBar(
+                      content: Text(
+                        context.tr(
+                          'Copia exportada en: ${_displayDestination(context, destination)}',
+                          'Backup exported to: ${_displayDestination(context, destination)}',
+                        ),
+                      ),
                     ),
                   );
                 }
               },
               icon: const Icon(Icons.backup_rounded),
-              label: const Text('Exportar base de datos'),
+              label: Text(
+                context.tr('Exportar base de datos', 'Export database'),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -443,9 +624,8 @@ class _ReportsCard extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final path = await context.push<String>(
-                  DirectoryPickerPage.routePath,
-                  extra: currentPath,
+                final path = await _selectBackupImportFolder(
+                  context,
                 );
                 if (path == null || !context.mounted) {
                   return;
@@ -455,9 +635,12 @@ class _ReportsCard extends StatelessWidget {
                   await settings.onImportDatabaseBackup(path);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'Backup preparado. Reinicia la app para aplicarlo.',
+                          context.tr(
+                            'Copia preparada. Reinicia la app para aplicarla.',
+                            'Backup prepared. Restart the app to apply it.',
+                          ),
                         ),
                       ),
                     );
@@ -471,12 +654,109 @@ class _ReportsCard extends StatelessWidget {
                 }
               },
               icon: const Icon(Icons.restore_rounded),
-              label: const Text('Importar base de datos'),
+              label: Text(
+                context.tr('Importar base de datos', 'Import database'),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<String?> _selectReportsFolder(
+    BuildContext context,
+  ) async {
+    try {
+      final selection = await NativeFileManager.pickFolder();
+      if (selection != null) {
+        return selection.uri;
+      }
+    } on PlatformException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ??
+                  context.tr(
+                    'No se pudo abrir el gestor de carpetas.',
+                    'The folder manager could not be opened.',
+                  ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return null;
+  }
+
+  Future<String?> _selectBackupImportFolder(
+    BuildContext context,
+  ) async {
+    try {
+      final path = await NativeFileManager.pickBackupImportFolder();
+      if (path != null && path.trim().isNotEmpty) {
+        return path;
+      }
+    } on PlatformException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ??
+                  context.tr(
+                    'No se pudo abrir el gestor de archivos.',
+                    'The file manager could not be opened.',
+                  ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return null;
+  }
+
+  Future<String?> _exportDatabaseBackup(
+    BuildContext context,
+    AppSettingsScope settings,
+  ) async {
+    try {
+      final selection = await NativeFileManager.pickExportFolder();
+      if (selection != null) {
+        settings.onReportsDirectoryPathChanged(selection.uri);
+        return settings.onExportDatabaseBackup();
+      }
+    } on PlatformException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ??
+                  context.tr(
+                    'No se pudo abrir el gestor de carpetas.',
+                    'The folder manager could not be opened.',
+                  ),
+            ),
+          ),
+        );
+      }
+      return null;
+    }
+
+    return settings.onExportDatabaseBackup();
+  }
+
+  String _displayDestination(BuildContext context, String destination) {
+    if (NativeFileManager.isExternalFolderReference(destination)) {
+      return context.tr(
+        'carpeta externa seleccionada',
+        'selected external folder',
+      );
+    }
+
+    return destination;
   }
 }
 
@@ -493,22 +773,22 @@ class _NotificationsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             icon: Icons.notifications_active_outlined,
-            title: 'Notificaciones',
+            title: context.tr('Notificaciones', 'Notifications'),
           ),
           const SizedBox(height: 18),
           DropdownButtonFormField<PomodoroCompletionSound>(
             value: settings.completionSound,
-            decoration: const InputDecoration(
-              labelText: 'Tono',
-              prefixIcon: Icon(Icons.music_note_rounded),
+            decoration: InputDecoration(
+              labelText: context.tr('Biblioteca de sonidos', 'Sound library'),
+              prefixIcon: const Icon(Icons.music_note_rounded),
             ),
             items: [
               for (final sound in PomodoroCompletionSound.values)
                 DropdownMenuItem(
                   value: sound,
-                  child: Text(sound.label),
+                  child: Text(_soundLabel(context, sound)),
                 ),
             ],
             onChanged: settings.notificationsEnabled
@@ -521,10 +801,29 @@ class _NotificationsCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            settings.completionSound.description,
+            _soundDescription(context, settings.completionSound),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: settings.notificationsEnabled
+                  ? settings.onPreviewCompletionSound
+                  : null,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text(context.tr('Escuchar sonido', 'Preview sound')),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _CompletionVibrationTile(
+            enabled: settings.completionVibrationEnabled,
+            pattern: settings.completionVibrationPattern,
+            onChanged: settings.onCompletionVibrationChanged,
+            onPatternChanged: settings.onCompletionVibrationPatternChanged,
+            onPreview: settings.onPreviewCompletionVibration,
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -535,9 +834,12 @@ class _NotificationsCard extends StatelessWidget {
                       await settings.onTestNotification();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(
-                              'Notificacion de prueba enviada.',
+                              context.tr(
+                                'Tarea programada de prueba enviada.',
+                                'Test scheduled-task alert sent.',
+                              ),
                             ),
                           ),
                         );
@@ -545,22 +847,33 @@ class _NotificationsCard extends StatelessWidget {
                     }
                   : null,
               icon: const Icon(Icons.notifications_active_outlined),
-              label: const Text('Probar notificacion'),
+              label: Text(
+                context.tr(
+                  'Probar tarea programada',
+                  'Test scheduled task',
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 18),
           _NotificationTile(
             icon: Icons.volume_up_outlined,
-            title: 'Alertas Sonoras',
-            subtitle: 'Sonido suave al terminar ciclo',
+            title: context.tr('Alertas sonoras', 'Sound alerts'),
+            subtitle: context.tr(
+              'Sonido suave al terminar el ciclo',
+              'A soft sound when the cycle ends',
+            ),
             value: settings.focusAlertsEnabled,
             onChanged: settings.onFocusAlertsEnabledChanged,
           ),
           const SizedBox(height: 14),
           _NotificationTile(
             icon: Icons.desktop_windows_outlined,
-            title: 'Escritorio',
-            subtitle: 'Notificaciones nativas del sistema',
+            title: context.tr('Sistema', 'System'),
+            subtitle: context.tr(
+              'Notificaciones nativas del sistema',
+              'Native system notifications',
+            ),
             value: settings.notificationsEnabled,
             onChanged: settings.onNotificationsEnabledChanged,
           ),
@@ -568,55 +881,271 @@ class _NotificationsCard extends StatelessWidget {
       ),
     );
   }
+
+  String _soundLabel(
+    BuildContext context,
+    PomodoroCompletionSound sound,
+  ) {
+    return switch (sound) {
+      PomodoroCompletionSound.softBell => context.tr(
+        'Campana suave',
+        'Soft bell',
+      ),
+      PomodoroCompletionSound.lightTap => context.tr(
+        'Toque ligero',
+        'Light tap',
+      ),
+      PomodoroCompletionSound.warmChime => context.tr(
+        'Campanilla cálida',
+        'Warm chime',
+      ),
+      PomodoroCompletionSound.crystalChime => context.tr(
+        'Cristal claro',
+        'Crystal chime',
+      ),
+      PomodoroCompletionSound.calmPulse => context.tr(
+        'Pulso calmado',
+        'Calm pulse',
+      ),
+      PomodoroCompletionSound.deepChime => context.tr(
+        'Campana profunda',
+        'Deep chime',
+      ),
+      PomodoroCompletionSound.digitalZen => context.tr(
+        'Zen digital',
+        'Digital zen',
+      ),
+      PomodoroCompletionSound.silent => context.tr('Silencio', 'Silent'),
+    };
+  }
+
+  String _soundDescription(
+    BuildContext context,
+    PomodoroCompletionSound sound,
+  ) {
+    return switch (sound) {
+      PomodoroCompletionSound.softBell => context.tr(
+        'Campana breve y clara para cerrar el bloque.',
+        'A short, clear bell to close the block.',
+      ),
+      PomodoroCompletionSound.lightTap => context.tr(
+        'Señal corta y discreta para avisos rápidos.',
+        'A short, subtle signal for quick alerts.',
+      ),
+      PomodoroCompletionSound.warmChime => context.tr(
+        'Notas suaves con un cierre más agradable.',
+        'Soft notes with a warmer finish.',
+      ),
+      PomodoroCompletionSound.crystalChime => context.tr(
+        'Secuencia limpia y brillante sin sonar agresiva.',
+        'A clean, bright sequence without sounding harsh.',
+      ),
+      PomodoroCompletionSound.calmPulse => context.tr(
+        'Dos pulsos redondos para una alerta tranquila.',
+        'Two rounded pulses for a calm alert.',
+      ),
+      PomodoroCompletionSound.deepChime => context.tr(
+        'Tono grave y reposado para descansos largos.',
+        'A deep, relaxed tone for long breaks.',
+      ),
+      PomodoroCompletionSound.digitalZen => context.tr(
+        'Secuencia moderna, corta y menos invasiva.',
+        'A modern, short, less intrusive sequence.',
+      ),
+      PomodoroCompletionSound.silent => context.tr(
+        'No reproducir sonido al finalizar.',
+        'Do not play a sound when finished.',
+      ),
+    };
+  }
 }
 
-class _TypographyPresetCard extends StatelessWidget {
+class _TypographyPresetCard extends StatefulWidget {
   const _TypographyPresetCard();
+
+  @override
+  State<_TypographyPresetCard> createState() => _TypographyPresetCardState();
+}
+
+class _TypographyPresetCardState extends State<_TypographyPresetCard> {
+  late AppTypographyPreset _draftPreset;
+  var _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) {
+      return;
+    }
+
+    _draftPreset = AppSettingsScope.of(context).typographyPreset;
+    _initialized = true;
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final settings = AppSettingsScope.of(context);
+    final previewTheme = AppTypography.textTheme(
+      colorScheme: Theme.of(context).colorScheme,
+      fontScale: settings.fontScale,
+      preset: _draftPreset,
+    );
+    final hasChanges = _draftPreset != settings.typographyPreset;
 
     return GlassCard(
       padding: AppCardPaddings.compact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             icon: Icons.text_fields_rounded,
-            title: 'Tipografia',
+            title: context.tr('Tipografía', 'Typography'),
           ),
           const SizedBox(height: 12),
           Text(
-            'Seleccion actual: ${settings.typographyPreset.label} (${settings.typographyPreset.familyLabel})',
+            context.tr(
+              'Aplicada: ${_typographyLabel(context, settings.typographyPreset)} '
+                  '(${settings.typographyPreset.familyLabel})',
+              'Applied: ${_typographyLabel(context, settings.typographyPreset)} '
+                  '(${settings.typographyPreset.familyLabel})',
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: palette.primaryMuted.withValues(alpha: 0.34),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: palette.neutralSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('Vista previa', 'Preview'),
+                  style: previewTheme.labelMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  context.tr('Un año de enfoque', 'A year of focus'),
+                  style: previewTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  context.tr(
+                    'MichiDoro se adapta a tu ritmo diario.',
+                    'MichiDoro adapts to your daily rhythm.',
+                  ),
+                  style: previewTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Text('25:00', style: previewTheme.headlineLarge),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Column(
             children: [
               for (final preset in AppTypographyPreset.values)
-                ChoiceChip(
-                  label: Text('${preset.label} - ${preset.familyLabel}'),
-                  selected: settings.typographyPreset == preset,
-                  onSelected: (_) => settings.onTypographyPresetChanged(preset),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ChoiceChip(
+                      label: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_typographyLabel(context, preset)} · '
+                          '${preset.familyLabel}',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontFamily: preset.fontFamily,
+                                color: palette.textPrimary,
+                              ),
+                        ),
+                      ),
+                      selected: _draftPreset == preset,
+                      selectedColor: palette.primaryMuted,
+                      checkmarkColor: palette.primary,
+                      onSelected: (_) => setState(() => _draftPreset = preset),
+                    ),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           Text(
-            settings.typographyPreset.description,
+            _typographyDescription(context, _draftPreset),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: hasChanges
+                  ? () {
+                      settings.onTypographyPresetChanged(_draftPreset);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            context.tr(
+                              'Tipografía aplicada globalmente.',
+                              'Typography applied throughout the app.',
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+              icon: const Icon(Icons.save_outlined),
+              label: Text(
+                hasChanges
+                    ? context.tr('Guardar cambios', 'Save changes')
+                    : context.tr('Cambios guardados', 'Changes saved'),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _typographyLabel(
+    BuildContext context,
+    AppTypographyPreset preset,
+  ) {
+    return switch (preset) {
+      AppTypographyPreset.moderna => context.tr('Moderna', 'Modern'),
+      AppTypographyPreset.serio => context.tr('Seria', 'Serious'),
+      AppTypographyPreset.normal => context.tr('Normal', 'Standard'),
+    };
+  }
+
+  String _typographyDescription(
+    BuildContext context,
+    AppTypographyPreset preset,
+  ) {
+    return switch (preset) {
+      AppTypographyPreset.moderna => context.tr(
+        'Limpia y actual para paneles.',
+        'Clean and current for dashboards.',
+      ),
+      AppTypographyPreset.serio => context.tr(
+        'Más formal para reportes y enfoque profundo.',
+        'More formal for reports and deep focus.',
+      ),
+      AppTypographyPreset.normal => context.tr(
+        'Neutral y familiar para uso diario.',
+        'Neutral and familiar for daily use.',
+      ),
+    };
   }
 }
 
@@ -653,7 +1182,7 @@ class _TypographyCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tipografía',
+                  context.tr('Tipografía', 'Typography'),
                   style:
                       Theme.of(
                         context,
@@ -664,7 +1193,10 @@ class _TypographyCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sora (Sans-Serif) - Diseñada para legibilidad en estados de flujo.',
+                  context.tr(
+                    'Sora (Sans-Serif) - Diseñada para facilitar la lectura.',
+                    'Sora (Sans-Serif) - Designed for readability.',
+                  ),
                   style: Theme.of(
                     context,
                   ).textTheme.bodyLarge?.copyWith(color: palette.textSecondary),
@@ -675,14 +1207,14 @@ class _TypographyCard extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () {},
-                        child: const Text('Restablecer'),
+                        child: Text(context.tr('Restablecer', 'Reset')),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: FilledButton(
                         onPressed: () {},
-                        child: const Text('Aplicar Todo'),
+                        child: Text(context.tr('Aplicar todo', 'Apply all')),
                       ),
                     ),
                   ],
@@ -729,13 +1261,11 @@ class _ModeTile extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
-    this.disabled = false,
   });
 
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
-  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
@@ -744,9 +1274,7 @@ class _ModeTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: disabled
-            ? palette.background.withValues(alpha: 0.5)
-            : palette.primaryMuted.withValues(alpha: 0.42),
+        color: palette.primaryMuted.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: palette.neutralSoft),
       ),
@@ -756,7 +1284,7 @@ class _ModeTile extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: disabled ? palette.neutral : palette.textPrimary,
+                color: palette.textPrimary,
               ),
             ),
           ),
@@ -856,6 +1384,152 @@ class _NotificationTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _CompletionVibrationTile extends StatelessWidget {
+  const _CompletionVibrationTile({
+    required this.enabled,
+    required this.pattern,
+    required this.onChanged,
+    required this.onPatternChanged,
+    required this.onPreview,
+  });
+
+  final bool enabled;
+  final PomodoroVibrationPattern pattern;
+  final ValueChanged<bool> onChanged;
+  final ValueChanged<PomodoroVibrationPattern> onPatternChanged;
+  final Future<void> Function() onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final previewLabel = context.tr('Probar vibración', 'Test vibration');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.primaryMuted.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: palette.neutralSoft),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.vibration_rounded, color: palette.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr(
+                        'Vibrar al finalizar',
+                        'Vibrate when finished',
+                      ),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      context.tr(
+                        'Aviso háptico al terminar enfoque o descanso',
+                        'Haptic alert when focus or a break finishes',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(value: enabled, onChanged: onChanged),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<PomodoroVibrationPattern>(
+            value: pattern,
+            decoration: InputDecoration(
+              labelText: context.tr(
+                'Patrón de vibración',
+                'Vibration pattern',
+              ),
+              prefixIcon: const Icon(Icons.graphic_eq_rounded),
+            ),
+            items: [
+              for (final option in PomodoroVibrationPattern.values)
+                DropdownMenuItem(
+                  value: option,
+                  child: Text(_vibrationPatternLabel(context, option)),
+                ),
+            ],
+            onChanged: enabled
+                ? (value) {
+                    if (value != null) {
+                      onPatternChanged(value);
+                    }
+                  }
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _vibrationPatternDescription(context, pattern),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Tooltip(
+            message: previewLabel,
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: enabled ? () async => onPreview() : null,
+                icon: const Icon(Icons.touch_app_rounded),
+                label: Text(previewLabel),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _vibrationPatternLabel(
+    BuildContext context,
+    PomodoroVibrationPattern value,
+  ) {
+    return switch (value) {
+      PomodoroVibrationPattern.light => context.tr('Suave', 'Light'),
+      PomodoroVibrationPattern.normal => context.tr('Normal', 'Normal'),
+      PomodoroVibrationPattern.double => context.tr('Doble', 'Double'),
+      PomodoroVibrationPattern.intense => context.tr('Intensa', 'Intense'),
+    };
+  }
+
+  String _vibrationPatternDescription(
+    BuildContext context,
+    PomodoroVibrationPattern value,
+  ) {
+    return switch (value) {
+      PomodoroVibrationPattern.light => context.tr(
+        'Un toque ligero y discreto.',
+        'One light and subtle tap.',
+      ),
+      PomodoroVibrationPattern.normal => context.tr(
+        'Un toque medio, igual al aviso original.',
+        'One medium tap, matching the original alert.',
+      ),
+      PomodoroVibrationPattern.double => context.tr(
+        'Dos toques cortos para distinguir el final.',
+        'Two short taps to make completion distinct.',
+      ),
+      PomodoroVibrationPattern.intense => context.tr(
+        'Un toque fuerte para que sea más perceptible.',
+        'One strong tap for a more noticeable alert.',
+      ),
+    };
   }
 }
 

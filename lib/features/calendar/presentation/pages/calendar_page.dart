@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
@@ -14,6 +15,7 @@ import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomod
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -82,7 +84,7 @@ class _CalendarPageState extends State<CalendarPage> {
       padding: AppCardPaddings.pageWithTop,
       children: [
         Text(
-          'Calendario',
+          context.tr('Calendario', 'Calendar'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontSize: AppDesignTokens.mainTitleFontSize,
             fontWeight: FontWeight.w700,
@@ -90,7 +92,10 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Planifica tus bloques de enfoque sin salir del modo offline.',
+          context.tr(
+            'Planifica tus bloques de enfoque sin salir del modo offline.',
+            'Plan your focus blocks while staying fully offline.',
+          ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 24),
@@ -201,8 +206,13 @@ class _CalendarPageState extends State<CalendarPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('No hay tareas rapidas para programar.'),
+          SnackBar(
+            content: Text(
+              context.tr(
+                'No hay tareas rápidas para programar.',
+                'There are no quick tasks to schedule.',
+              ),
+            ),
           ),
         );
       return;
@@ -225,10 +235,12 @@ class _CalendarPageState extends State<CalendarPage> {
       builder: (dialogContext) => _EditTaskPlanningDialog(
         task: task,
         goals: _goalsController.goalsForDay(_selectedDay),
-        onSave: (goalId) => _updateTaskPlanningFromDialog(
-          task: task,
-          goalId: goalId,
-        ),
+        onSave: ({required goalId, required durationMinutes}) =>
+            _updateTaskPlanningFromDialog(
+              task: task,
+              goalId: goalId,
+              durationMinutes: durationMinutes,
+            ),
         onUnschedule: () => _unscheduleTaskFromDialog(task),
       ),
     );
@@ -313,8 +325,16 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<String?> _updateTaskPlanningFromDialog({
     required Task task,
     required String? goalId,
+    required int durationMinutes,
   }) async {
-    await _tasksController.assignTaskToGoal(task.id, goalId);
+    final saved = await _tasksController.updateTaskPlanning(
+      id: task.id,
+      goalId: goalId,
+      durationMinutes: durationMinutes,
+    );
+    if (!saved) {
+      return _tasksController.validationMessage.value;
+    }
 
     if (mounted) {
       setState(() {});
@@ -344,17 +364,22 @@ class _CalendarPageState extends State<CalendarPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Eliminar tarea'),
-          content: Text('Se eliminara "${task.title}" de este dia.'),
+          title: Text(context.tr('Eliminar tarea', 'Delete task')),
+          content: Text(
+            context.tr(
+              'Se eliminará "${task.title}" de este día.',
+              '"${task.title}" will be removed from this day.',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancelar'),
+              child: Text(context.tr('Cancelar', 'Cancel')),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Eliminar'),
+              label: Text(context.tr('Eliminar', 'Delete')),
             ),
           ],
         );
@@ -396,17 +421,22 @@ class _CalendarPageState extends State<CalendarPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Eliminar objetivo'),
-          content: Text('Se eliminara "${goal.title}" de este dia.'),
+          title: Text(context.tr('Eliminar objetivo', 'Delete goal')),
+          content: Text(
+            context.tr(
+              'Se eliminará "${goal.title}" de este día.',
+              '"${goal.title}" will be removed from this day.',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancelar'),
+              child: Text(context.tr('Cancelar', 'Cancel')),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Eliminar'),
+              label: Text(context.tr('Eliminar', 'Delete')),
             ),
           ],
         );
@@ -423,10 +453,15 @@ class _CalendarPageState extends State<CalendarPage> {
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
-              content: Text('Objetivo eliminado: ${goal.title}'),
+              content: Text(
+                context.tr(
+                  'Objetivo eliminado: ${goal.title}',
+                  'Goal deleted: ${goal.title}',
+                ),
+              ),
               duration: const Duration(seconds: 3),
               action: SnackBarAction(
-                label: 'Deshacer',
+                label: context.tr('Deshacer', 'Undo'),
                 onPressed: () {
                   unawaited(_restoreDeletedGoal(goal, affectedTasks));
                 },
@@ -491,7 +526,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
 
     if (validationMessage != null) {
       setState(() {
-        _validationMessage = validationMessage;
+        _validationMessage = context.localizeMessage(validationMessage);
         _isSaving = false;
       });
       return;
@@ -504,7 +539,12 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: Text('Objetivo para ${_formatShortDate(widget.selectedDay)}'),
+      title: Text(
+        context.tr(
+          'Objetivo para ${_formatShortDate(widget.selectedDay)}',
+          'Goal for ${_formatShortDate(widget.selectedDay)}',
+        ),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -513,7 +553,7 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
             autofocus: true,
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
-              labelText: 'Objetivo',
+              labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
             ),
@@ -524,12 +564,12 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _isSaving ? null : () => unawaited(_submit()),
           icon: const Icon(Icons.add_rounded),
-          label: const Text('Crear'),
+          label: Text(context.tr('Crear', 'Create')),
         ),
       ],
     );
@@ -585,7 +625,7 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
 
     if (validationMessage != null) {
       setState(() {
-        _validationMessage = validationMessage;
+        _validationMessage = context.localizeMessage(validationMessage);
         _isSaving = false;
       });
       return;
@@ -599,7 +639,10 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
     return AlertDialog(
       scrollable: true,
       title: Text(
-        'Editar objetivo de ${_formatShortDate(widget.selectedDay)}',
+        context.tr(
+          'Editar objetivo de ${_formatShortDate(widget.selectedDay)}',
+          'Edit goal for ${_formatShortDate(widget.selectedDay)}',
+        ),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -608,7 +651,7 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
             controller: _titleController,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Objetivo',
+              labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
             ),
@@ -619,12 +662,12 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _isSaving ? null : () => unawaited(_submit()),
           icon: const Icon(Icons.check_rounded),
-          label: const Text('Guardar'),
+          label: Text(context.tr('Guardar', 'Save')),
         ),
       ],
     );
@@ -682,7 +725,7 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
 
     if (validationMessage != null) {
       setState(() {
-        _validationMessage = validationMessage;
+        _validationMessage = context.localizeMessage(validationMessage);
         _isSaving = false;
       });
       return;
@@ -696,7 +739,7 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       scrollable: true,
-      title: const Text('Crear nueva tarea'),
+      title: Text(context.tr('Crear nueva tarea', 'Create new task')),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Column(
@@ -707,7 +750,7 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
               autofocus: true,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: 'Tarea',
+                labelText: context.tr('Tarea', 'Task'),
                 errorText: _validationMessage,
                 prefixIcon: const Icon(Icons.task_alt_rounded),
               ),
@@ -717,9 +760,9 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
             DropdownButtonFormField<int>(
               value: _durationMinutes,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Duracion',
-                prefixIcon: Icon(Icons.timer_outlined),
+              decoration: InputDecoration(
+                labelText: context.tr('Duración', 'Duration'),
+                prefixIcon: const Icon(Icons.timer_outlined),
               ),
               items: const [25, 30, 45, 60, 90, 120]
                   .map(
@@ -742,13 +785,13 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
               DropdownButtonFormField<String?>(
                 value: _selectedGoalId,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Objetivo',
-                  prefixIcon: Icon(Icons.flag_rounded),
+                decoration: InputDecoration(
+                  labelText: context.tr('Objetivo', 'Goal'),
+                  prefixIcon: const Icon(Icons.flag_rounded),
                 ),
                 items: [
-                  const DropdownMenuItem<String?>(
-                    child: Text('Sin objetivo'),
+                  DropdownMenuItem<String?>(
+                    child: Text(context.tr('Sin objetivo', 'No goal')),
                   ),
                   ...widget.goals.map(
                     (goal) => DropdownMenuItem<String?>(
@@ -772,12 +815,12 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _isSaving ? null : () => unawaited(_submit()),
           icon: const Icon(Icons.add_rounded),
-          label: const Text('Crear'),
+          label: Text(context.tr('Crear', 'Create')),
         ),
       ],
     );
@@ -838,15 +881,15 @@ class _ScheduleTaskDialogState extends State<_ScheduleTaskDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Asignar tarea rapida'),
+      title: Text(context.tr('Asignar tarea rápida', 'Assign quick task')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
             value: _selectedTaskId,
-            decoration: const InputDecoration(
-              labelText: 'Tarea rapida',
-              prefixIcon: Icon(Icons.checklist_rounded),
+            decoration: InputDecoration(
+              labelText: context.tr('Tarea rápida', 'Quick task'),
+              prefixIcon: const Icon(Icons.checklist_rounded),
             ),
             items: widget.tasks
                 .map(
@@ -868,13 +911,13 @@ class _ScheduleTaskDialogState extends State<_ScheduleTaskDialog> {
             const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               value: _selectedGoalId,
-              decoration: const InputDecoration(
-                labelText: 'Objetivo',
-                prefixIcon: Icon(Icons.flag_rounded),
+              decoration: InputDecoration(
+                labelText: context.tr('Objetivo', 'Goal'),
+                prefixIcon: const Icon(Icons.flag_rounded),
               ),
               items: [
-                const DropdownMenuItem<String?>(
-                  child: Text('Sin objetivo'),
+                DropdownMenuItem<String?>(
+                  child: Text(context.tr('Sin objetivo', 'No goal')),
                 ),
                 ...widget.goals.map(
                   (goal) => DropdownMenuItem<String?>(
@@ -893,12 +936,12 @@ class _ScheduleTaskDialogState extends State<_ScheduleTaskDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _isSaving ? null : () => unawaited(_submit()),
           icon: const Icon(Icons.calendar_month_rounded),
-          label: const Text('Asignar'),
+          label: Text(context.tr('Asignar', 'Assign')),
         ),
       ],
     );
@@ -915,7 +958,11 @@ class _EditTaskPlanningDialog extends StatefulWidget {
 
   final Task task;
   final List<ProductivityGoal> goals;
-  final Future<String?> Function(String? goalId) onSave;
+  final Future<String?> Function({
+    required String? goalId,
+    required int durationMinutes,
+  })
+  onSave;
   final Future<void> Function() onUnschedule;
 
   @override
@@ -925,17 +972,57 @@ class _EditTaskPlanningDialog extends StatefulWidget {
 
 class _EditTaskPlanningDialogState extends State<_EditTaskPlanningDialog> {
   late String? _selectedGoalId = widget.task.goalId;
+  late final TextEditingController _durationController;
+  String? _validationMessage;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _durationController = TextEditingController(
+      text: '${widget.task.durationMinutes ?? 25}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     if (_isSaving) {
       return;
     }
 
+    final durationMinutes = int.tryParse(_durationController.text.trim());
+    if (durationMinutes == null ||
+        durationMinutes <= 0 ||
+        durationMinutes > 24 * 60) {
+      setState(() {
+        _validationMessage = context.tr(
+          'Escribe una duración entre 1 y 1440 minutos.',
+          'Enter a duration between 1 and 1440 minutes.',
+        );
+      });
+      return;
+    }
+
     setState(() => _isSaving = true);
-    await widget.onSave(_selectedGoalId);
+    final validationMessage = await widget.onSave(
+      goalId: _selectedGoalId,
+      durationMinutes: durationMinutes,
+    );
 
     if (!mounted) {
+      return;
+    }
+
+    if (validationMessage != null) {
+      setState(() {
+        _isSaving = false;
+        _validationMessage = context.localizeMessage(validationMessage);
+      });
       return;
     }
 
@@ -961,55 +1048,109 @@ class _EditTaskPlanningDialogState extends State<_EditTaskPlanningDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Planificacion de tarea'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.task_alt_rounded),
-            title: Text(widget.task.title),
-            subtitle: const Text('Tarea planificada'),
-          ),
-          DropdownButtonFormField<String?>(
-            value: _selectedGoalId,
-            decoration: const InputDecoration(
-              labelText: 'Objetivo',
-              prefixIcon: Icon(Icons.flag_rounded),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(context.tr('Planificación de tarea', 'Task planning')),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.task_alt_rounded),
+              title: Text(widget.task.title),
+              subtitle: Text(context.tr('Tarea planificada', 'Planned task')),
             ),
-            items: [
-              const DropdownMenuItem<String?>(
-                child: Text('Sin objetivo'),
+            DropdownButtonFormField<String?>(
+              value: _selectedGoalId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: context.tr('Objetivo', 'Goal'),
+                prefixIcon: const Icon(Icons.flag_rounded),
               ),
-              ...widget.goals.map(
-                (goal) => DropdownMenuItem<String?>(
-                  value: goal.id,
-                  child: Text(goal.title),
+              items: [
+                DropdownMenuItem<String?>(
+                  child: Text(context.tr('Sin objetivo', 'No goal')),
                 ),
+                ...widget.goals.map(
+                  (goal) => DropdownMenuItem<String?>(
+                    value: goal.id,
+                    child: Text(
+                      goal.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: _isSaving
+                  ? null
+                  : (value) => setState(() => _selectedGoalId = value),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _durationController,
+              enabled: !_isSaving,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: context.tr(
+                  'Duración en minutos',
+                  'Duration in minutes',
+                ),
+                prefixIcon: const Icon(Icons.timer_outlined),
+                errorText: _validationMessage,
               ),
-            ],
-            onChanged: (value) {
-              setState(() => _selectedGoalId = value);
-            },
-          ),
-        ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final minutes in const [25, 30, 45, 60, 90, 120])
+                  ChoiceChip(
+                    label: Text('$minutes min'),
+                    selected: int.tryParse(_durationController.text) == minutes,
+                    onSelected: _isSaving
+                        ? null
+                        : (_) {
+                            setState(() {
+                              _durationController.text = '$minutes';
+                              _validationMessage = null;
+                            });
+                          },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isSaving ? null : () => unawaited(_submit()),
+                icon: const Icon(Icons.save_rounded),
+                label: Text(context.tr('Guardar', 'Save')),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+                child: Text(context.tr('Cancelar', 'Cancel')),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: _isSaving ? null : () => unawaited(_unschedule()),
+                icon: const Icon(Icons.event_busy_rounded),
+                label: Text(context.tr('Quitar del día', 'Remove from day')),
+              ),
+            ),
+          ],
+        ),
       ),
-      actions: [
-        TextButton.icon(
-          onPressed: _isSaving ? null : () => unawaited(_unschedule()),
-          icon: const Icon(Icons.event_busy_rounded),
-          label: const Text('Quitar del dia'),
-        ),
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton.icon(
-          onPressed: _isSaving ? null : () => unawaited(_submit()),
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('Guardar'),
-        ),
-      ],
     );
   }
 }
@@ -1043,7 +1184,7 @@ class _MonthCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  _formatMonth(visibleMonth),
+                  _formatMonth(context, visibleMonth),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontSize: AppDesignTokens.sectionTitleFontSize,
                     fontWeight: FontWeight.w700,
@@ -1052,13 +1193,13 @@ class _MonthCard extends StatelessWidget {
               ),
               _ArrowButton(
                 icon: Icons.chevron_left_rounded,
-                tooltip: 'Mes anterior',
+                tooltip: context.tr('Mes anterior', 'Previous month'),
                 onPressed: onPreviousMonth,
               ),
               const SizedBox(width: 8),
               _ArrowButton(
                 icon: Icons.chevron_right_rounded,
-                tooltip: 'Mes siguiente',
+                tooltip: context.tr('Mes siguiente', 'Next month'),
                 onPressed: onNextMonth,
               ),
             ],
@@ -1118,7 +1259,9 @@ class _CalendarGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+    final labels = context.l10n.localeName == 'en'
+        ? const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        : const ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     final days = _monthGridDays(visibleMonth);
 
     return Column(
@@ -1308,7 +1451,7 @@ class _AgendaCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  _formatSelectedDay(selectedDay),
+                  _formatSelectedDay(context, selectedDay),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontSize: AppDesignTokens.sectionTitleFontSize,
                     fontWeight: FontWeight.w700,
@@ -1323,7 +1466,10 @@ class _AgendaCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Agenda local de planificacion',
+            context.tr(
+              'Agenda local de planificación',
+              'Local planning agenda',
+            ),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -1336,12 +1482,12 @@ class _AgendaCard extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: onAddTask,
                 icon: const Icon(Icons.add_task_rounded),
-                label: const Text('Nueva tarea'),
+                label: Text(context.tr('Nueva tarea', 'New task')),
               ),
               MenuAnchor(
                 builder: (context, controller, child) {
                   return IconButton.outlined(
-                    tooltip: 'Mas acciones',
+                    tooltip: context.tr('Más acciones', 'More actions'),
                     onPressed: () {
                       if (controller.isOpen) {
                         controller.close();
@@ -1356,12 +1502,14 @@ class _AgendaCard extends StatelessWidget {
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.flag_rounded),
                     onPressed: onAddGoal,
-                    child: const Text('Crear objetivo'),
+                    child: Text(context.tr('Crear objetivo', 'Create goal')),
                   ),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.playlist_add_check_rounded),
                     onPressed: onScheduleTask,
-                    child: const Text('Asignar tarea rapida'),
+                    child: Text(
+                      context.tr('Asignar tarea rápida', 'Assign quick task'),
+                    ),
                   ),
                 ],
               ),
@@ -1384,7 +1532,7 @@ class _AgendaCard extends StatelessWidget {
             if (tasks.isNotEmpty) ...[
               _AgendaSectionTitle(
                 icon: Icons.task_alt_rounded,
-                label: 'Tareas del dia',
+                label: context.tr('Tareas del día', 'Tasks for the day'),
                 count: tasks.length,
               ),
               const SizedBox(height: 10),
@@ -1538,7 +1686,7 @@ class _TaskStatusSummaryMenuItem extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(_taskStatusLabel(status)),
+          Text(_taskStatusLabel(context, status)),
           const SizedBox(width: 18),
           Container(
             width: 30,
@@ -1598,12 +1746,12 @@ class _GoalDeadlineTile extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
-                const _Tag(label: 'Objetivo'),
+                _Tag(label: context.tr('Objetivo', 'Goal')),
               ],
             ),
           ),
           PopupMenuButton<_GoalDeadlineAction>(
-            tooltip: 'Opciones de objetivo',
+            tooltip: context.tr('Opciones de objetivo', 'Goal options'),
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (action) {
               switch (action) {
@@ -1613,19 +1761,19 @@ class _GoalDeadlineTile extends StatelessWidget {
                   onDelete();
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: _GoalDeadlineAction.edit,
                 child: ListTile(
-                  leading: Icon(Icons.edit_rounded),
-                  title: Text('Editar objetivo'),
+                  leading: const Icon(Icons.edit_rounded),
+                  title: Text(context.tr('Editar objetivo', 'Edit goal')),
                 ),
               ),
               PopupMenuItem(
                 value: _GoalDeadlineAction.delete,
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline_rounded),
-                  title: Text('Eliminar objetivo'),
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(context.tr('Eliminar objetivo', 'Delete goal')),
                 ),
               ),
             ],
@@ -1700,14 +1848,14 @@ class _PlannedTaskTile extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     _Tag(
-                      label: _taskStatusLabel(task.status),
+                      label: _taskStatusLabel(context, task.status),
                       color: statusStyle.color,
                       background: statusStyle.background,
                     ),
                     if (task.durationMinutes != null)
                       _Tag(label: '${task.durationMinutes} min'),
                     if (goal == null)
-                      const _Tag(label: 'Sin objetivo')
+                      _Tag(label: context.tr('Sin objetivo', 'No goal'))
                     else
                       _Tag(label: goal!.title),
                   ],
@@ -1724,7 +1872,7 @@ class _PlannedTaskTile extends StatelessWidget {
             ),
           ),
           PopupMenuButton<_PlannedTaskAction>(
-            tooltip: 'Opciones de tarea',
+            tooltip: context.tr('Opciones de tarea', 'Task options'),
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (action) {
               switch (action) {
@@ -1742,48 +1890,56 @@ class _PlannedTaskTile extends StatelessWidget {
                   onStatusChanged(TaskStatus.completed);
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: _PlannedTaskAction.startFocus,
                 child: ListTile(
-                  leading: Icon(Icons.play_arrow_rounded),
-                  title: Text('Empezar Pomodoro'),
+                  leading: const Icon(Icons.play_arrow_rounded),
+                  title: Text(
+                    context.tr('Empezar Pomodoro', 'Start Pomodoro'),
+                  ),
                 ),
               ),
               PopupMenuItem(
                 value: _PlannedTaskAction.editPlanning,
                 child: ListTile(
-                  leading: Icon(Icons.edit_calendar_rounded),
-                  title: Text('Editar planificacion'),
+                  leading: const Icon(Icons.edit_calendar_rounded),
+                  title: Text(
+                    context.tr('Editar planificación', 'Edit planning'),
+                  ),
                 ),
               ),
               PopupMenuItem(
                 value: _PlannedTaskAction.markListed,
                 child: ListTile(
-                  leading: Icon(Icons.radio_button_unchecked_rounded),
-                  title: Text('Marcar pendiente'),
+                  leading: const Icon(Icons.radio_button_unchecked_rounded),
+                  title: Text(context.tr('Marcar pendiente', 'Mark pending')),
                 ),
               ),
               PopupMenuItem(
                 value: _PlannedTaskAction.markInProgress,
                 child: ListTile(
-                  leading: Icon(Icons.timelapse_rounded),
-                  title: Text('Marcar en progreso'),
+                  leading: const Icon(Icons.timelapse_rounded),
+                  title: Text(
+                    context.tr('Marcar en progreso', 'Mark in progress'),
+                  ),
                 ),
               ),
               PopupMenuItem(
                 value: _PlannedTaskAction.markCompleted,
                 child: ListTile(
-                  leading: Icon(Icons.check_circle_rounded),
-                  title: Text('Marcar completada'),
+                  leading: const Icon(Icons.check_circle_rounded),
+                  title: Text(
+                    context.tr('Marcar completada', 'Mark completed'),
+                  ),
                 ),
               ),
-              PopupMenuDivider(),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: _PlannedTaskAction.deleteTask,
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline_rounded),
-                  title: Text('Eliminar tarea'),
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(context.tr('Eliminar tarea', 'Delete task')),
                 ),
               ),
             ],
@@ -1880,7 +2036,10 @@ class _EmptyAgenda extends StatelessWidget {
         border: Border.all(color: palette.neutralSoft),
       ),
       child: Text(
-        'Sin tareas planificadas para el ${day.day}.',
+        context.tr(
+          'Sin tareas planificadas para el ${day.day}.',
+          'No tasks planned for day ${day.day}.',
+        ),
         style: Theme.of(
           context,
         ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
@@ -1979,12 +2138,20 @@ bool _sameDate(DateTime first, DateTime second) {
       first.day == second.day;
 }
 
-String _formatMonth(DateTime date) {
-  return '${_monthNames[date.month - 1]} ${date.year}';
+String _formatMonth(BuildContext context, DateTime date) {
+  final months = context.l10n.localeName == 'en'
+      ? _monthNamesEnglish
+      : _monthNamesSpanish;
+  return '${months[date.month - 1]} ${date.year}';
 }
 
-String _formatSelectedDay(DateTime date) {
-  return '${_weekdayNames[date.weekday % 7]} ${date.day} de ${_monthNames[date.month - 1]}';
+String _formatSelectedDay(BuildContext context, DateTime date) {
+  final isEnglish = context.l10n.localeName == 'en';
+  final weekdays = isEnglish ? _weekdayNamesEnglish : _weekdayNamesSpanish;
+  final months = isEnglish ? _monthNamesEnglish : _monthNamesSpanish;
+  return isEnglish
+      ? '${weekdays[date.weekday % 7]}, ${months[date.month - 1]} ${date.day}'
+      : '${weekdays[date.weekday % 7]} ${date.day} de ${months[date.month - 1]}';
 }
 
 String _formatTimeRange(CalendarEvent event) {
@@ -2027,11 +2194,11 @@ Map<String, int> _focusedSecondsByTask(List<PomodoroSession> sessions) {
   return focusedSecondsByTask;
 }
 
-String _taskStatusLabel(TaskStatus status) {
+String _taskStatusLabel(BuildContext context, TaskStatus status) {
   return switch (status) {
-    TaskStatus.listed => 'Pendiente',
-    TaskStatus.inProgress => 'En progreso',
-    TaskStatus.completed => 'Completada',
+    TaskStatus.listed => context.tr('Pendiente', 'Pending'),
+    TaskStatus.inProgress => context.tr('En progreso', 'In progress'),
+    TaskStatus.completed => context.tr('Completada', 'Completed'),
   };
 }
 
@@ -2088,7 +2255,7 @@ Color _calendarProgressColor(TaskProgressBand band) {
   };
 }
 
-const _monthNames = [
+const _monthNamesSpanish = [
   'Enero',
   'Febrero',
   'Marzo',
@@ -2103,7 +2270,22 @@ const _monthNames = [
   'Diciembre',
 ];
 
-const _weekdayNames = [
+const _monthNamesEnglish = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const _weekdayNamesSpanish = [
   'Domingo',
   'Lunes',
   'Martes',
@@ -2111,4 +2293,14 @@ const _weekdayNames = [
   'Jueves',
   'Viernes',
   'Sabado',
+];
+
+const _weekdayNamesEnglish = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
 ];

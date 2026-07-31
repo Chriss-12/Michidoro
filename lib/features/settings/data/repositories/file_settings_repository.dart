@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
+import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/entities/timer_preferences.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 
 class FileSettingsRepository implements SettingsRepository {
   const FileSettingsRepository();
@@ -36,6 +38,9 @@ class FileSettingsRepository implements SettingsRepository {
           'completionVibrationEnabled',
           fallback: true,
         ),
+        completionVibrationPattern: _readVibrationPattern(
+          decoded['completionVibrationPattern'],
+        ),
         autoStartBreak: _readBool(decoded, 'autoStartBreak', fallback: true),
         autoStartFocus: _readBool(decoded, 'autoStartFocus'),
         reportsDirectoryPath: _readString(decoded, 'reportsDirectoryPath'),
@@ -43,10 +48,14 @@ class FileSettingsRepository implements SettingsRepository {
         profileEmail: _readString(decoded, 'profileEmail'),
         profileImagePath: _readString(decoded, 'profileImagePath'),
         avatarIndex: _readInt(decoded, 'avatarIndex', 0),
+        themePreset: _readThemePreset(decoded['themePreset']),
+        isDarkMode: _readBool(decoded, 'isDarkMode'),
+        fontScale: _readDouble(decoded, 'fontScale', 1),
         typographyPreset: _readTypographyPreset(decoded['typographyPreset']),
         enabledStatisticsCharts: _readStatisticsCharts(
           decoded['enabledStatisticsCharts'],
         ),
+        language: AppLanguage.fromCode(decoded['languageCode']),
       ).normalized();
     } on FormatException {
       return const TimerPreferences.defaults();
@@ -67,6 +76,8 @@ class FileSettingsRepository implements SettingsRepository {
         'longBreakFrequency': normalized.longBreakFrequency,
         'completionSound': normalized.completionSound.name,
         'completionVibrationEnabled': normalized.completionVibrationEnabled,
+        'completionVibrationPattern':
+            normalized.completionVibrationPattern.name,
         'autoStartBreak': normalized.autoStartBreak,
         'autoStartFocus': normalized.autoStartFocus,
         'reportsDirectoryPath': normalized.reportsDirectoryPath,
@@ -74,10 +85,14 @@ class FileSettingsRepository implements SettingsRepository {
         'profileEmail': normalized.profileEmail,
         'profileImagePath': normalized.profileImagePath,
         'avatarIndex': normalized.avatarIndex,
+        'themePreset': normalized.themePreset.name,
+        'isDarkMode': normalized.isDarkMode,
+        'fontScale': normalized.fontScale,
         'typographyPreset': normalized.typographyPreset.name,
         'enabledStatisticsCharts': [
           for (final chart in normalized.enabledStatisticsCharts) chart.name,
         ],
+        'languageCode': normalized.language.code,
       }),
       flush: true,
     );
@@ -106,6 +121,15 @@ class FileSettingsRepository implements SettingsRepository {
     return value is bool ? value : fallback;
   }
 
+  static double _readDouble(
+    Map<String, dynamic> source,
+    String key,
+    double fallback,
+  ) {
+    final value = source[key];
+    return value is num ? value.toDouble() : fallback;
+  }
+
   static String _readString(
     Map<String, dynamic> source,
     String key, {
@@ -126,6 +150,17 @@ class FileSettingsRepository implements SettingsRepository {
     );
   }
 
+  static PomodoroVibrationPattern _readVibrationPattern(Object? value) {
+    if (value is! String) {
+      return PomodoroVibrationPattern.normal;
+    }
+
+    return PomodoroVibrationPattern.values.firstWhere(
+      (pattern) => pattern.name == value,
+      orElse: () => PomodoroVibrationPattern.normal,
+    );
+  }
+
   static AppTypographyPreset _readTypographyPreset(Object? value) {
     if (value is! String) {
       return AppTypographyPreset.moderna;
@@ -134,6 +169,17 @@ class FileSettingsRepository implements SettingsRepository {
     return AppTypographyPreset.values.firstWhere(
       (preset) => preset.name == value,
       orElse: () => AppTypographyPreset.moderna,
+    );
+  }
+
+  static AppThemePreset _readThemePreset(Object? value) {
+    if (value is! String) {
+      return AppThemePreset.natureFocus;
+    }
+
+    return AppThemePreset.values.firstWhere(
+      (preset) => preset.name == value,
+      orElse: () => AppThemePreset.natureFocus,
     );
   }
 

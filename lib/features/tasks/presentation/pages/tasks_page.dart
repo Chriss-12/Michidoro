@@ -6,6 +6,7 @@ import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -56,7 +57,7 @@ class _TasksPageState extends State<TasksPage> {
           children: [
             const SizedBox(height: 24),
             Text(
-              'Mis tareas',
+              context.tr('Mis tareas', 'My tasks'),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontSize: AppDesignTokens.mainTitleFontSize,
                 fontWeight: FontWeight.w700,
@@ -64,7 +65,10 @@ class _TasksPageState extends State<TasksPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Organiza lo importante de hoy',
+              context.tr(
+                'Organiza lo importante de hoy',
+                'Organize what matters today',
+              ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: palette.textSecondary,
               ),
@@ -79,9 +83,15 @@ class _TasksPageState extends State<TasksPage> {
                     controller: _titleController,
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
-                      labelText: 'Nueva tarea',
-                      hintText: 'Ej. Revisar avance del proyecto',
-                      errorText: validationMessage,
+                      labelText: context.tr('Nueva tarea', 'New task'),
+                      hintText: context.tr(
+                        'Ej. Revisar avance del proyecto',
+                        'E.g. Review project progress',
+                      ),
+                      errorText: _localizedValidationMessage(
+                        context,
+                        validationMessage,
+                      ),
                       prefixIcon: const Icon(Icons.add_task_rounded),
                     ),
                     onChanged: (_) => _tasksController.clearValidationMessage(),
@@ -93,7 +103,7 @@ class _TasksPageState extends State<TasksPage> {
                     child: FilledButton.icon(
                       onPressed: _createTask,
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('Agregar tarea'),
+                      label: Text(context.tr('Agregar tarea', 'Add task')),
                     ),
                   ),
                 ],
@@ -153,15 +163,17 @@ class _TaskFilterBar extends StatelessWidget {
         segments: [
           ButtonSegment(
             value: TaskFilter.all,
-            label: Text('Todas (${tasks.length})'),
+            label: Text('${context.tr('Todas', 'All')} (${tasks.length})'),
           ),
           ButtonSegment(
             value: TaskFilter.active,
-            label: Text('Activas ($activeCount)'),
+            label: Text('${context.tr('Activas', 'Active')} ($activeCount)'),
           ),
           ButtonSegment(
             value: TaskFilter.completed,
-            label: Text('Hechas ($completedCount)'),
+            label: Text(
+              '${context.tr('Hechas', 'Completed')} ($completedCount)',
+            ),
           ),
         ],
         selected: {selectedFilter},
@@ -192,7 +204,7 @@ class _EmptyTasksState extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Text(
-          'Sin tareas todavia',
+          context.tr('Sin tareas todavía', 'No tasks yet'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontSize: AppDesignTokens.sectionTitleFontSize,
             fontWeight: FontWeight.w800,
@@ -200,7 +212,10 @@ class _EmptyTasksState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Agrega tu primera tarea para empezar a planificar el dia.',
+          context.tr(
+            'Agrega tu primera tarea para empezar a planificar el día.',
+            'Add your first task to start planning your day.',
+          ),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: palette.textSecondary,
@@ -241,7 +256,7 @@ class _TaskList extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Tareas de hoy',
+                context.tr('Tareas de hoy', "Today's tasks"),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w800,
@@ -282,9 +297,18 @@ class _FilteredEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final label = switch (filter) {
-      TaskFilter.all => 'No hay tareas para mostrar.',
-      TaskFilter.active => 'No quedan tareas activas.',
-      TaskFilter.completed => 'Todavia no completaste tareas.',
+      TaskFilter.all => context.tr(
+        'No hay tareas para mostrar.',
+        'There are no tasks to show.',
+      ),
+      TaskFilter.active => context.tr(
+        'No quedan tareas activas.',
+        'There are no active tasks left.',
+      ),
+      TaskFilter.completed => context.tr(
+        'Todavía no completaste tareas.',
+        "You haven't completed any tasks yet.",
+      ),
     };
 
     return Column(
@@ -334,8 +358,8 @@ class _TaskTile extends StatelessWidget {
             dimension: 42,
             child: IconButton(
               tooltip: task.isCompleted
-                  ? 'Marcar como activa'
-                  : 'Marcar como completada',
+                  ? context.tr('Marcar como activa', 'Mark as active')
+                  : context.tr('Marcar como completada', 'Mark as completed'),
               onPressed: onToggleCompleted,
               icon: Icon(
                 task.isCompleted
@@ -358,17 +382,17 @@ class _TaskTile extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Empezar Pomodoro',
+            tooltip: context.tr('Empezar Pomodoro', 'Start Pomodoro'),
             onPressed: onStartFocus,
             icon: const Icon(Icons.play_arrow_rounded),
           ),
           IconButton(
-            tooltip: 'Editar tarea',
+            tooltip: context.tr('Editar tarea', 'Edit task'),
             onPressed: onEdit,
             icon: const Icon(Icons.edit_rounded),
           ),
           IconButton(
-            tooltip: 'Eliminar tarea',
+            tooltip: context.tr('Eliminar tarea', 'Delete task'),
             onPressed: onDelete,
             icon: const Icon(Icons.delete_outline_rounded),
           ),
@@ -397,17 +421,22 @@ extension on _TasksPageState {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Eliminar tarea'),
-          content: Text('Eliminar "${task.title}" de la lista?'),
+          title: Text(context.tr('Eliminar tarea', 'Delete task')),
+          content: Text(
+            context.tr(
+              '¿Eliminar "${task.title}" de la lista?',
+              'Delete "${task.title}" from the list?',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
+              child: Text(context.tr('Cancelar', 'Cancel')),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
               icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Eliminar'),
+              label: Text(context.tr('Eliminar', 'Delete')),
             ),
           ],
         );
@@ -450,7 +479,10 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
 
     if (title.isEmpty) {
       setState(() {
-        _errorText = 'Escribe un titulo para guardar la tarea.';
+        _errorText = context.tr(
+          'Escribe un título para guardar la tarea.',
+          'Enter a title to save the task.',
+        );
       });
       return;
     }
@@ -461,12 +493,12 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Editar tarea'),
+      title: Text(context.tr('Editar tarea', 'Edit task')),
       content: TextField(
         controller: _controller,
         autofocus: true,
         decoration: InputDecoration(
-          labelText: 'Titulo',
+          labelText: context.tr('Título', 'Title'),
           errorText: _errorText,
         ),
         textInputAction: TextInputAction.done,
@@ -484,14 +516,36 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _save,
           icon: const Icon(Icons.save_rounded),
-          label: const Text('Guardar'),
+          label: Text(context.tr('Guardar', 'Save')),
         ),
       ],
     );
   }
+}
+
+String? _localizedValidationMessage(BuildContext context, String? message) {
+  if (message == null) {
+    return null;
+  }
+
+  return switch (message) {
+    'Escribe un titulo para guardar la tarea.' => context.tr(
+      'Escribe un título para guardar la tarea.',
+      'Enter a title to save the task.',
+    ),
+    'La duracion debe estar entre 1 y 1440 minutos.' => context.tr(
+      'La duración debe estar entre 1 y 1440 minutos.',
+      'Duration must be between 1 and 1440 minutes.',
+    ),
+    'No se pudo actualizar la tarea.' => context.tr(
+      'No se pudo actualizar la tarea.',
+      'The task could not be updated.',
+    ),
+    _ => message,
+  };
 }

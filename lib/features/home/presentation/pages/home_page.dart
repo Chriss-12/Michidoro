@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,8 +11,10 @@ import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
-import 'package:pomodoro_app_v1/features/tasks/presentation/pages/tasks_page.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -27,7 +31,10 @@ class HomePage extends StatelessWidget {
       padding: AppCardPaddings.page,
       children: [
         Text(
-          'Hola, ${settings.profileName}',
+          context.tr(
+            'Hola, ${settings.profileName}',
+            'Hello, ${settings.profileName}',
+          ),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontSize: AppDesignTokens.mainTitleFontSize,
             fontWeight: FontWeight.w700,
@@ -35,7 +42,7 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Listo para enfocarte hoy',
+          context.tr('Listo para enfocarte hoy', 'Ready to focus today'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 36),
@@ -50,8 +57,6 @@ class HomePage extends StatelessWidget {
         const _DailyGoalCard(),
         const SizedBox(height: 18),
         const _EnergyCard(),
-        const SizedBox(height: 18),
-        const _TodayTasksCard(),
         const SizedBox(height: 18),
         const _WeeklyProgressCardV2(),
       ],
@@ -77,12 +82,15 @@ class _CalendarPlanningCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Planificacion',
+                  context.tr('Planificación', 'Planning'),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Revisa tu calendario local de enfoque.',
+                  context.tr(
+                    'Revisa tu calendario local de enfoque.',
+                    'Review your local focus calendar.',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -91,7 +99,7 @@ class _CalendarPlanningCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Abrir calendario',
+            tooltip: context.tr('Abrir calendario', 'Open calendar'),
             onPressed: () => context.push(CalendarPage.routePath),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
@@ -120,12 +128,6 @@ class _PerformanceHistoryCardState extends State<_PerformanceHistoryCard> {
     _PerformanceRange.month: [0.46, 0.61, 0.73, 0.81],
   };
 
-  static const _labels = <_PerformanceRange, List<String>>{
-    _PerformanceRange.day: ['08', '10', '12', '14', '16', '18', '20'],
-    _PerformanceRange.week: ['L', 'M', 'X', 'J', 'V', 'S', 'D'],
-    _PerformanceRange.month: ['S1', 'S2', 'S3', 'S4'],
-  };
-
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -139,7 +141,7 @@ class _PerformanceHistoryCardState extends State<_PerformanceHistoryCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Historial de rendimiento',
+            context.tr('Historial de rendimiento', 'Performance history'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontSize: AppDesignTokens.sectionTitleFontSize,
               fontWeight: FontWeight.w700,
@@ -147,24 +149,32 @@ class _PerformanceHistoryCardState extends State<_PerformanceHistoryCard> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Evolución del rendimiento por período',
+            context.tr(
+              'Evolución del rendimiento por período',
+              'Performance over time',
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          SizedBox(
+            width: double.infinity,
             child: SegmentedButton<_PerformanceRange>(
-              segments: const [
-                ButtonSegment(value: _PerformanceRange.day, label: Text('Día')),
+              expandedInsets: EdgeInsets.zero,
+              style: _compactSegmentStyle,
+              segments: [
+                ButtonSegment(
+                  value: _PerformanceRange.day,
+                  label: Text(context.tr('Día', 'Day')),
+                ),
                 ButtonSegment(
                   value: _PerformanceRange.week,
-                  label: Text('Semana'),
+                  label: Text(context.tr('Semana', 'Week')),
                 ),
                 ButtonSegment(
                   value: _PerformanceRange.month,
-                  label: Text('Mes'),
+                  label: Text(context.tr('Mes', 'Month')),
                 ),
               ],
               selected: {_range},
@@ -181,8 +191,9 @@ class _PerformanceHistoryCardState extends State<_PerformanceHistoryCard> {
               child: CustomPaint(
                 painter: _PerformanceLinePainter(
                   palette: palette,
+                  fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
                   values: values,
-                  labels: _labels[_range]!,
+                  labels: _performanceDemoLabels(context, _range),
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -192,15 +203,18 @@ class _PerformanceHistoryCardState extends State<_PerformanceHistoryCard> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HistorySummaryRow(label: 'Promedio', value: '$average%'),
+              _HistorySummaryRow(
+                label: context.tr('Promedio', 'Average'),
+                value: '$average%',
+              ),
               const SizedBox(height: 8),
               _HistorySummaryRow(
-                label: 'Período',
-                value: _range.label,
+                label: context.tr('Período', 'Period'),
+                value: _range.label(context),
               ),
               const SizedBox(height: 8),
               Text(
-                'Datos de demostración',
+                context.tr('Datos de demostración', 'Demo data'),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -237,7 +251,8 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
           for (final count in taskCounts) count / maxTasks,
         ];
         final labels = [
-          for (final progress in weekProgress) _weekdayShortLabel(progress.day),
+          for (final progress in weekProgress)
+            _weekdayShortLabel(context, progress.day),
         ];
         final total = weekProgress.fold<int>(
           0,
@@ -254,7 +269,7 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Historial de rendimiento',
+                context.tr('Historial de rendimiento', 'Performance history'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w700,
@@ -262,7 +277,10 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Tareas por dia de la semana actual',
+                context.tr(
+                  'Tareas por día de la semana actual',
+                  'Tasks by day of the current week',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -274,6 +292,9 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
                   child: CustomPaint(
                     painter: _PerformanceLinePainter(
                       palette: palette,
+                      fontFamily: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.fontFamily,
                       values: values,
                       labels: labels,
                     ),
@@ -285,14 +306,20 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _HistorySummaryRow(label: 'Tareas', value: '$total'),
+                  _HistorySummaryRow(
+                    label: context.tr('Tareas', 'Tasks'),
+                    value: '$total',
+                  ),
                   const SizedBox(height: 8),
                   _HistorySummaryRow(
-                    label: 'Completadas',
+                    label: context.tr('Completadas', 'Completed'),
                     value: '$completion%',
                   ),
                   const SizedBox(height: 8),
-                  const _HistorySummaryRow(label: 'Periodo', value: 'Semana'),
+                  _HistorySummaryRow(
+                    label: context.tr('Período', 'Period'),
+                    value: context.tr('Semana', 'Week'),
+                  ),
                 ],
               ),
             ],
@@ -304,12 +331,12 @@ class _PerformanceHistoryCardV2 extends StatelessWidget {
 }
 
 extension on _PerformanceRange {
-  String get label {
+  String label(BuildContext context) {
     return switch (this) {
-      _PerformanceRange.day => 'Día',
-      _PerformanceRange.week => 'Semana',
-      _PerformanceRange.month => 'Mes',
-      _PerformanceRange.year => 'Año',
+      _PerformanceRange.day => context.tr('Día', 'Day'),
+      _PerformanceRange.week => context.tr('Semana', 'Week'),
+      _PerformanceRange.month => context.tr('Mes', 'Month'),
+      _PerformanceRange.year => context.tr('Año', 'Year'),
     };
   }
 }
@@ -349,11 +376,13 @@ class _HistorySummaryRow extends StatelessWidget {
 class _PerformanceLinePainter extends CustomPainter {
   const _PerformanceLinePainter({
     required this.palette,
+    required this.fontFamily,
     required this.values,
     required this.labels,
   });
 
   final AppPalette palette;
+  final String? fontFamily;
   final List<double> values;
   final List<String> labels;
 
@@ -423,12 +452,25 @@ class _PerformanceLinePainter extends CustomPainter {
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
+    final maximumLabels = values.length < 2
+        ? 1
+        : (chartWidth / 36).floor().clamp(2, values.length);
+    final labelStride = values.length <= maximumLabels
+        ? 1
+        : (values.length / maximumLabels).ceil();
     for (var index = 0; index < points.length; index++) {
       canvas.drawCircle(points[index], 4, pointPaint);
+      if (index % labelStride != 0 && index != points.length - 1) {
+        continue;
+      }
       textPainter
         ..text = TextSpan(
           text: labels[index],
-          style: TextStyle(color: palette.textSecondary, fontSize: 10),
+          style: TextStyle(
+            color: palette.textSecondary,
+            fontFamily: fontFamily,
+            fontSize: 10,
+          ),
         )
         ..layout()
         ..paint(
@@ -441,6 +483,7 @@ class _PerformanceLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PerformanceLinePainter oldDelegate) {
     return oldDelegate.palette != palette ||
+        oldDelegate.fontFamily != fontFamily ||
         !listEquals(oldDelegate.values, values) ||
         !listEquals(oldDelegate.labels, labels);
   }
@@ -456,6 +499,23 @@ class _PerformanceDashboardCard extends StatefulWidget {
 
 class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
   _PerformanceRange _range = _PerformanceRange.month;
+  Object? _tasksRevision;
+  Object? _sessionsRevision;
+  _PerformanceRange? _loadedRange;
+  Future<StatisticsReportData>? _reportFuture;
+  Timer? _rangeRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleRangeRefresh();
+  }
+
+  @override
+  void dispose() {
+    _rangeRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -465,11 +525,9 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
 
     return SignalBuilder(
       builder: (context) {
-        final snapshot = _PerformanceSnapshot.fromControllers(
-          range: _range,
-          focusMinutes: settings.focusMinutes,
-          tasksController: tasksController,
-          pomodoroController: pomodoroController,
+        final reportFuture = _reportFor(
+          tasksRevision: tasksController.tasks.value,
+          sessionsRevision: pomodoroController.sessions.value,
         );
         final visibleCharts = settings.enabledStatisticsCharts;
 
@@ -478,18 +536,38 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Rendimiento ${_range.titleSuffix}',
+                context.tr('Rendimiento', 'Performance') +
+                    _range.titleSuffix(context),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                snapshot.summaryLabel,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.palette.textSecondary,
-                ),
+              FutureBuilder<StatisticsReportData>(
+                future: reportFuture,
+                builder: (context, reportSnapshot) {
+                  final report = reportSnapshot.data;
+                  final label =
+                      reportSnapshot.connectionState == ConnectionState.done &&
+                          report != null
+                      ? _PerformanceSnapshot.fromReportData(
+                          context: context,
+                          range: _range,
+                          focusMinutes: settings.focusMinutes,
+                          report: report,
+                        ).summaryLabel(context)
+                      : context.tr(
+                          'Resumen de actividad del período',
+                          'Activity summary for this period',
+                        );
+                  return Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.palette.textSecondary,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 14),
               _PerformanceRangeSelector(
@@ -502,54 +580,206 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
                 onToggle: settings.onStatisticsChartVisibilityChanged,
               ),
               const SizedBox(height: 18),
-              if (visibleCharts.contains(StatisticsChartType.circular)) ...[
-                _DashboardSection(
-                  title: 'Circular',
-                  child: _OverallProgressChart(
-                    progress: snapshot.overallProgress,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (visibleCharts.contains(StatisticsChartType.stackedBars)) ...[
-                _DashboardSection(
-                  title: 'Barras apiladas',
-                  child: _StackedTaskStatusChart(snapshot: snapshot),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (visibleCharts.contains(StatisticsChartType.groupedBars)) ...[
-                _DashboardSection(
-                  title: 'Barras agrupadas',
-                  child: _GroupedFocusChart(snapshot: snapshot),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (visibleCharts.contains(
-                StatisticsChartType.horizontalBars,
-              )) ...[
-                _DashboardSection(
-                  title: 'Grafico horizontal',
-                  child: _HorizontalStatusChart(snapshot: snapshot),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (visibleCharts.contains(StatisticsChartType.standardBars)) ...[
-                _DashboardSection(
-                  title: 'Grafico de barras',
-                  child: _BasicBarsChart(snapshot: snapshot),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (visibleCharts.contains(StatisticsChartType.xy))
-                _DashboardSection(
-                  title: 'Grafico basico x/y',
-                  child: _BasicTrendChart(snapshot: snapshot),
-                ),
+              FutureBuilder<StatisticsReportData>(
+                future: reportFuture,
+                builder: (context, reportSnapshot) {
+                  if (reportSnapshot.connectionState != ConnectionState.done) {
+                    return const _PerformanceLoadingState();
+                  }
+                  if (reportSnapshot.hasError) {
+                    return _PerformanceErrorState(onRetry: _retry);
+                  }
+
+                  final report = reportSnapshot.data;
+                  if (report == null || _isEmptyReport(report)) {
+                    return const _PerformanceEmptyState();
+                  }
+
+                  return _PerformanceDashboardContent(
+                    snapshot: _PerformanceSnapshot.fromReportData(
+                      context: context,
+                      range: _range,
+                      focusMinutes: settings.focusMinutes,
+                      report: report,
+                    ),
+                    visibleCharts: visibleCharts,
+                  );
+                },
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Future<StatisticsReportData> _reportFor({
+    required Object tasksRevision,
+    required Object sessionsRevision,
+  }) {
+    if (_reportFuture == null ||
+        _loadedRange != _range ||
+        !identical(_tasksRevision, tasksRevision) ||
+        !identical(_sessionsRevision, sessionsRevision)) {
+      _tasksRevision = tasksRevision;
+      _sessionsRevision = sessionsRevision;
+      _loadedRange = _range;
+      _reportFuture = serviceLocator<GenerateStatisticsReport>()(
+        StatisticsReportRequest(period: _range.reportPeriod),
+      );
+    }
+
+    return _reportFuture!;
+  }
+
+  void _retry() {
+    setState(() {
+      _reportFuture = null;
+    });
+  }
+
+  void _scheduleRangeRefresh() {
+    _rangeRefreshTimer?.cancel();
+    final now = DateTime.now();
+    final nextDay = DateTime(now.year, now.month, now.day + 1);
+    _rangeRefreshTimer = Timer(nextDay.difference(now), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _reportFuture = null);
+      _scheduleRangeRefresh();
+    });
+  }
+}
+
+class _PerformanceDashboardContent extends StatelessWidget {
+  const _PerformanceDashboardContent({
+    required this.snapshot,
+    required this.visibleCharts,
+  });
+
+  final _PerformanceSnapshot snapshot;
+  final Set<StatisticsChartType> visibleCharts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (visibleCharts.contains(StatisticsChartType.circular)) ...[
+          _DashboardSection(
+            title: context.tr('Circular', 'Circular'),
+            child: _OverallProgressChart(progress: snapshot.overallProgress),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (visibleCharts.contains(StatisticsChartType.stackedBars)) ...[
+          _DashboardSection(
+            title: context.tr('Barras apiladas', 'Stacked bars'),
+            child: _StackedTaskStatusChart(snapshot: snapshot),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (visibleCharts.contains(StatisticsChartType.groupedBars)) ...[
+          _DashboardSection(
+            title: context.tr('Barras agrupadas', 'Grouped bars'),
+            child: _GroupedFocusChart(snapshot: snapshot),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (visibleCharts.contains(StatisticsChartType.horizontalBars)) ...[
+          _DashboardSection(
+            title: context.tr('Gráfico horizontal', 'Horizontal chart'),
+            child: _HorizontalStatusChart(snapshot: snapshot),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (visibleCharts.contains(StatisticsChartType.standardBars)) ...[
+          _DashboardSection(
+            title: context.tr('Gráfico de barras', 'Bar chart'),
+            child: _BasicBarsChart(snapshot: snapshot),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (visibleCharts.contains(StatisticsChartType.xy))
+          _DashboardSection(
+            title: context.tr('Gráfico básico x/y', 'Basic x/y chart'),
+            child: _BasicTrendChart(snapshot: snapshot),
+          ),
+      ],
+    );
+  }
+}
+
+class _PerformanceLoadingState extends StatelessWidget {
+  const _PerformanceLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      key: ValueKey('performance-loading'),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
+class _PerformanceErrorState extends StatelessWidget {
+  const _PerformanceErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      key: const ValueKey('performance-error'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Column(
+          children: [
+            Text(
+              context.tr(
+                'No se pudieron cargar las estadísticas.',
+                'Statistics could not be loaded.',
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(context.tr('Reintentar', 'Retry')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PerformanceEmptyState extends StatelessWidget {
+  const _PerformanceEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      key: const ValueKey('performance-empty'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 22),
+        child: Text(
+          context.tr(
+            'Aún no hay actividad en este período.',
+            'There is no activity in this period yet.',
+          ),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: context.palette.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 }
@@ -565,14 +795,28 @@ class _PerformanceRangeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return SizedBox(
+      width: double.infinity,
       child: SegmentedButton<_PerformanceRange>(
-        segments: const [
-          ButtonSegment(value: _PerformanceRange.day, label: Text('Día')),
-          ButtonSegment(value: _PerformanceRange.week, label: Text('Semana')),
-          ButtonSegment(value: _PerformanceRange.month, label: Text('Mes')),
-          ButtonSegment(value: _PerformanceRange.year, label: Text('Año')),
+        expandedInsets: EdgeInsets.zero,
+        style: _compactSegmentStyle,
+        segments: [
+          ButtonSegment(
+            value: _PerformanceRange.day,
+            label: Text(context.tr('Día', 'Day')),
+          ),
+          ButtonSegment(
+            value: _PerformanceRange.week,
+            label: Text(context.tr('Semana', 'Week')),
+          ),
+          ButtonSegment(
+            value: _PerformanceRange.month,
+            label: Text(context.tr('Mes', 'Month')),
+          ),
+          ButtonSegment(
+            value: _PerformanceRange.year,
+            label: Text(context.tr('Año', 'Year')),
+          ),
         ],
         selected: {selectedRange},
         showSelectedIcon: false,
@@ -581,6 +825,12 @@ class _PerformanceRangeSelector extends StatelessWidget {
     );
   }
 }
+
+const _compactSegmentStyle = ButtonStyle(
+  padding: WidgetStatePropertyAll(
+    EdgeInsets.symmetric(horizontal: 6),
+  ),
+);
 
 class _ChartVisibilitySelector extends StatelessWidget {
   const _ChartVisibilitySelector({
@@ -600,7 +850,7 @@ class _ChartVisibilitySelector extends StatelessWidget {
       children: [
         for (final chart in StatisticsChartType.values)
           FilterChip(
-            label: Text(chart.label),
+            label: Text(_chartTypeLabel(context, chart)),
             selected: visibleCharts.contains(chart),
             onSelected: (selected) => onToggle(chart, enabled: selected),
           ),
@@ -667,9 +917,18 @@ class _StackedTaskStatusChart extends StatelessWidget {
         const SizedBox(height: 10),
         _MiniLegend(
           values: [
-            _LegendValue('Pendientes', snapshot.taskSummary.listed),
-            _LegendValue('En progreso', snapshot.taskSummary.inProgress),
-            _LegendValue('Completadas', snapshot.taskSummary.completed),
+            _LegendValue(
+              context.tr('Pendientes', 'Pending'),
+              snapshot.taskSummary.listed,
+            ),
+            _LegendValue(
+              context.tr('En progreso', 'In progress'),
+              snapshot.taskSummary.inProgress,
+            ),
+            _LegendValue(
+              context.tr('Completadas', 'Completed'),
+              snapshot.taskSummary.completed,
+            ),
           ],
         ),
       ],
@@ -710,31 +969,39 @@ class _GroupedFocusChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final values = snapshot.bucketValues.take(6).toList(growable: false);
-    final labels = snapshot.bucketLabels
-        .take(values.length)
-        .toList(
-          growable: false,
-        );
+    final values = snapshot.bucketValues;
 
-    return SizedBox(
-      height: 150,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (var index = 0; index < values.length; index += 1)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _GroupedBarPair(
-                  label: labels[index],
-                  taskValue: values[index],
-                  focusValue: snapshot.focusBucketValues[index],
-                ),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final requiredWidth = values.length * 42.0;
+        final chartWidth = requiredWidth > constraints.maxWidth
+            ? requiredWidth
+            : constraints.maxWidth;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: chartWidth,
+            height: 150,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var index = 0; index < values.length; index += 1)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: _GroupedBarPair(
+                        label: snapshot.bucketLabels[index],
+                        taskValue: values[index],
+                        focusValue: snapshot.focusBucketValues[index],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -805,21 +1072,31 @@ class _HorizontalStatusChart extends StatelessWidget {
     return Column(
       children: [
         _HorizontalMetricBar(
-          label: 'Tareas',
-          description:
-              '${snapshot.taskSummary.total} tareas, ${snapshot.taskSummary.completed} completadas',
+          label: context.tr('Tareas', 'Tasks'),
+          description: context.tr(
+            '${snapshot.taskSummary.total} tareas, '
+                '${snapshot.taskSummary.completed} completadas',
+            '${snapshot.taskSummary.total} tasks, '
+                '${snapshot.taskSummary.completed} completed',
+          ),
           value: snapshot.taskProgress,
         ),
         const _MetricDivider(),
         _HorizontalMetricBar(
-          label: 'Pomodoros',
-          description: '${snapshot.completedPomodoros} completados',
+          label: context.tr('Pomodoros', 'Pomodoros'),
+          description: context.tr(
+            '${snapshot.completedPomodoros} completados',
+            '${snapshot.completedPomodoros} completed',
+          ),
           value: snapshot.pomodoroProgress,
         ),
         const _MetricDivider(),
         _HorizontalMetricBar(
-          label: 'Enfoque',
-          description: '${snapshot.focusedMinutes} min enfocados',
+          label: context.tr('Enfoque', 'Focus'),
+          description: context.tr(
+            '${snapshot.focusedMinutes} min enfocados',
+            '${snapshot.focusedMinutes} focused min',
+          ),
           value: snapshot.focusProgress,
         ),
       ],
@@ -839,7 +1116,11 @@ class _BasicBarsChart extends StatelessWidget {
       snapshot.pomodoroProgress,
       snapshot.focusProgress,
     ];
-    final labels = ['Tareas', 'Pom', 'Foco'];
+    final labels = [
+      context.tr('Tareas', 'Tasks'),
+      'Pom',
+      context.tr('Foco', 'Focus'),
+    ];
 
     return SizedBox(
       height: 150,
@@ -908,6 +1189,7 @@ class _BasicTrendChart extends StatelessWidget {
         child: CustomPaint(
           painter: _PerformanceLinePainter(
             palette: context.palette,
+            fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
             values: snapshot.bucketValues,
             labels: snapshot.bucketLabels,
           ),
@@ -960,83 +1242,57 @@ class _PerformanceSnapshot {
     required this.bucketLabels,
   });
 
-  factory _PerformanceSnapshot.fromControllers({
+  factory _PerformanceSnapshot.fromReportData({
+    required BuildContext context,
     required _PerformanceRange range,
     required int focusMinutes,
-    required TasksController tasksController,
-    required PomodoroController pomodoroController,
+    required StatisticsReportData report,
   }) {
-    final now = DateTime.now();
-    final bounds = _rangeBounds(range, now);
-    final tasks = tasksController.tasks.value
-        .where((task) {
-          final date = task.scheduledDate ?? task.createdAt;
-          return !_dateOnly(date).isBefore(bounds.start) &&
-              !_dateOnly(date).isAfter(bounds.end);
-        })
-        .toList(growable: false);
-    final sessions = pomodoroController.sessions.value
-        .where((session) {
-          final date = _dateOnly(session.endedAt);
-          return !date.isBefore(bounds.start) && !date.isAfter(bounds.end);
-        })
-        .toList(growable: false);
-    final buckets = _bucketStarts(range, bounds.start, bounds.end);
+    final buckets = report.calendarDays.isEmpty
+        ? [
+            StatisticsCalendarDay(
+              day: report.range.start,
+              completionRatio: 0,
+              isEnded: false,
+              totalTasks: 0,
+            ),
+          ]
+        : report.calendarDays;
     final taskCounts = [
-      for (final bucket in buckets)
-        tasks
-            .where(
-              (task) => _sameBucket(
-                range,
-                task.scheduledDate ?? task.createdAt,
-                bucket,
-              ),
-            )
-            .length,
-    ];
-    final focusMinutesByBucket = [
-      for (final bucket in buckets)
-        sessions
-                .where((session) => _sameBucket(range, session.endedAt, bucket))
-                .fold<int>(
-                  0,
-                  (total, session) => total + session.focusedSeconds,
-                ) ~/
-            60,
+      for (final bucket in buckets) bucket.totalTasks,
     ];
     final maxTaskCount = taskCounts.fold<int>(
       1,
       (max, count) => count > max ? count : max,
     );
-    final maxFocusMinutes = focusMinutesByBucket.fold<int>(
+    final maxFocusedSeconds = buckets.fold<int>(
       1,
-      (max, minutes) => minutes > max ? minutes : max,
+      (max, bucket) =>
+          bucket.focusedSeconds > max ? bucket.focusedSeconds : max,
     );
 
     return _PerformanceSnapshot(
       range: range,
       focusMinutes: focusMinutes,
-      taskSummary: TaskStatusSummary.fromTasks(tasks),
-      completedPomodoros: sessions.length,
-      focusedSeconds: sessions.fold<int>(
-        0,
-        (total, session) => total + session.focusedSeconds,
-      ),
+      taskSummary: report.tasks,
+      completedPomodoros: report.completedPomodoros,
+      focusedSeconds: report.focusedSeconds,
       bucketValues: [
         for (final count in taskCounts) count / maxTaskCount,
       ],
       focusBucketValues: [
-        for (final minutes in focusMinutesByBucket) minutes / maxFocusMinutes,
+        for (final bucket in buckets) bucket.focusedSeconds / maxFocusedSeconds,
       ],
       bucketLabels: [
-        for (final bucket in buckets) _bucketLabel(range, bucket),
+        for (final bucket in buckets)
+          _reportBucketLabel(context, range, bucket.day),
       ],
     );
   }
 
   final _PerformanceRange range;
   final int focusMinutes;
-  final TaskStatusSummary taskSummary;
+  final StatisticsTaskTotals taskSummary;
   final int completedPomodoros;
   final int focusedSeconds;
   final List<double> bucketValues;
@@ -1054,19 +1310,18 @@ class _PerformanceSnapshot {
   double get overallProgress =>
       (taskProgress + pomodoroProgress + focusProgress) / 3;
   int get expectedPomodoros {
-    return switch (range) {
-      _PerformanceRange.day => 4,
-      _PerformanceRange.week => 12,
-      _PerformanceRange.month => 24,
-      _PerformanceRange.year => 180,
-    };
+    return _expectedPomodorosFor(range);
   }
 
   int get expectedFocusSeconds => focusMinutes * expectedPomodoros * 60;
 
-  String get summaryLabel {
-    return '${taskSummary.total} tareas, $completedPomodoros pomodoros, '
-        '$focusedMinutes min de enfoque';
+  String summaryLabel(BuildContext context) {
+    return context.tr(
+      '${taskSummary.total} tareas, $completedPomodoros pomodoros, '
+          '$focusedMinutes min de enfoque',
+      '${taskSummary.total} tasks, $completedPomodoros pomodoros, '
+          '$focusedMinutes focus min',
+    );
   }
 }
 
@@ -1111,7 +1366,7 @@ class _PerformanceInsightsCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Rendimiento',
+                context.tr('Rendimiento', 'Performance'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w700,
@@ -1119,28 +1374,41 @@ class _PerformanceInsightsCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Rendimiento del mes actual',
+                context.tr(
+                  'Rendimiento del mes actual',
+                  'Performance for the current month',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: AppDesignTokens.bodyFontSize,
                 ),
               ),
               const SizedBox(height: 16),
               _HorizontalMetricBar(
-                label: 'Tareas',
-                description:
-                    '${taskSummary.total} tareas, ${taskSummary.completed} completadas',
+                label: context.tr('Tareas', 'Tasks'),
+                description: context.tr(
+                  '${taskSummary.total} tareas, '
+                      '${taskSummary.completed} completadas',
+                  '${taskSummary.total} tasks, '
+                      '${taskSummary.completed} completed',
+                ),
                 value: taskProgress,
               ),
               const _MetricDivider(),
               _HorizontalMetricBar(
-                label: 'Pomodoros',
-                description: '${monthlySessions.length} completados este mes',
+                label: context.tr('Pomodoros', 'Pomodoros'),
+                description: context.tr(
+                  '${monthlySessions.length} completados este mes',
+                  '${monthlySessions.length} completed this month',
+                ),
                 value: pomodoroProgress,
               ),
               const _MetricDivider(),
               _HorizontalMetricBar(
-                label: 'Enfoque',
-                description: '$focusedMinutes min enfocados',
+                label: context.tr('Enfoque', 'Focus'),
+                description: context.tr(
+                  '$focusedMinutes min enfocados',
+                  '$focusedMinutes focused min',
+                ),
                 value: focusProgress,
               ),
               const SizedBox(height: 20),
@@ -1169,19 +1437,19 @@ class _TaskStatusOverviewCard extends StatelessWidget {
           child: Column(
             children: [
               _TaskStatusMetric(
-                label: 'Pendientes',
+                label: context.tr('Pendientes', 'Pending'),
                 value: summary.listed,
                 icon: Icons.playlist_add_check_rounded,
               ),
               const SizedBox(height: 10),
               _TaskStatusMetric(
-                label: 'En progreso',
+                label: context.tr('En progreso', 'In progress'),
                 value: summary.inProgress,
                 icon: Icons.pending_actions_rounded,
               ),
               const SizedBox(height: 10),
               _TaskStatusMetric(
-                label: 'Completadas',
+                label: context.tr('Completadas', 'Completed'),
                 value: summary.completed,
                 icon: Icons.task_alt_rounded,
               ),
@@ -1308,12 +1576,15 @@ class _OverallProgressChart extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Rendimiento general',
+                context.tr('Rendimiento general', 'Overall performance'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 4),
               Text(
-                'Promedio de tareas, pomodoros y objetivo diario de enfoque.',
+                context.tr(
+                  'Promedio de tareas, pomodoros y objetivo diario de enfoque.',
+                  'Average of tasks, pomodoros, and daily focus goal.',
+                ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,
                 ),
@@ -1338,6 +1609,7 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
   StatisticsReportPeriod _period = StatisticsReportPeriod.day;
   DateTime? _from;
   DateTime? _to;
+  bool _isExporting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1351,7 +1623,7 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Descargar estadisticas',
+            context.tr('Descargar estadísticas', 'Download statistics'),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontSize: AppDesignTokens.sectionTitleFontSize,
               fontWeight: FontWeight.w700,
@@ -1360,27 +1632,29 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
           const SizedBox(height: 10),
           DropdownButtonFormField<StatisticsReportPeriod>(
             value: _period,
-            decoration: const InputDecoration(labelText: 'Periodo'),
-            items: const [
+            decoration: InputDecoration(
+              labelText: context.tr('Período', 'Period'),
+            ),
+            items: [
               DropdownMenuItem(
                 value: StatisticsReportPeriod.day,
-                child: Text('Dia'),
+                child: Text(context.tr('Día', 'Day')),
               ),
               DropdownMenuItem(
                 value: StatisticsReportPeriod.week,
-                child: Text('Semana'),
+                child: Text(context.tr('Semana', 'Week')),
               ),
               DropdownMenuItem(
                 value: StatisticsReportPeriod.month,
-                child: Text('Mes'),
+                child: Text(context.tr('Mes', 'Month')),
               ),
               DropdownMenuItem(
                 value: StatisticsReportPeriod.year,
-                child: Text('Año'),
+                child: Text(context.tr('Año', 'Year')),
               ),
               DropdownMenuItem(
                 value: StatisticsReportPeriod.range,
-                child: Text('Fecha a fecha'),
+                child: Text(context.tr('Fecha a fecha', 'Date range')),
               ),
             ],
             onChanged: (value) {
@@ -1397,14 +1671,22 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _pickDate(isFrom: true),
-                    child: Text(_from == null ? 'Desde' : _formatDate(_from!)),
+                    child: Text(
+                      _from == null
+                          ? context.tr('Desde', 'From')
+                          : _formatDate(_from!),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _pickDate(isFrom: false),
-                    child: Text(_to == null ? 'Hasta' : _formatDate(_to!)),
+                    child: Text(
+                      _to == null
+                          ? context.tr('Hasta', 'To')
+                          : _formatDate(_to!),
+                    ),
                   ),
                 ),
               ],
@@ -1412,7 +1694,12 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
           ],
           const SizedBox(height: 12),
           Text(
-            'El PDF incluye gráficas de rendimiento, estudio vs descanso y porcentaje de avance.',
+            context.tr(
+              'El PDF incluye gráficas de rendimiento, estudio vs descanso '
+                  'y porcentaje de avance.',
+              'The PDF includes performance charts, focus versus break time, '
+                  'and progress percentage.',
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
@@ -1421,31 +1708,90 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () async {
-                await settings.onDownloadStatisticsPdf(
-                  StatisticsReportRequest(
-                    period: _period,
-                    from: _from,
-                    to: _to,
-                  ),
-                );
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'PDF guardado en ${settings.lastReportPath}',
-                      ),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-              label: const Text('Descargar PDF'),
+              onPressed: _isExporting ? null : () => _export(settings),
+              icon: _isExporting
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_rounded, size: 16),
+              label: Text(
+                _isExporting
+                    ? context.tr('Guardando...', 'Saving...')
+                    : context.tr('Descargar PDF', 'Download PDF'),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _export(AppSettingsScope settings) async {
+    setState(() => _isExporting = true);
+    try {
+      final reportFile = await settings.onDownloadStatisticsPdf(
+        StatisticsReportRequest(
+          period: _period,
+          from: _from,
+          to: _to,
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                'PDF guardado en ${reportFile.displayPath}',
+                'PDF saved to ${reportFile.displayPath}',
+              ),
+            ),
+            action: SnackBarAction(
+              label: context.tr('Abrir', 'Open'),
+              onPressed: () => _openReport(settings, reportFile.openReference),
+            ),
+          ),
+        );
+      }
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                'No se pudo guardar el PDF. Revisa la carpeta seleccionada.',
+                'The PDF could not be saved. Check the selected folder.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  Future<void> _openReport(AppSettingsScope settings, String path) async {
+    try {
+      await settings.onOpenReport(path);
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                'No se pudo abrir el PDF. Verifica que tengas un visor '
+                    'instalado.',
+                'The PDF could not be opened. Make sure a PDF viewer is '
+                    'installed.',
+              ),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
@@ -1562,7 +1908,9 @@ class _DailyGoalCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    today.isEnded ? 'Dia finalizado' : 'Meta Diaria',
+                    today.isEnded
+                        ? context.tr('Día finalizado', 'Day completed')
+                        : context.tr('Meta diaria', 'Daily goal'),
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ],
@@ -1574,7 +1922,10 @@ class _DailyGoalCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '$progressLabel% de tareas completadas hoy',
+                context.tr(
+                  '$progressLabel% de tareas completadas hoy',
+                  "$progressLabel% of today's tasks completed",
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
@@ -1596,7 +1947,10 @@ class _DailyGoalCard extends StatelessWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Dia terminado con $progressLabel% de avance.',
+                                context.tr(
+                                  'Día terminado con $progressLabel% de avance.',
+                                  'Day completed with $progressLabel% progress.',
+                                ),
                               ),
                             ),
                           );
@@ -1606,7 +1960,11 @@ class _DailyGoalCard extends StatelessWidget {
                         ? Icons.check_circle_rounded
                         : Icons.outlined_flag_rounded,
                   ),
-                  label: Text(today.isEnded ? 'Dia terminado' : 'Terminar dia'),
+                  label: Text(
+                    today.isEnded
+                        ? context.tr('Día terminado', 'Day completed')
+                        : context.tr('Terminar día', 'End day'),
+                  ),
                 ),
               ),
             ],
@@ -1634,67 +1992,24 @@ class _EnergyCard extends StatelessWidget {
               _SoftIcon(icon: Icons.bolt_outlined, color: palette.primary),
               const Spacer(),
               Text(
-                'Nivel de Energía',
+                context.tr('Nivel de energía', 'Energy level'),
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Text('Óptimo', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            context.tr('Óptimo', 'Optimal'),
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
           const SizedBox(height: 4),
           Text(
-            'Basado en tus descansos recientes',
+            context.tr(
+              'Basado en tus descansos recientes',
+              'Based on your recent breaks',
+            ),
             style: Theme.of(context).textTheme.bodySmall,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TodayTasksCard extends StatelessWidget {
-  const _TodayTasksCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: AppCardPaddings.spacious,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Tareas para Hoy',
-                  style:
-                      Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(
-                        fontSize: AppDesignTokens.sectionTitleFontSize,
-                      ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.go(TasksPage.routePath),
-                child: const Text('Ver todas ›'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          const _TaskTile(
-            title: 'Revisión de\ndiseño\nMichiFocus',
-            meta: 'Alta prioridad · 2:00\nPM',
-            tag: 'Trabajo',
-          ),
-          const SizedBox(height: 12),
-          const _TaskTile(
-            title: 'Estirar y\nMeditación',
-            meta: 'Salud · 4:30 PM',
-            tag: 'Personal',
-          ),
-          const SizedBox(height: 12),
-          const _DoneTile(),
         ],
       ),
     );
@@ -1716,7 +2031,7 @@ class _WeeklyProgressCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Progreso Semanal',
+            context.tr('Progreso semanal', 'Weekly progress'),
             style:
                 Theme.of(
                   context,
@@ -1725,21 +2040,30 @@ class _WeeklyProgressCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 18),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _WeeklyDayProgress(day: 'L', progress: 0.65),
-              _WeeklyDayProgress(day: 'M', progress: 0.45),
-              _WeeklyDayProgress(day: 'M', progress: 0),
-              _WeeklyDayProgress(day: 'J', progress: 0),
-              _WeeklyDayProgress(day: 'V', progress: 0),
-              _WeeklyDayProgress(day: 'S', progress: 0),
-              _WeeklyDayProgress(day: 'D', progress: 0),
+              _WeeklyDayProgress(
+                day: context.tr('L', 'M'),
+                progress: 0.65,
+              ),
+              _WeeklyDayProgress(
+                day: context.tr('M', 'T'),
+                progress: 0.45,
+              ),
+              _WeeklyDayProgress(day: context.tr('X', 'W'), progress: 0),
+              _WeeklyDayProgress(day: context.tr('J', 'T'), progress: 0),
+              _WeeklyDayProgress(day: context.tr('V', 'F'), progress: 0),
+              _WeeklyDayProgress(day: context.tr('S', 'S'), progress: 0),
+              _WeeklyDayProgress(day: context.tr('D', 'S'), progress: 0),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'Completá bloques de enfoque para llenar tu semana.',
+            context.tr(
+              'Completa bloques de enfoque para llenar tu semana.',
+              'Complete focus blocks to fill your week.',
+            ),
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -1768,7 +2092,7 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Progreso Semanal',
+                context.tr('Progreso semanal', 'Weekly progress'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                 ),
@@ -1779,7 +2103,7 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
                 children: [
                   for (final progress in weekProgress)
                     _WeeklyDayProgressV2(
-                      day: _weekdayShortLabel(progress.day),
+                      day: _weekdayShortLabel(context, progress.day),
                       progress: progress.completionRatio,
                       band: progress.band,
                       isEnded: progress.isEnded,
@@ -1788,7 +2112,12 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Rojo hasta 20%, amarillo hasta 50%, verde hasta 70%, verde fuerte hasta 100%.',
+                context.tr(
+                  'Rojo hasta 20%, amarillo hasta 50%, verde hasta 70%, '
+                      'verde fuerte hasta 100%.',
+                  'Red up to 20%, yellow up to 50%, green up to 70%, '
+                      'strong green up to 100%.',
+                ),
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
@@ -1896,111 +2225,6 @@ class _WeeklyDayProgress extends StatelessWidget {
   }
 }
 
-class _TaskTile extends StatelessWidget {
-  const _TaskTile({required this.title, required this.meta, required this.tag});
-
-  final String title;
-  final String meta;
-  final String tag;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 18,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: palette.outlineColor),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-                Text(meta, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-          _Pill(
-            label: tag,
-            background: palette.secondarySoft.withValues(alpha: 0.45),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DoneTile extends StatelessWidget {
-  const _DoneTile();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle_outline_rounded,
-            size: 16,
-            color: palette.secondary,
-          ),
-          const SizedBox(width: 14),
-          Text(
-            'Planificar semana\nCompletada',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              decoration: TextDecoration.lineThrough,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.background});
-
-  final String label;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: context.palette.primary),
-      ),
-    );
-  }
-}
-
 class _SoftIcon extends StatelessWidget {
   const _SoftIcon({required this.icon, required this.color});
 
@@ -2029,16 +2253,64 @@ Color _progressColor(TaskProgressBand band) {
   };
 }
 
-String _weekdayShortLabel(DateTime day) {
+String _weekdayShortLabel(BuildContext context, DateTime day) {
   return switch (day.weekday) {
-    DateTime.monday => 'L',
-    DateTime.tuesday => 'M',
-    DateTime.wednesday => 'X',
-    DateTime.thursday => 'J',
-    DateTime.friday => 'V',
+    DateTime.monday => context.tr('L', 'M'),
+    DateTime.tuesday => context.tr('M', 'T'),
+    DateTime.wednesday => context.tr('X', 'W'),
+    DateTime.thursday => context.tr('J', 'T'),
+    DateTime.friday => context.tr('V', 'F'),
     DateTime.saturday => 'S',
-    DateTime.sunday => 'D',
+    DateTime.sunday => context.tr('D', 'S'),
     _ => '',
+  };
+}
+
+List<String> _performanceDemoLabels(
+  BuildContext context,
+  _PerformanceRange range,
+) {
+  return switch (range) {
+    _PerformanceRange.day => ['08', '10', '12', '14', '16', '18', '20'],
+    _PerformanceRange.week => [
+      context.tr('L', 'M'),
+      context.tr('M', 'T'),
+      context.tr('X', 'W'),
+      context.tr('J', 'T'),
+      context.tr('V', 'F'),
+      'S',
+      context.tr('D', 'S'),
+    ],
+    _PerformanceRange.month => [
+      context.tr('S1', 'W1'),
+      context.tr('S2', 'W2'),
+      context.tr('S3', 'W3'),
+      context.tr('S4', 'W4'),
+    ],
+    _PerformanceRange.year => const [],
+  };
+}
+
+String _chartTypeLabel(BuildContext context, StatisticsChartType chart) {
+  return switch (chart) {
+    StatisticsChartType.circular => context.tr('Circular', 'Circular'),
+    StatisticsChartType.stackedBars => context.tr(
+      'Barras apiladas',
+      'Stacked bars',
+    ),
+    StatisticsChartType.groupedBars => context.tr(
+      'Barras agrupadas',
+      'Grouped bars',
+    ),
+    StatisticsChartType.horizontalBars => context.tr(
+      'Gráfico horizontal',
+      'Horizontal chart',
+    ),
+    StatisticsChartType.standardBars => context.tr(
+      'Gráfico de barras',
+      'Bar chart',
+    ),
+    StatisticsChartType.xy => 'X/Y',
   };
 }
 
@@ -2046,97 +2318,55 @@ bool _isInMonth(DateTime date, DateTime month) {
   return date.year == month.year && date.month == month.month;
 }
 
-extension on AppPalette {
-  Color get outlineColor => neutral.withValues(alpha: 0.55);
-}
-
 extension on _PerformanceRange {
-  String get titleSuffix {
+  String titleSuffix(BuildContext context) {
     return switch (this) {
-      _PerformanceRange.day => 'del día',
-      _PerformanceRange.week => 'de la semana',
-      _PerformanceRange.month => 'del mes',
-      _PerformanceRange.year => 'del año',
+      _PerformanceRange.day => context.tr(' del día', ' for the day'),
+      _PerformanceRange.week => context.tr(' de la semana', ' for the week'),
+      _PerformanceRange.month => context.tr(' del mes', ' for the month'),
+      _PerformanceRange.year => context.tr(' del año', ' for the year'),
+    };
+  }
+
+  StatisticsReportPeriod get reportPeriod {
+    return switch (this) {
+      _PerformanceRange.day => StatisticsReportPeriod.day,
+      _PerformanceRange.week => StatisticsReportPeriod.week,
+      _PerformanceRange.month => StatisticsReportPeriod.month,
+      _PerformanceRange.year => StatisticsReportPeriod.year,
     };
   }
 }
 
-DateTimeRange _rangeBounds(_PerformanceRange range, DateTime now) {
-  final today = _dateOnly(now);
-
-  return switch (range) {
-    _PerformanceRange.day => DateTimeRange(start: today, end: today),
-    _PerformanceRange.week => DateTimeRange(
-      start: today.subtract(Duration(days: today.weekday - 1)),
-      end: today.add(Duration(days: DateTime.sunday - today.weekday)),
-    ),
-    _PerformanceRange.month => DateTimeRange(
-      start: DateTime(today.year, today.month),
-      end: DateTime(today.year, today.month + 1, 0),
-    ),
-    _PerformanceRange.year => DateTimeRange(
-      start: DateTime(today.year),
-      end: DateTime(today.year, 12, 31),
-    ),
-  };
-}
-
-List<DateTime> _bucketStarts(
+String _reportBucketLabel(
+  BuildContext context,
   _PerformanceRange range,
-  DateTime start,
-  DateTime end,
+  DateTime bucket,
 ) {
   return switch (range) {
-    _PerformanceRange.day => [
-      for (var hour = 6; hour <= 22; hour += 4)
-        DateTime(start.year, start.month, start.day, hour),
-    ],
-    _PerformanceRange.week => [
-      for (
-        var day = start;
-        !day.isAfter(end);
-        day = day.add(const Duration(days: 1))
-      )
-        day,
-    ],
-    _PerformanceRange.month => [
-      DateTime(start.year, start.month),
-      DateTime(start.year, start.month, 8),
-      DateTime(start.year, start.month, 15),
-      DateTime(start.year, start.month, 22),
-      DateTime(start.year, start.month, 29),
-    ],
-    _PerformanceRange.year => [
-      for (var month = 1; month <= 12; month += 1) DateTime(start.year, month),
-    ],
-  };
-}
-
-bool _sameBucket(_PerformanceRange range, DateTime date, DateTime bucket) {
-  return switch (range) {
-    _PerformanceRange.day =>
-      _dateOnly(date) == _dateOnly(bucket) &&
-          date.hour >= bucket.hour &&
-          date.hour < bucket.hour + 4,
-    _PerformanceRange.week => _dateOnly(date) == _dateOnly(bucket),
-    _PerformanceRange.month =>
-      date.year == bucket.year &&
-          date.month == bucket.month &&
-          ((date.day - 1) ~/ 7) == ((bucket.day - 1) ~/ 7),
-    _PerformanceRange.year =>
-      date.year == bucket.year && date.month == bucket.month,
-  };
-}
-
-String _bucketLabel(_PerformanceRange range, DateTime bucket) {
-  return switch (range) {
     _PerformanceRange.day => '${bucket.hour}h',
-    _PerformanceRange.week => _weekdayShortLabel(bucket),
-    _PerformanceRange.month => 'S${((bucket.day - 1) ~/ 7) + 1}',
+    _PerformanceRange.week => _weekdayShortLabel(context, bucket),
+    _PerformanceRange.month => '${bucket.day}',
     _PerformanceRange.year => '${bucket.month}',
   };
 }
 
-DateTime _dateOnly(DateTime date) {
-  return DateTime(date.year, date.month, date.day);
+int _expectedPomodorosFor(_PerformanceRange range) {
+  return switch (range) {
+    _PerformanceRange.day => 4,
+    _PerformanceRange.week => 12,
+    _PerformanceRange.month => 24,
+    _PerformanceRange.year => 180,
+  };
+}
+
+bool _isEmptyReport(StatisticsReportData report) {
+  return report.tasks.total == 0 &&
+      report.createdTasks.total == 0 &&
+      report.completedPomodoros == 0 &&
+      report.focusedSeconds == 0 &&
+      report.completionEvents == 0 &&
+      report.legacyUnknownCompletions == 0 &&
+      report.moodSampleCount == 0 &&
+      report.distractionMinutes == 0;
 }

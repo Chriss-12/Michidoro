@@ -5,6 +5,7 @@ import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:pomodoro_app_v1/shared/templates/app_shell.dart';
 import 'package:pomodoro_app_v1/shared/templates/page_header.dart';
@@ -24,9 +25,12 @@ class ProfileSettingsPage extends StatelessWidget {
       child: ListView(
         padding: AppCardPaddings.detailPage,
         children: [
-          const PageHeader(
-            title: 'Profile',
-            subtitle: 'Customize your photo and display name.',
+          PageHeader(
+            title: context.tr('Perfil', 'Profile'),
+            subtitle: context.tr(
+              'Personaliza tu foto y nombre visible.',
+              'Customize your photo and display name.',
+            ),
             showBack: true,
           ),
           Padding(
@@ -42,7 +46,7 @@ class ProfileSettingsPage extends StatelessWidget {
                       foregroundImage: _profileImage(settings.profileImagePath),
                       child: _profileImage(settings.profileImagePath) == null
                           ? Text(
-                              _avatarLabel(settings.avatarIndex),
+                              _avatarLabel(settings),
                               style: TextStyle(
                                 color: palette.primary,
                                 fontSize: AppDesignTokens.sectionTitleFontSize,
@@ -56,9 +60,9 @@ class ProfileSettingsPage extends StatelessWidget {
                   TextFormField(
                     initialValue: settings.profileName,
                     onChanged: settings.onProfileNameChanged,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    decoration: InputDecoration(
+                      labelText: context.tr('Nombre', 'Name'),
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -66,44 +70,25 @@ class ProfileSettingsPage extends StatelessWidget {
                     initialValue: settings.profileEmail,
                     keyboardType: TextInputType.emailAddress,
                     onChanged: settings.onProfileEmailChanged,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    decoration: InputDecoration(
+                      labelText: context.tr('Correo electrónico', 'Email'),
+                      prefixIcon: const Icon(Icons.alternate_email_rounded),
                     ),
                   ),
                   const SizedBox(height: 24),
                   TextFormField(
                     initialValue: settings.profileImagePath,
                     onChanged: settings.onProfileImagePathChanged,
-                    decoration: const InputDecoration(
-                      labelText: 'Local image path',
+                    decoration: InputDecoration(
+                      labelText: context.tr(
+                        'Ruta de imagen local',
+                        'Local image path',
+                      ),
                       hintText: r'C:\\Users\\...\\photo.png',
-                      prefixIcon: Icon(Icons.image_outlined),
+                      prefixIcon: const Icon(Icons.image_outlined),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Profile image',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    children: [
-                      for (var index = 0; index < 4; index++)
-                        ChoiceChip(
-                          selected: index == settings.avatarIndex,
-                          onSelected: (_) => settings.onAvatarChanged(index),
-                          label: Text(_avatarLabel(index)),
-                          avatar: CircleAvatar(
-                            backgroundColor: palette.primaryMuted,
-                            child: Text(_avatarLabel(index)),
-                          ),
-                        ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -113,13 +98,12 @@ class ProfileSettingsPage extends StatelessWidget {
     );
   }
 
-  String _avatarLabel(int index) {
-    return switch (index) {
-      0 => 'C',
-      1 => 'CH',
-      2 => 'P',
-      _ => 'A',
-    };
+  String _avatarLabel(AppSettingsScope settings) {
+    if (settings.profileName.trim().isNotEmpty) {
+      return settings.profileName.trim().characters.first.toUpperCase();
+    }
+
+    return 'U';
   }
 
   ImageProvider? _profileImage(String path) {

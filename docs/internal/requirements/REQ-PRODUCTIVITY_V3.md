@@ -129,13 +129,13 @@ Acceptance criteria:
 
 Notes:
 - Implemented on 2026-07-18.
-- Profile name, email, local image path, avatar choice, and typography preset
-  persist in the local Settings JSON.
-- The current photo flow uses a local image path because no native file picker
-  package is approved yet.
-- Verification evidence: `dart format` ran on modified files with existing
-  workspace access warnings; focused Settings/widget tests passed;
-  `flutter analyze` passed; full `flutter test` passed with 67 tests.
+- Profile name, email, selected local image path, avatar choice, and typography
+  preset persist in the local Settings JSON.
+- 2026-07-18 added an in-app local image picker for accessible image files, so
+  Settings no longer requires typing the photo path manually.
+- Verification evidence: `dart format lib test` passed; focused
+  Settings/widget tests passed; `flutter analyze` passed; full `flutter test`
+  passed with 76 tests.
 
 ### REQ-V3-005 - Report folder and database backup picker
 
@@ -373,23 +373,26 @@ Notes:
 Status: Verified
 
 Objective:
-Remove the unattractive square logo moment during app startup while preserving
-the existing loading screen behavior the user likes.
+Remove the unattractive square logo moment during app startup and keep the
+approved MichiDoro cat emblem consistent across native and Flutter launch views.
 
 Checklist:
 - [x] Requirement approved.
 - [x] Native launch assets reviewed.
-- [x] Current loading screen protected from unrelated changes.
+- [x] Current cat emblem protected from unrelated changes.
 - [x] Android launch verification planned.
 - [x] Checks passed.
 - [x] Documentation updated.
 - [x] Traceability updated.
 
 Acceptance criteria:
-- [x] The initial native launch does not show the square app logo.
+- [x] The initial native launch shows the approved circular cat emblem without
+  the white square logo card.
 - [x] The launch view uses the same visual background style as the current loading screen.
-- [x] The launch view does not show the loading indicator.
-- [x] The existing in-app loading screen is not visually changed.
+- [x] The Flutter launch view shows the animated numeric loading percentage.
+- [x] The in-app launch view keeps the cat, circular ring, clock, ruler, app
+  name, and tagline.
+- [x] The installed Android launcher icon uses the same circular cat emblem.
 
 Notes:
 - Implemented on 2026-07-18.
@@ -399,3 +402,17 @@ Notes:
   loading screen and progress animation.
 - Verification evidence: native launch XML reviewed; `dart format lib test`
   passed; `flutter analyze` passed; full `flutter test` passed with 71 tests.
+- Refined on 2026-07-20 after user approval: Android launch resources now show
+  `launch_image.png` centered over the gradient instead of the white square
+  text card and Android 12 uses the same cat emblem. An intermediate revision
+  omitted the numeric percentage; the final preference below restores it.
+- Refinement verification: focused widget test passed, `flutter analyze`
+  passed, full `flutter test` passed with 76 tests, and the debug APK built
+  successfully with the locally installed JDK 17.
+- Final user preference confirmed on 2026-07-20: the animated percentage was
+  restored below the cat emblem. All Android launcher density assets now use
+  the same `launch_image.png` cat, circle, clock, and ruler mark instead of the
+  text-only MichiDoro card.
+- Final verification: `dart format` passed, `flutter analyze` passed, full
+  `flutter test` passed with 76 tests, launcher assets were visually inspected,
+  and the debug APK built successfully with the locally installed JDK 17.

@@ -4,6 +4,7 @@ import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 
 class ScheduledTaskReminderController {
   ScheduledTaskReminderController({
@@ -78,12 +79,24 @@ class ScheduledTaskReminderController {
   }
 
   String _titleFor(int count) {
+    if (_settingsController.language.value == AppLanguage.english) {
+      return count == 1 ? 'Task scheduled for today' : 'Tasks scheduled today';
+    }
+
     return count == 1
         ? 'Tarea programada para hoy'
         : 'Tareas programadas para hoy';
   }
 
   String _bodyFor(List<Task> tasks) {
+    if (_settingsController.language.value == AppLanguage.english) {
+      if (tasks.length == 1) {
+        return 'Pending: ${tasks.single.title}.';
+      }
+
+      return 'You have ${tasks.length} pending tasks. Start with: ${tasks.first.title}.';
+    }
+
     if (tasks.length == 1) {
       return 'Tienes pendiente: ${tasks.single.title}.';
     }

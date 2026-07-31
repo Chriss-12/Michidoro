@@ -1,5 +1,7 @@
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
+import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 
 class TimerPreferences {
   const TimerPreferences({
@@ -11,13 +13,18 @@ class TimerPreferences {
     required this.completionVibrationEnabled,
     required this.autoStartBreak,
     required this.autoStartFocus,
+    this.completionVibrationPattern = PomodoroVibrationPattern.normal,
     this.reportsDirectoryPath = '',
     this.profileName = 'Chriss',
     this.profileEmail = '',
     this.profileImagePath = '',
     this.avatarIndex = 0,
+    this.themePreset = AppThemePreset.natureFocus,
+    this.isDarkMode = false,
+    this.fontScale = 1,
     this.typographyPreset = AppTypographyPreset.moderna,
     this.enabledStatisticsCharts = const {...StatisticsChartType.values},
+    this.language = AppLanguage.spanish,
   });
 
   const TimerPreferences.defaults()
@@ -27,6 +34,7 @@ class TimerPreferences {
       longBreakFrequency = 3,
       completionSound = PomodoroCompletionSound.softBell,
       completionVibrationEnabled = true,
+      completionVibrationPattern = PomodoroVibrationPattern.normal,
       autoStartBreak = true,
       autoStartFocus = false,
       reportsDirectoryPath = '',
@@ -34,8 +42,12 @@ class TimerPreferences {
       profileEmail = '',
       profileImagePath = '',
       avatarIndex = 0,
+      themePreset = AppThemePreset.natureFocus,
+      isDarkMode = false,
+      fontScale = 1,
       typographyPreset = AppTypographyPreset.moderna,
-      enabledStatisticsCharts = const {...StatisticsChartType.values};
+      enabledStatisticsCharts = const {...StatisticsChartType.values},
+      language = AppLanguage.spanish;
 
   final int focusMinutes;
   final int shortBreakMinutes;
@@ -43,6 +55,7 @@ class TimerPreferences {
   final int longBreakFrequency;
   final PomodoroCompletionSound completionSound;
   final bool completionVibrationEnabled;
+  final PomodoroVibrationPattern completionVibrationPattern;
   final bool autoStartBreak;
   final bool autoStartFocus;
   final String reportsDirectoryPath;
@@ -50,8 +63,12 @@ class TimerPreferences {
   final String profileEmail;
   final String profileImagePath;
   final int avatarIndex;
+  final AppThemePreset themePreset;
+  final bool isDarkMode;
+  final double fontScale;
   final AppTypographyPreset typographyPreset;
   final Set<StatisticsChartType> enabledStatisticsCharts;
+  final AppLanguage language;
 
   TimerPreferences normalized() {
     return TimerPreferences(
@@ -61,6 +78,7 @@ class TimerPreferences {
       longBreakFrequency: longBreakFrequency.clamp(3, 5),
       completionSound: completionSound,
       completionVibrationEnabled: completionVibrationEnabled,
+      completionVibrationPattern: completionVibrationPattern,
       autoStartBreak: autoStartBreak,
       autoStartFocus: autoStartFocus,
       reportsDirectoryPath: reportsDirectoryPath.trim(),
@@ -68,10 +86,17 @@ class TimerPreferences {
       profileEmail: profileEmail.trim(),
       profileImagePath: profileImagePath.trim(),
       avatarIndex: avatarIndex.clamp(0, 3),
+      themePreset: themePreset,
+      isDarkMode: isDarkMode,
+      fontScale: fontScale.clamp(
+        AppTypography.minFontScale,
+        AppTypography.maxFontScale,
+      ),
       typographyPreset: typographyPreset,
       enabledStatisticsCharts: enabledStatisticsCharts.isEmpty
           ? const {...StatisticsChartType.values}
           : {...enabledStatisticsCharts},
+      language: language,
     );
   }
 }

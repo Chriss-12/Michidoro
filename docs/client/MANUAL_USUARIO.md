@@ -41,7 +41,21 @@ No se pueden guardar tareas sin título.
 
 ## Focus
 
-Cada tarea puede iniciar un Pomodoro con **Empezar Pomodoro**. Antes de entrar en Focus se puede elegir una duración predefinida.
+Cada tarea puede iniciar un Pomodoro con **Empezar Pomodoro**. La acción
+**Iniciar/Continuar tarea** divide el tiempo pendiente en bloques de enfoque y
+descanso, acorta el último bloque para no exceder los minutos planificados y
+continúa automáticamente hasta completar la tarea.
+
+También se puede ejecutar un único Pomodoro predefinido. La opción recomendada
+minimiza tiempo extra de descanso y evita un último bloque demasiado corto. En
+**Personalizado** se eligen minutos de enfoque y descanso y se decide entre
+**Solo este Pomodoro** o **Usar para todo el plan**.
+
+El anillo representa una sola vuelta sobre el avance total de la tarea y dentro
+solo muestra la cuenta regresiva y el modo actual. El botón de información
+debajo del anillo abre el bloque, porcentaje, siguiente descanso y tiempo de
+reloj aproximado. Al salir de la app, el estado se guarda y el tiempo
+transcurrido se reconcilia al volver.
 
 Durante la sesión podés:
 
@@ -91,12 +105,16 @@ Los gráficos que se oculten en **Home > Rendimiento** también se excluyen del 
 
 En **Settings > Reportes** podés seleccionar dónde guardar los PDF. Si no configurás una carpeta, la app usa **Descargas** cuando el sistema lo permite. Si la carpeta configurada no está disponible, la app usa una ubicación local segura como respaldo.
 
-Desde la misma sección podés exportar una copia local de la base de datos e importar una copia previa. Cuando se importa un backup, la app lo prepara y lo aplica en el siguiente inicio.
+Desde la misma sección podés exportar un único archivo `michifocus.sqlite` con
+toda la base de datos e importar una copia previa. La app valida y migra la
+copia antes de aplicarla en el siguiente inicio. Las preferencias visuales y
+del temporizador no se agregan como un archivo JSON separado al backup.
 
 ## Configuración
 
 En **Settings** podés ajustar:
 
+- nombre, correo y foto de perfil local;
 - duración de enfoque;
 - descanso corto;
 - descanso largo;

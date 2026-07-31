@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 
 enum AppTypographyPreset {
-  moderna('Moderna', 'Sora', 'Limpia y actual para dashboards.'),
-  serio('Serio', 'Merriweather', 'Mas formal para reportes y foco profundo.'),
-  normal('Normal', 'Roboto', 'Neutral y familiar para uso diario.');
+  moderna('Moderna', 'Sora', 'Sora', 'Limpia y actual para dashboards.'),
+  serio(
+    'Serio',
+    'Merriweather',
+    'Merriweather',
+    'Más formal para reportes y foco profundo.',
+  ),
+  normal('Normal', 'Roboto', 'Roboto', 'Neutral y familiar para uso diario.');
 
-  const AppTypographyPreset(this.label, this.familyLabel, this.description);
+  const AppTypographyPreset(
+    this.label,
+    this.familyLabel,
+    this.fontFamily,
+    this.description,
+  );
 
   final String label;
   final String familyLabel;
+  final String fontFamily;
   final String description;
 }
 
@@ -120,11 +130,6 @@ class AppTypography {
       ),
     );
 
-    final font = switch (preset) {
-      AppTypographyPreset.moderna => GoogleFonts.sora(),
-      AppTypographyPreset.serio => GoogleFonts.merriweather(),
-      AppTypographyPreset.normal => GoogleFonts.roboto(),
-    };
-    return textTheme.apply(fontFamily: font.fontFamily);
+    return textTheme.apply(fontFamily: preset.fontFamily);
   }
 }

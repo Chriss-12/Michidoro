@@ -5,6 +5,7 @@ import 'package:pomodoro_app_v1/features/goals/presentation/pages/goals_page.dar
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/pages/pomodoro_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/directory_picker_page.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/pages/local_image_picker_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/notification_settings_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/pomodoro_time_settings_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/profile_settings_page.dart';
@@ -115,6 +116,15 @@ class AppRouter {
         pageBuilder: (context, state) => _buildTransitionPage(
           state: state,
           child: DirectoryPickerPage(
+            initialPath: state.extra is String ? state.extra! as String : null,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: LocalImagePickerPage.routePath,
+        pageBuilder: (context, state) => _buildTransitionPage(
+          state: state,
+          child: LocalImagePickerPage(
             initialPath: state.extra is String ? state.extra! as String : null,
           ),
         ),

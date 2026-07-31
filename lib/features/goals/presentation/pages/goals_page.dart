@@ -6,6 +6,7 @@ import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -107,7 +108,13 @@ class _GoalsPageState extends State<GoalsPage> {
     );
 
     if (!saved) {
-      return _goalsController.validationMessage.value;
+      if (!mounted) {
+        return null;
+      }
+      return _localizedGoalValidation(
+        context,
+        _goalsController.validationMessage.value,
+      );
     }
 
     return null;
@@ -118,17 +125,24 @@ class _GoalsPageState extends State<GoalsPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Eliminar objetivo'),
-          content: Text('Se eliminara "${goal.title}" de tu plan local.'),
+          title: Text(
+            dialogContext.tr('Eliminar objetivo', 'Delete goal'),
+          ),
+          content: Text(
+            dialogContext.tr(
+              'Se eliminará "${goal.title}" de tu plan local.',
+              '"${goal.title}" will be removed from your local plan.',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancelar'),
+              child: Text(dialogContext.tr('Cancelar', 'Cancel')),
             ),
             FilledButton.icon(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('Eliminar'),
+              label: Text(dialogContext.tr('Eliminar', 'Delete')),
             ),
           ],
         );
@@ -149,7 +163,10 @@ class _GoalsPageState extends State<GoalsPage> {
         final goals = _goalsController.goals.value;
         final taskSummary = _tasksController.allTaskSummary.value;
         final unassignedSummary = _tasksController.unassignedSummary();
-        final validationMessage = _goalsController.validationMessage.value;
+        final validationMessage = _localizedGoalValidation(
+          context,
+          _goalsController.validationMessage.value,
+        );
         final totalGoals = goals.length;
         final completedGoals = goals.where((goal) {
           final summary = _tasksController.summaryForGoal(goal.id);
@@ -174,7 +191,7 @@ class _GoalsPageState extends State<GoalsPage> {
           children: [
             const SizedBox(height: 24),
             Text(
-              'Mis metas',
+              context.tr('Mis metas', 'My goals'),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontSize: AppDesignTokens.mainTitleFontSize,
                 fontWeight: FontWeight.w700,
@@ -182,7 +199,10 @@ class _GoalsPageState extends State<GoalsPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Convierte tu enfoque en avances medibles',
+              context.tr(
+                'Convierte tu enfoque en avances medibles',
+                'Turn your focus into measurable progress',
+              ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: palette.textSecondary,
               ),
@@ -308,7 +328,7 @@ class _EditGoalDialogState extends State<_EditGoalDialog> {
 
     if (validationMessage != null) {
       setState(() {
-        _validationMessage = validationMessage;
+        _validationMessage = context.localizeMessage(validationMessage);
         _isSaving = false;
       });
       return;
@@ -331,7 +351,7 @@ class _EditGoalDialogState extends State<_EditGoalDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('Editar objetivo'),
+      title: Text(context.tr('Editar objetivo', 'Edit goal')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -339,7 +359,7 @@ class _EditGoalDialogState extends State<_EditGoalDialog> {
             controller: _titleController,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Objetivo',
+              labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
             ),
@@ -361,12 +381,12 @@ class _EditGoalDialogState extends State<_EditGoalDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _isSaving ? null : _submit,
           icon: const Icon(Icons.check_rounded),
-          label: const Text('Guardar'),
+          label: Text(context.tr('Guardar', 'Save')),
         ),
       ],
     );
@@ -407,8 +427,11 @@ class _GoalComposerCard extends StatelessWidget {
             controller: titleController,
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
-              labelText: 'Nueva meta',
-              hintText: 'Ej. Completar el modulo de reportes',
+              labelText: context.tr('Nueva meta', 'New goal'),
+              hintText: context.tr(
+                'Ej. Completar el módulo de reportes',
+                'E.g. Complete the reports module',
+              ),
               errorText: validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
             ),
@@ -432,7 +455,7 @@ class _GoalComposerCard extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onSubmitted,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Agregar meta'),
+              label: Text(context.tr('Agregar meta', 'Add goal')),
             ),
           ),
         ],
@@ -471,7 +494,7 @@ class _TargetDateSelector extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Fecha objetivo',
+                  context.tr('Fecha objetivo', 'Target date'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -479,8 +502,8 @@ class _TargetDateSelector extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   targetDate == null
-                      ? 'Sin fecha definida'
-                      : _formatGoalDate(targetDate!),
+                      ? context.tr('Sin fecha definida', 'No date set')
+                      : _formatGoalDate(context, targetDate!),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -489,12 +512,12 @@ class _TargetDateSelector extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Elegir fecha',
+            tooltip: context.tr('Elegir fecha', 'Choose date'),
             onPressed: onPickDate,
             icon: const Icon(Icons.calendar_month_rounded),
           ),
           IconButton(
-            tooltip: 'Quitar fecha',
+            tooltip: context.tr('Quitar fecha', 'Remove date'),
             onPressed: onClearDate,
             icon: const Icon(Icons.close_rounded),
           ),
@@ -532,14 +555,17 @@ class _TargetSessionsStepper extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Meta de pomodoros',
+                  context.tr('Meta de pomodoros', 'Pomodoro target'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$value sesiones para completar',
+                  context.tr(
+                    '$value ${value == 1 ? 'sesión' : 'sesiones'} para completar',
+                    '$value ${value == 1 ? 'session' : 'sessions'} to complete',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: palette.textSecondary,
                   ),
@@ -548,7 +574,7 @@ class _TargetSessionsStepper extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Reducir objetivo',
+            tooltip: context.tr('Reducir objetivo', 'Decrease target'),
             onPressed: value == 1 ? null : () => onChanged(-1),
             icon: const Icon(Icons.remove_rounded),
           ),
@@ -559,7 +585,7 @@ class _TargetSessionsStepper extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Aumentar objetivo',
+            tooltip: context.tr('Aumentar objetivo', 'Increase target'),
             onPressed: value == 24 ? null : () => onChanged(1),
             icon: const Icon(Icons.add_rounded),
           ),
@@ -596,7 +622,7 @@ class _GoalsSummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Progreso general',
+                  context.tr('Progreso general', 'Overall progress'),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontSize: AppDesignTokens.sectionTitleFontSize,
                     fontWeight: FontWeight.w800,
@@ -621,27 +647,27 @@ class _GoalsSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _SummaryMetric(
-            label: 'Objetivos',
+            label: context.tr('Objetivos', 'Goals'),
             value: '$totalGoals',
           ),
           const SizedBox(height: 8),
           _SummaryMetric(
-            label: 'Objetivos listos',
+            label: context.tr('Objetivos listos', 'Completed goals'),
             value: '$completedGoals',
           ),
           const SizedBox(height: 8),
           _SummaryMetric(
-            label: 'Pendientes',
+            label: context.tr('Pendientes', 'Pending'),
             value: '${taskSummary.listed}',
           ),
           const SizedBox(height: 8),
           _SummaryMetric(
-            label: 'En progreso',
+            label: context.tr('En progreso', 'In progress'),
             value: '${taskSummary.inProgress}',
           ),
           const SizedBox(height: 8),
           _SummaryMetric(
-            label: 'Completadas',
+            label: context.tr('Completadas', 'Completed'),
             value: '${taskSummary.completed}',
           ),
         ],
@@ -662,39 +688,97 @@ class _UnassignedTasksSummaryCard extends StatelessWidget {
 
     return GlassCard(
       padding: AppCardPaddings.compact,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.inbox_rounded, color: palette.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tareas sin objetivo',
+          Row(
+            children: [
+              Icon(Icons.inbox_rounded, color: palette.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.tr('Tareas sin objetivo', 'Tasks without a goal'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${summary.listed} pendientes - ${summary.inProgress} en progreso - ${summary.completed} completadas',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
-                  ),
+              ),
+              Text(
+                '$percent%',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: palette.primary,
+                  fontWeight: FontWeight.w800,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Text(
-            '$percent%',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: palette.primary,
-              fontWeight: FontWeight.w800,
-            ),
+          const SizedBox(height: 12),
+          _GoalTaskRows(
+            summary: summary,
+            fullWidth: true,
           ),
         ],
       ),
+    );
+  }
+}
+
+enum _GoalAction {
+  edit,
+  delete;
+
+  String label(BuildContext context) {
+    return switch (this) {
+      _GoalAction.edit => context.tr('Editar', 'Edit'),
+      _GoalAction.delete => context.tr('Eliminar', 'Delete'),
+    };
+  }
+
+  IconData get icon {
+    return switch (this) {
+      _GoalAction.edit => Icons.edit_rounded,
+      _GoalAction.delete => Icons.delete_outline_rounded,
+    };
+  }
+}
+
+class _GoalActionsMenu extends StatelessWidget {
+  const _GoalActionsMenu({
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_GoalAction>(
+      tooltip: context.tr('Opciones de objetivo', 'Goal options'),
+      icon: const Icon(Icons.more_vert_rounded),
+      onSelected: (action) {
+        switch (action) {
+          case _GoalAction.edit:
+            onEdit();
+          case _GoalAction.delete:
+            onDelete();
+        }
+      },
+      itemBuilder: (context) {
+        return [
+          for (final action in _GoalAction.values)
+            PopupMenuItem(
+              value: action,
+              child: Row(
+                children: [
+                  Icon(action.icon),
+                  const SizedBox(width: 12),
+                  Text(action.label(context)),
+                ],
+              ),
+            ),
+        ];
+      },
     );
   }
 }
@@ -762,7 +846,7 @@ class _EmptyGoalsState extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Text(
-          'Sin metas todavia',
+          context.tr('Sin metas todavía', 'No goals yet'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontSize: AppDesignTokens.sectionTitleFontSize,
             fontWeight: FontWeight.w800,
@@ -770,7 +854,10 @@ class _EmptyGoalsState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Crea una meta y suma pomodoros hasta completarla.',
+          context.tr(
+            'Crea una meta y suma pomodoros hasta completarla.',
+            'Create a goal and add Pomodoros until you complete it.',
+          ),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: palette.textSecondary,
@@ -807,7 +894,7 @@ class _GoalsList extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Metas activas',
+                context.tr('Metas activas', 'Active goals'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w800,
@@ -896,7 +983,12 @@ class _GoalTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${taskSummary.completed}/${taskSummary.total} tareas completadas',
+                      context.tr(
+                        '${taskSummary.completed}/${taskSummary.total} '
+                            '${taskSummary.total == 1 ? 'tarea completada' : 'tareas completadas'}',
+                        '${taskSummary.completed}/${taskSummary.total} '
+                            '${taskSummary.total == 1 ? 'task completed' : 'tasks completed'}',
+                      ),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: palette.textSecondary,
                       ),
@@ -906,7 +998,12 @@ class _GoalTile extends StatelessWidget {
                     if (goal.targetDate != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Fecha objetivo: ${_formatGoalDate(goal.targetDate!)}',
+                        context.tr(
+                          'Fecha objetivo: '
+                              '${_formatGoalDate(context, goal.targetDate!)}',
+                          'Target date: '
+                              '${_formatGoalDate(context, goal.targetDate!)}',
+                        ),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: palette.textSecondary,
                         ),
@@ -915,15 +1012,9 @@ class _GoalTile extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'Editar meta',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-              ),
-              IconButton(
-                tooltip: 'Eliminar meta',
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
+              _GoalActionsMenu(
+                onEdit: onEdit,
+                onDelete: onDelete,
               ),
             ],
           ),
@@ -946,19 +1037,24 @@ class _GoalTile extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${goal.completedSessions}/${goal.targetSessions} pomodoros',
+                context.tr(
+                  '${goal.completedSessions}/${goal.targetSessions} '
+                      '${goal.targetSessions == 1 ? 'pomodoro' : 'pomodoros'}',
+                  '${goal.completedSessions}/${goal.targetSessions} '
+                      '${goal.targetSessions == 1 ? 'Pomodoro' : 'Pomodoros'}',
+                ),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: palette.textSecondary,
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                tooltip: 'Restar pomodoro',
+                tooltip: context.tr('Restar pomodoro', 'Remove Pomodoro'),
                 onPressed: goal.completedSessions == 0 ? null : onDecrement,
                 icon: const Icon(Icons.remove_circle_outline_rounded),
               ),
               IconButton(
-                tooltip: 'Sumar pomodoro',
+                tooltip: context.tr('Sumar pomodoro', 'Add Pomodoro'),
                 onPressed: goal.isCompleted ? null : onIncrement,
                 icon: const Icon(Icons.add_circle_outline_rounded),
               ),
@@ -971,35 +1067,58 @@ class _GoalTile extends StatelessWidget {
 }
 
 class _GoalTaskRows extends StatelessWidget {
-  const _GoalTaskRows({required this.summary});
+  const _GoalTaskRows({
+    required this.summary,
+    this.fullWidth = false,
+  });
 
   final TaskStatusSummary summary;
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _GoalTaskRow(label: 'Pendientes', value: summary.listed),
+        _GoalTaskRow(
+          label: context.tr('Pendientes', 'Pending'),
+          value: summary.listed,
+          fullWidth: fullWidth,
+        ),
         const SizedBox(height: 6),
-        _GoalTaskRow(label: 'En progreso', value: summary.inProgress),
+        _GoalTaskRow(
+          label: context.tr('En progreso', 'In progress'),
+          value: summary.inProgress,
+          fullWidth: fullWidth,
+        ),
         const SizedBox(height: 6),
-        _GoalTaskRow(label: 'Completadas', value: summary.completed),
+        _GoalTaskRow(
+          label: context.tr('Completadas', 'Completed'),
+          value: summary.completed,
+          fullWidth: fullWidth,
+        ),
       ],
     );
   }
 }
 
 class _GoalTaskRow extends StatelessWidget {
-  const _GoalTaskRow({required this.label, required this.value});
+  const _GoalTaskRow({
+    required this.label,
+    required this.value,
+    required this.fullWidth,
+  });
 
   final String label;
   final int value;
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Container(
+    final row = Container(
+      width: fullWidth ? double.infinity : null,
+      constraints: fullWidth ? null : const BoxConstraints(maxWidth: 210),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: palette.background.withValues(alpha: 0.42),
@@ -1007,10 +1126,13 @@ class _GoalTaskRow extends StatelessWidget {
         border: Border.all(color: palette.neutralSoft),
       ),
       child: Row(
+        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          Expanded(
+          Flexible(
+            fit: fullWidth ? FlexFit.tight : FlexFit.loose,
             child: Text(
               label,
+              softWrap: true,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: palette.textSecondary,
                 fontWeight: FontWeight.w600,
@@ -1028,9 +1150,37 @@ class _GoalTaskRow extends StatelessWidget {
         ],
       ),
     );
+
+    if (fullWidth) {
+      return row;
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: row,
+    );
   }
 }
 
-String _formatGoalDate(DateTime date) {
-  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+String? _localizedGoalValidation(BuildContext context, String? message) {
+  return switch (message) {
+    'Escribe un titulo para guardar la meta.' => context.tr(
+      'Escribe un título para guardar la meta.',
+      'Enter a title to save the goal.',
+    ),
+    'El objetivo debe tener al menos 1 pomodoro.' => context.tr(
+      'El objetivo debe tener al menos 1 pomodoro.',
+      'The goal must include at least 1 Pomodoro.',
+    ),
+    _ => message,
+  };
+}
+
+String _formatGoalDate(BuildContext context, DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return context.tr(
+    '$day/$month/${date.year}',
+    '$month/$day/${date.year}',
+  );
 }

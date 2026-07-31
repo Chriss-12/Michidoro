@@ -4,6 +4,7 @@ import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 
 class PomodoroTimeControls extends StatelessWidget {
@@ -46,7 +47,7 @@ class _FocusCard extends StatelessWidget {
               const SizedBox(width: 18),
               Expanded(
                 child: Text(
-                  'Tiempo de\nEnfoque',
+                  context.tr('Tiempo de\nEnfoque', 'Focus\nTime'),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: palette.tertiary,
                     fontSize: AppDesignTokens.sectionTitleFontSize,
@@ -87,11 +88,14 @@ class _FocusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Auto-iniciar Enfoque',
+                      context.tr('Auto-iniciar Enfoque', 'Auto-start Focus'),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      'Comienza el siguiente ciclo\nautomáticamente',
+                      context.tr(
+                        'Comienza el siguiente ciclo\nautomáticamente',
+                        'Starts the next cycle\nautomatically',
+                      ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -128,7 +132,7 @@ class _BreaksCard extends StatelessWidget {
               Icon(Icons.eco_outlined, color: palette.secondary),
               const SizedBox(width: 18),
               Text(
-                'Descansos',
+                context.tr('Descansos', 'Breaks'),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: palette.tertiary,
                   fontSize: AppDesignTokens.sectionTitleFontSize,
@@ -138,7 +142,7 @@ class _BreaksCard extends StatelessWidget {
           ),
           const SizedBox(height: 30),
           _BreakSlider(
-            label: 'Descanso Corto',
+            label: context.tr('Descanso Corto', 'Short Break'),
             value: settings.shortBreakMinutes,
             min: 1,
             max: 20,
@@ -146,7 +150,7 @@ class _BreaksCard extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           _BreakSlider(
-            label: 'Descanso Largo',
+            label: context.tr('Descanso Largo', 'Long Break'),
             value: settings.longBreakMinutes,
             min: 5,
             max: 45,
@@ -162,11 +166,17 @@ class _BreaksCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Frecuencia de Largo',
+                      context.tr(
+                        'Frecuencia de Largo',
+                        'Long Break Frequency',
+                      ),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      'Cada 4 sesiones de enfoque',
+                      context.tr(
+                        'Cada ${settings.longBreakFrequency} sesiones de enfoque',
+                        'Every ${settings.longBreakFrequency} focus sessions',
+                      ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -299,7 +309,7 @@ class _AtmosphereCard extends StatelessWidget {
           const _ForestPreview(),
           const SizedBox(height: 48),
           Text(
-            'Ajustes Atmosféricos',
+            context.tr('Ajustes Atmosféricos', 'Atmosphere Settings'),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: palette.tertiary,
               fontSize: AppDesignTokens.sectionTitleFontSize,
@@ -308,21 +318,14 @@ class _AtmosphereCard extends StatelessWidget {
           const SizedBox(height: 24),
           _AtmosphereTile(
             icon: Icons.volume_up_outlined,
-            title: 'Sonido de\nFinalización',
+            title: context.tr(
+              'Sonido de\nFinalización',
+              'Completion\nSound',
+            ),
             trailing: _CompletionSoundPicker(
               selectedSound: settings.completionSound,
               onChanged: settings.onCompletionSoundChanged,
               onPreview: settings.onPreviewCompletionSound,
-            ),
-          ),
-          const SizedBox(height: 18),
-          _AtmosphereTile(
-            icon: Icons.vibration_rounded,
-            title: 'Vibración\nFinal',
-            trailing: _CompletionVibrationControl(
-              enabled: settings.completionVibrationEnabled,
-              onChanged: settings.onCompletionVibrationChanged,
-              onPreview: settings.onPreviewCompletionVibration,
             ),
           ),
           if (showSaveButton) ...[
@@ -331,40 +334,14 @@ class _AtmosphereCard extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () {},
-                child: const Text('Guardar Configuración'),
+                child: Text(
+                  context.tr('Guardar Configuración', 'Save Settings'),
+                ),
               ),
             ),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _CompletionVibrationControl extends StatelessWidget {
-  const _CompletionVibrationControl({
-    required this.enabled,
-    required this.onChanged,
-    required this.onPreview,
-  });
-
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-  final Future<void> Function() onPreview;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton.filledTonal(
-          tooltip: 'Probar vibración',
-          onPressed: enabled ? () async => onPreview() : null,
-          icon: const Icon(Icons.touch_app_rounded),
-        ),
-        const SizedBox(width: 8),
-        Switch.adaptive(value: enabled, onChanged: onChanged),
-      ],
     );
   }
 }
@@ -388,13 +365,13 @@ class _CompletionSoundPicker extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton.filledTonal(
-          tooltip: 'Escuchar sonido',
+          tooltip: context.tr('Escuchar sonido', 'Preview sound'),
           onPressed: () async => onPreview(),
           icon: const Icon(Icons.volume_up_rounded),
         ),
         const SizedBox(width: 8),
         PopupMenuButton<PomodoroCompletionSound>(
-          tooltip: 'Seleccionar sonido',
+          tooltip: context.tr('Seleccionar sonido', 'Select sound'),
           initialValue: selectedSound,
           onSelected: onChanged,
           itemBuilder: (context) {
@@ -405,8 +382,8 @@ class _CompletionSoundPicker extends StatelessWidget {
                   child: ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    title: Text(sound.label),
-                    subtitle: Text(sound.description),
+                    title: Text(_soundLabel(context, sound)),
+                    subtitle: Text(_soundDescription(context, sound)),
                   ),
                 ),
             ];
@@ -423,7 +400,7 @@ class _CompletionSoundPicker extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text(
-                    selectedSound.label,
+                    _soundLabel(context, selectedSound),
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
@@ -481,7 +458,10 @@ class _ForestPreview extends StatelessWidget {
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(
-                'Vista Previa del Entorno',
+                context.tr(
+                  'Vista Previa del Entorno',
+                  'Atmosphere Preview',
+                ),
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: palette.secondary),
@@ -525,4 +505,81 @@ class _AtmosphereTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _soundLabel(
+  BuildContext context,
+  PomodoroCompletionSound sound,
+) {
+  return switch (sound) {
+    PomodoroCompletionSound.softBell => context.tr(
+      'Campana suave',
+      'Soft bell',
+    ),
+    PomodoroCompletionSound.lightTap => context.tr(
+      'Toque ligero',
+      'Light tap',
+    ),
+    PomodoroCompletionSound.warmChime => context.tr(
+      'Campanilla cálida',
+      'Warm chime',
+    ),
+    PomodoroCompletionSound.crystalChime => context.tr(
+      'Cristal claro',
+      'Crystal chime',
+    ),
+    PomodoroCompletionSound.calmPulse => context.tr(
+      'Pulso calmado',
+      'Calm pulse',
+    ),
+    PomodoroCompletionSound.deepChime => context.tr(
+      'Campana profunda',
+      'Deep chime',
+    ),
+    PomodoroCompletionSound.digitalZen => context.tr(
+      'Zen digital',
+      'Digital zen',
+    ),
+    PomodoroCompletionSound.silent => context.tr('Silencio', 'Silent'),
+  };
+}
+
+String _soundDescription(
+  BuildContext context,
+  PomodoroCompletionSound sound,
+) {
+  return switch (sound) {
+    PomodoroCompletionSound.softBell => context.tr(
+      'Campana breve y clara para cerrar el bloque.',
+      'A short, clear bell to close the block.',
+    ),
+    PomodoroCompletionSound.lightTap => context.tr(
+      'Señal corta y discreta para avisos rápidos.',
+      'A short, discreet cue for quick alerts.',
+    ),
+    PomodoroCompletionSound.warmChime => context.tr(
+      'Notas suaves con un cierre más agradable.',
+      'Soft notes with a warmer finish.',
+    ),
+    PomodoroCompletionSound.crystalChime => context.tr(
+      'Secuencia limpia y brillante sin sonar agresiva.',
+      'A clean, bright sequence without sounding harsh.',
+    ),
+    PomodoroCompletionSound.calmPulse => context.tr(
+      'Dos pulsos redondos para una alerta tranquila.',
+      'Two rounded pulses for a calm alert.',
+    ),
+    PomodoroCompletionSound.deepChime => context.tr(
+      'Tono grave y reposado para descansos largos.',
+      'A deep, relaxed tone for long breaks.',
+    ),
+    PomodoroCompletionSound.digitalZen => context.tr(
+      'Secuencia moderna, corta y menos invasiva.',
+      'A modern, short, less intrusive sequence.',
+    ),
+    PomodoroCompletionSound.silent => context.tr(
+      'No reproducir sonido al finalizar.',
+      'Do not play a sound when finished.',
+    ),
+  };
 }

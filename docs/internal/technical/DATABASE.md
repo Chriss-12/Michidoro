@@ -4,39 +4,64 @@ Use `drift` with SQLite for local persistence when needed. Keep schema and DAO c
 
 ## Current local schema overview
 
-The current local persistence model is documented in the generated ERD image:
+The current local persistence model uses one Drift-managed SQLite file,
+`michifocus.sqlite`. The generated ERD image documents the unified schema:
 
 - [`database_erd.svg`](database_erd.svg)
 
-Current Drift-backed SQLite stores:
+Current Drift-backed SQLite store:
 
 | Local store | SQLite table | Schema version | Purpose |
 |---|---|---:|---|
-| `michifocus_goals` | `goals` | 2 | Planned objectives and target dates. |
-| `michifocus_tasks` | `tasks` | 3 | Quick/planned tasks, status, scheduling, objective link, and estimated duration. |
-| `michifocus_pomodoro_sessions` | `pomodoro_sessions` | 4 | Completed focus sessions, actual focused seconds, optional objective/task links, and focus reflection data. |
-| `michifocus_calendar_events` | `calendar_events` | 1 | Legacy/local calendar events. |
+| `michifocus.sqlite` | `goals` | 1 | Planned objectives and target dates. |
+| `michifocus.sqlite` | `tasks` | 1 | Quick/planned tasks, status, scheduling, objective link, and estimated duration. |
+| `michifocus.sqlite` | `pomodoro_sessions` | 1 | Completed focus sessions, actual focused seconds, optional objective/task links, and focus reflection data. |
+| `michifocus.sqlite` | `calendar_events` | 1 | Local calendar events. |
+| `michifocus.sqlite` | `pomodoro_runtime` | 3 | Singleton active timer owner, phase, cadence, task-plan position, and recovery timestamps. |
 
 Logical relationships:
 
 - `tasks.goal_id` links a task to `goals.id`.
 - `pomodoro_sessions.goal_id` links a completed session to `goals.id`.
 - `pomodoro_sessions.task_id` links a completed session to `tasks.id`.
+- `pomodoro_runtime.task_id` links the active timer owner to `tasks.id`.
 - `tasks.scheduled_date` and `calendar_events.scheduled_at` group planning
   data by calendar day.
 
 Important boundary:
 
-- These links are logical application-level relationships; Drift does not
-  currently declare foreign key constraints between the feature databases.
+- The unified Drift database declares SQLite foreign keys for task/goal and
+  Pomodoro history links.
 - Settings and timer preferences are stored through the local JSON settings
-  repository, not as Drift tables.
-- V3-M2 database export copies the local Settings JSON and known Drift SQLite
-  database files into a `michifocus-backup` folder under the configured Reports
-  folder or Downloads/default folder.
-- V3-M2 database import selects a local backup folder, stages known MichiFocus
-  files in `michifocus-pending-import`, and applies them on the next app startup
-  before Drift databases open.
+  repository, not as Drift tables and not as part of database backups.
+- Database export checkpoints the active timer, creates a consistent SQLite
+  snapshot with `VACUUM INTO`, and exports only that `michifocus.sqlite` file.
+- Database import selects a local backup folder, stages `michifocus.sqlite`,
+  migrates it in isolation, runs SQLite integrity and foreign-key checks,
+  verifies required tables and schema version, pauses any imported running
+  timer, and applies it on the next app startup before Drift opens. Legacy
+  four-file database backups are still accepted for migration.
+- The database connection uses `PRAGMA journal_mode = DELETE` so normal backup
+  export remains a single SQLite file rather than requiring separate WAL files.
+
+## Unified relationships
+
+The database declares these SQLite foreign keys:
+
+| Child column | Parent column | Delete action |
+|---|---|---|
+| `tasks.goal_id` | `goals.id` | `SET NULL` |
+| `pomodoro_sessions.goal_id` | `goals.id` | `SET NULL` |
+| `pomodoro_sessions.task_id` | `tasks.id` | `SET NULL` |
+| `pomodoro_runtime.goal_id` | `goals.id` | `SET NULL` |
+| `pomodoro_runtime.task_id` | `tasks.id` | `RESTRICT` |
+
+The connection enables `PRAGMA foreign_keys = ON`, and indexes cover the
+foreign-key and scheduled-date/time query columns. On first launch after the
+unified database change, legacy feature-specific files are copied into
+`michifocus.sqlite` when no unified database exists. See
+[`REQ-DATABASE.md`](../requirements/REQ-DATABASE.md) for the complete scope and
+remaining verification items.
 
 ## Required checks
 
@@ -183,4 +208,49 @@ Verification evidence:
 - `flutter analyze` passed after generated code changes.
 - Full `flutter test` passed with 39 total tests, including calendar
   controller and local SQLite file persistence tests.
+
+## V5-M3 reporting history and indexes
+
+Unified database schema version 2 adds:
+
+| Drift table/column | SQLite storage | Purpose |
+|---|---|---|
+| `TaskRecords.legacyCompletionUnknown` | `tasks.legacy_completion_unknown` | Marks migrated completed tasks whose completion date cannot be trusted. |
+| `TaskCompletionEventRecords` | `task_completion_events` | Preserves immutable completion transitions with task and scheduled-date snapshots. |
+| `ReportingMetadataRecords` | `reporting_metadata` | Records when trustworthy completion tracking began. |
+
+The migration marks existing completed tasks as legacy unknown, creates no
+invented completion events, and keeps backup import/export on the single
+`michifocus.sqlite` file.
+
+Reporting range indexes cover `tasks.scheduled_date`, `tasks.created_at`,
+`pomodoro_sessions.ended_at`, and `task_completion_events.completed_at`.
+Automated query-plan evidence uses 20,000 tasks and 50,000 sessions and confirms
+the timestamp indexes are selected for bounded report queries. Chart buckets
+are grouped in one bounded task query and one bounded Pomodoro query instead of
+issuing one query per bucket.
+
+## V6-M0 recoverable Pomodoro runtime
+
+Unified database schema version 3 adds the singleton `pomodoro_runtime` table.
+It stores the active owner, focus/break phase, running or paused state,
+remaining and total phase seconds, cadence, automatic transition settings,
+continuous or single-block mode, current block, total blocks, task estimate,
+focused baseline, and clock reconciliation timestamps.
+
+The runtime row is a recoverable checkpoint, not immutable focus history.
+Completed and partial focus remain in `pomodoro_sessions`; deterministic
+session identifiers and insert-ignore semantics prevent a retried boundary
+from being counted twice. Background time is reconciled from timestamps when
+the process resumes or restarts.
+
+Verification evidence on 2026-07-29:
+
+- Drift generated code was rebuilt after schema version 3.
+- Schema 1 and schema 2 migration tests passed.
+- Runtime repository restoration, exclusive ownership, background clock
+  reconciliation, and duplicate-boundary tests passed.
+- Unified import/export, invalid backup rejection, and full database
+  regression tests passed.
+- `flutter analyze` passed and the full suite passed with 134 tests.
 

@@ -1,4 +1,4 @@
-enum PomodoroSessionStatus { completed }
+enum PomodoroSessionStatus { completed, partial }
 
 class PomodoroSession {
   const PomodoroSession({

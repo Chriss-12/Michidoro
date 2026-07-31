@@ -15,6 +15,7 @@ class Task {
     this.scheduledDate,
     this.goalId,
     this.durationMinutes,
+    this.legacyCompletionUnknown = false,
   });
 
   final String id;
@@ -24,6 +25,7 @@ class Task {
   final DateTime? scheduledDate;
   final String? goalId;
   final int? durationMinutes;
+  final bool legacyCompletionUnknown;
 
   bool get isCompleted => status.isCompleted;
   bool get isPlanned => scheduledDate != null;
@@ -36,6 +38,7 @@ class Task {
     DateTime? scheduledDate,
     String? goalId,
     int? durationMinutes,
+    bool? legacyCompletionUnknown,
     bool clearScheduledDate = false,
     bool clearGoalId = false,
     bool clearDuration = false,
@@ -52,6 +55,8 @@ class Task {
       durationMinutes: clearDuration
           ? null
           : durationMinutes ?? this.durationMinutes,
+      legacyCompletionUnknown:
+          legacyCompletionUnknown ?? this.legacyCompletionUnknown,
     );
   }
 }

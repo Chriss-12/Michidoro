@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class DirectoryPickerPage extends StatefulWidget {
   const DirectoryPickerPage({super.key, this.initialPath});
@@ -53,7 +54,10 @@ class _DirectoryPickerPageState extends State<DirectoryPickerPage> {
       setState(() {
         _currentDirectory = null;
         _children = const [];
-        _errorMessage = 'No se encontraron carpetas accesibles.';
+        _errorMessage = context.tr(
+          'No se encontraron carpetas accesibles.',
+          'No accessible folders were found.',
+        );
         _isLoading = false;
       });
       return;
@@ -86,7 +90,10 @@ class _DirectoryPickerPageState extends State<DirectoryPickerPage> {
       setState(() {
         _currentDirectory = directory;
         _children = const [];
-        _errorMessage = 'No se pudo leer esta carpeta.';
+        _errorMessage = context.tr(
+          'No se pudo leer esta carpeta.',
+          'This folder could not be read.',
+        );
         _isLoading = false;
       });
     }
@@ -144,13 +151,13 @@ class _DirectoryPickerPageState extends State<DirectoryPickerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Seleccionar carpeta'),
+        title: Text(context.tr('Seleccionar carpeta', 'Select folder')),
         actions: [
           TextButton(
             onPressed: currentDirectory == null
                 ? null
                 : () => context.pop(currentDirectory.path),
-            child: const Text('Elegir'),
+            child: Text(context.tr('Elegir', 'Choose')),
           ),
         ],
       ),
@@ -158,7 +165,8 @@ class _DirectoryPickerPageState extends State<DirectoryPickerPage> {
         padding: AppCardPaddings.page,
         children: [
           Text(
-            currentDirectory?.path ?? 'Sin carpeta seleccionada',
+            currentDirectory?.path ??
+                context.tr('Sin carpeta seleccionada', 'No folder selected'),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
             ),
@@ -179,7 +187,7 @@ class _DirectoryPickerPageState extends State<DirectoryPickerPage> {
           if (_parentOf(currentDirectory) case final parent?)
             ListTile(
               leading: const Icon(Icons.arrow_upward_rounded),
-              title: const Text('Subir carpeta'),
+              title: Text(context.tr('Subir carpeta', 'Go up')),
               subtitle: Text(parent.path),
               onTap: () => _openDirectory(parent),
             ),

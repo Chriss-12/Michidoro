@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
+import 'package:pomodoro_app_v1/l10n/app_language.dart';
 
 class AppSettingsScope extends InheritedWidget {
   const AppSettingsScope({
@@ -13,12 +15,14 @@ class AppSettingsScope extends InheritedWidget {
     required this.profileImagePath,
     required this.avatarIndex,
     required this.typographyPreset,
+    required this.language,
     required this.focusMinutes,
     required this.shortBreakMinutes,
     required this.longBreakMinutes,
     required this.longBreakFrequency,
     required this.completionSound,
     required this.completionVibrationEnabled,
+    required this.completionVibrationPattern,
     required this.autoStartBreak,
     required this.autoStartFocus,
     required this.notificationsEnabled,
@@ -38,6 +42,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.onProfileImagePathChanged,
     required this.onAvatarChanged,
     required this.onTypographyPresetChanged,
+    required this.onLanguageChanged,
     required this.onFocusMinutesChanged,
     required this.onShortBreakMinutesChanged,
     required this.onLongBreakMinutesChanged,
@@ -45,6 +50,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.onCompletionSoundChanged,
     required this.onPreviewCompletionSound,
     required this.onCompletionVibrationChanged,
+    required this.onCompletionVibrationPatternChanged,
     required this.onPreviewCompletionVibration,
     required this.onAutoStartBreakChanged,
     required this.onAutoStartFocusChanged,
@@ -56,6 +62,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.onFocusAlertsEnabledChanged,
     required this.onDownloadReport,
     required this.onDownloadStatisticsPdf,
+    required this.onOpenReport,
     required this.onExportDatabaseBackup,
     required this.onImportDatabaseBackup,
     required this.onTestNotification,
@@ -72,12 +79,14 @@ class AppSettingsScope extends InheritedWidget {
   final String profileImagePath;
   final int avatarIndex;
   final AppTypographyPreset typographyPreset;
+  final AppLanguage language;
   final int focusMinutes;
   final int shortBreakMinutes;
   final int longBreakMinutes;
   final int longBreakFrequency;
   final PomodoroCompletionSound completionSound;
   final bool completionVibrationEnabled;
+  final PomodoroVibrationPattern completionVibrationPattern;
   final bool autoStartBreak;
   final bool autoStartFocus;
   final bool notificationsEnabled;
@@ -97,6 +106,7 @@ class AppSettingsScope extends InheritedWidget {
   final ValueChanged<String> onProfileImagePathChanged;
   final ValueChanged<int> onAvatarChanged;
   final ValueChanged<AppTypographyPreset> onTypographyPresetChanged;
+  final ValueChanged<AppLanguage> onLanguageChanged;
   final ValueChanged<int> onFocusMinutesChanged;
   final ValueChanged<int> onShortBreakMinutesChanged;
   final ValueChanged<int> onLongBreakMinutesChanged;
@@ -104,6 +114,8 @@ class AppSettingsScope extends InheritedWidget {
   final ValueChanged<PomodoroCompletionSound> onCompletionSoundChanged;
   final Future<void> Function() onPreviewCompletionSound;
   final ValueChanged<bool> onCompletionVibrationChanged;
+  final ValueChanged<PomodoroVibrationPattern>
+  onCompletionVibrationPatternChanged;
   final Future<void> Function() onPreviewCompletionVibration;
   final ValueChanged<bool> onAutoStartBreakChanged;
   final ValueChanged<bool> onAutoStartFocusChanged;
@@ -115,9 +127,10 @@ class AppSettingsScope extends InheritedWidget {
   final ValueChanged<bool> onBreakAlertsEnabledChanged;
   final ValueChanged<bool> onFocusAlertsEnabledChanged;
   final Future<void> Function() onDownloadReport;
-  final Future<void> Function(StatisticsReportRequest request)
+  final Future<StatisticsReportFile> Function(StatisticsReportRequest request)
   onDownloadStatisticsPdf;
-  final Future<void> Function() onExportDatabaseBackup;
+  final Future<void> Function(String path) onOpenReport;
+  final Future<String> Function() onExportDatabaseBackup;
   final Future<void> Function(String directoryPath) onImportDatabaseBackup;
   final Future<void> Function() onTestNotification;
   final VoidCallback onClearNotifications;
@@ -140,12 +153,14 @@ class AppSettingsScope extends InheritedWidget {
         profileImagePath != oldWidget.profileImagePath ||
         avatarIndex != oldWidget.avatarIndex ||
         typographyPreset != oldWidget.typographyPreset ||
+        language != oldWidget.language ||
         focusMinutes != oldWidget.focusMinutes ||
         shortBreakMinutes != oldWidget.shortBreakMinutes ||
         longBreakMinutes != oldWidget.longBreakMinutes ||
         longBreakFrequency != oldWidget.longBreakFrequency ||
         completionSound != oldWidget.completionSound ||
         completionVibrationEnabled != oldWidget.completionVibrationEnabled ||
+        completionVibrationPattern != oldWidget.completionVibrationPattern ||
         autoStartBreak != oldWidget.autoStartBreak ||
         autoStartFocus != oldWidget.autoStartFocus ||
         notificationsEnabled != oldWidget.notificationsEnabled ||

@@ -19,6 +19,7 @@
 - Mapa de avance en Calendario.
 - Acción **Terminar día**.
 - Recordatorios locales para tareas planificadas del día mientras la app está abierta.
+- Selector local de foto de perfil desde Settings.
 - Reportes PDF por día, semana, mes, año y rango personalizado.
 - Selección de gráficos visibles en Home para decidir qué se incluye en los reportes.
 - Carpeta configurable para guardar reportes.
