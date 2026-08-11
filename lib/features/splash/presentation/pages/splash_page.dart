@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
+import 'package:pomodoro_app_v1/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class SplashPage extends StatefulWidget {
@@ -38,13 +40,17 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     _navigationScheduled = true;
-    unawaited(_goHome());
+    unawaited(_goNext());
   }
 
-  Future<void> _goHome() async {
+  Future<void> _goNext() async {
     await Future<void>.delayed(const Duration(milliseconds: 1700));
     if (mounted) {
-      context.go(HomePage.routePath);
+      context.go(
+        appSettingsController.shouldShowOnboarding
+            ? OnboardingPage.routePath
+            : HomePage.routePath,
+      );
     }
   }
 

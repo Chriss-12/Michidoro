@@ -14,6 +14,7 @@ class PomodoroTimeSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppShell(
       selectedIndex: 2,
+      showHeader: false,
       child: ListView(
         padding: AppCardPaddings.page,
         children: [

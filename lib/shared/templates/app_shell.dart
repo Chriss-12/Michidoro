@@ -13,11 +13,13 @@ class AppShell extends StatelessWidget {
   const AppShell({
     required this.selectedIndex,
     required this.child,
+    this.showHeader = true,
     super.key,
   });
 
   final int selectedIndex;
   final Widget child;
+  final bool showHeader;
 
   static const List<String> routes = [
     HomePage.routePath,
@@ -40,7 +42,7 @@ class AppShell extends StatelessWidget {
           bottom: false,
           child: Column(
             children: [
-              const PageHeader(title: ''),
+              if (showHeader) const PageHeader(title: ''),
               Expanded(child: child),
             ],
           ),

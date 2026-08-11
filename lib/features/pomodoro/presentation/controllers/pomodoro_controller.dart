@@ -96,6 +96,7 @@ class PomodoroController {
   bool _autoStartBreak;
   bool _autoStartFocus;
   bool _hasStructuredTaskPlan = false;
+  final List<String> _pendingReflectionSessionIds = [];
 
   int get plannedSeconds => _focusSeconds;
   int get cadenceFocusMinutes => _focusSeconds ~/ 60;
@@ -161,6 +162,13 @@ class PomodoroController {
 
   Future<void> loadSessions() async {
     sessions.value = await _repository.loadSessions();
+    final pendingSessions =
+        sessions.value.where((session) => session.moodPromptPending).toList()
+          ..sort((first, second) => first.endedAt.compareTo(second.endedAt));
+    _pendingReflectionSessionIds
+      ..clear()
+      ..addAll(pendingSessions.map((session) => session.id));
+    _showNextPendingReflection();
   }
 
   Future<void> initialize() async {
@@ -433,12 +441,11 @@ class PomodoroController {
 
   Future<void> stopForNow() async {
     if (phase.value == PomodoroPhase.focus && elapsedFocusSeconds > 0) {
-      final session = await _saveFocusedSession(
+      await _saveFocusedSession(
         focusedSeconds: elapsedFocusSeconds,
         endedAt: _now(),
         status: PomodoroSessionStatus.partial,
       );
-      pendingReflectionSessionId.value = session.id;
       if (_hasCompletedActiveTask()) {
         final taskId = activeTaskId.value;
         final callback = onTaskPlanCompleted;
@@ -524,14 +531,12 @@ class PomodoroController {
         ? elapsedFocusSeconds
         : _clampFocusSeconds(focusedSeconds);
 
-    final session = await _saveFocusedSession(
+    await _saveFocusedSession(
       focusedSeconds: recordedFocusedSeconds,
       endedAt: completedAt,
     );
     _startedAt = null;
     focusStartMoodScore.value = null;
-    pendingReflectionSessionId.value = session.id;
-
     if (_hasCompletedActiveTask()) {
       final taskId = activeTaskId.value;
       final callback = onTaskPlanCompleted;
@@ -574,6 +579,11 @@ class PomodoroController {
       ...sessions.value.where((existing) => existing.id != session.id),
     ];
 
+    if (!wasAlreadyRecorded && status == PomodoroSessionStatus.completed) {
+      _pendingReflectionSessionIds.add(session.id);
+      _showNextPendingReflection();
+    }
+
     final goalId = session.goalId;
     final goalCompletionCallback = onGoalPomodoroCompleted;
     if (!wasAlreadyRecorded &&
@@ -613,7 +623,8 @@ class PomodoroController {
     sessions.value = sessions.value
         .map((session) => session.id == sessionId ? updatedSession : session)
         .toList(growable: false);
-    pendingReflectionSessionId.value = null;
+    _pendingReflectionSessionIds.remove(sessionId);
+    _showNextPendingReflection();
   }
 
   Future<void> completeBreak() async {
@@ -725,6 +736,12 @@ class PomodoroController {
 
   int _clampMoodScore(int value) {
     return value.clamp(1, 5);
+  }
+
+  void _showNextPendingReflection() {
+    pendingReflectionSessionId.value = _pendingReflectionSessionIds.isEmpty
+        ? null
+        : _pendingReflectionSessionIds.first;
   }
 
   void _startBreakAfterFocus() {

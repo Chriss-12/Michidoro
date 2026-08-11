@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/legacy_database_migrator.dart';
+import 'package:pomodoro_app_v1/app/data/datasources/unified_database_validator.dart';
 import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
@@ -111,6 +111,8 @@ class AppSettingsController {
     'michifocus.sqlite',
   ];
 
+  static const currentOnboardingVersion = 1;
+
   static const _legacyDatabaseBackupFileNames = [
     'michifocus_goals.sqlite',
     'michifocus_tasks.sqlite',
@@ -119,6 +121,9 @@ class AppSettingsController {
   ];
 
   static const _pendingImportDirectoryName = 'michifocus-pending-import';
+  static const _stagingImportDirectoryName = 'michifocus-staging-import';
+  static const _importCandidateFileName = '.michifocus-import.sqlite';
+  static const _preImportFileName = '.michifocus-before-import.sqlite';
 
   final FlutterSignal<AppThemePreset> themePreset = signal(
     AppThemePreset.natureFocus,
@@ -133,6 +138,7 @@ class AppSettingsController {
     AppTypographyPreset.moderna,
   );
   final FlutterSignal<AppLanguage> language = signal(AppLanguage.spanish);
+  final FlutterSignal<int> completedOnboardingVersion = signal(0);
   final FlutterSignal<int> focusMinutes = signal(25);
   final FlutterSignal<int> shortBreakMinutes = signal(5);
   final FlutterSignal<int> longBreakMinutes = signal(15);
@@ -192,6 +198,7 @@ class AppSettingsController {
     fontScale.value = normalized.fontScale;
     typographyPreset.value = normalized.typographyPreset;
     language.value = normalized.language;
+    completedOnboardingVersion.value = normalized.completedOnboardingVersion;
     enabledStatisticsCharts.value = normalized.enabledStatisticsCharts;
     if (!isPomodoroRunning.value) {
       remainingSeconds.value = normalized.focusMinutes * 60;
@@ -220,11 +227,20 @@ class AppSettingsController {
       typographyPreset: typographyPreset.value,
       enabledStatisticsCharts: enabledStatisticsCharts.value,
       language: language.value,
+      completedOnboardingVersion: completedOnboardingVersion.value,
     ).normalized();
   }
 
   Future<void> saveTimerPreferences() async {
     await _settingsRepository?.saveTimerPreferences(timerPreferences);
+  }
+
+  bool get shouldShowOnboarding =>
+      completedOnboardingVersion.value < currentOnboardingVersion;
+
+  Future<void> completeOnboarding() async {
+    completedOnboardingVersion.value = currentOnboardingVersion;
+    await saveTimerPreferences();
   }
 
   void setFocusMinutes(int value) {
@@ -392,7 +408,13 @@ class AppSettingsController {
       return;
     }
 
-    switch (completionVibrationPattern.value) {
+    final selectedPattern = completionVibrationPattern.value;
+    if (Platform.isAndroid) {
+      await NativeFileManager.playCompletionVibration(selectedPattern.name);
+      return;
+    }
+
+    switch (selectedPattern) {
       case PomodoroVibrationPattern.light:
         await HapticFeedback.lightImpact();
       case PomodoroVibrationPattern.normal:
@@ -485,7 +507,7 @@ class AppSettingsController {
   }
 
   Future<String> exportDatabaseBackup({
-    Future<void> Function(String targetPath)? createDatabaseSnapshot,
+    required Future<void> Function(String targetPath) createDatabaseSnapshot,
   }) async {
     final appDirectory = await _applicationDocumentsDirectory();
     final snapshot = File(
@@ -494,28 +516,23 @@ class AppSettingsController {
     if (snapshot.existsSync()) {
       await snapshot.delete();
     }
-    if (createDatabaseSnapshot != null) {
-      await createDatabaseSnapshot(snapshot.path);
+    await createDatabaseSnapshot(snapshot.path);
+    if (!snapshot.existsSync() || !await _isSQLiteDatabase(snapshot)) {
+      throw const FileSystemException(
+        'No se pudo crear una instantanea valida de la base de datos.',
+      );
     }
 
     final externalFolder = _externalReportsFolderReference();
     if (externalFolder != null) {
-      if (snapshot.existsSync()) {
-        final saved = await NativeFileManager.saveFileToExternalFolder(
-          folderUri: externalFolder,
-          fileName: 'michifocus.sqlite',
-          mimeType: 'application/vnd.sqlite3',
-          bytes: await snapshot.readAsBytes(),
-        );
-        await snapshot.delete();
-        lastReportPath.value = saved.displayPath;
-      } else {
-        lastReportPath.value =
-            await NativeFileManager.exportBackupToExternalFolder(
-              folderUri: externalFolder,
-              fileNames: databaseBackupFileNames,
-            );
-      }
+      final saved = await NativeFileManager.saveFileToExternalFolder(
+        folderUri: externalFolder,
+        fileName: 'michifocus.sqlite',
+        mimeType: 'application/vnd.sqlite3',
+        bytes: await snapshot.readAsBytes(),
+      );
+      await snapshot.delete();
+      lastReportPath.value = saved.displayPath;
       return lastReportPath.value;
     }
 
@@ -525,18 +542,8 @@ class AppSettingsController {
       backupDirectory.createSync(recursive: true);
     }
 
-    if (snapshot.existsSync()) {
-      await snapshot.copy('${backupDirectory.path}/michifocus.sqlite');
-      await snapshot.delete();
-    } else {
-      for (final fileName in databaseBackupFileNames) {
-        final source = File('${appDirectory.path}/$fileName');
-        if (!source.existsSync()) {
-          continue;
-        }
-        await source.copy('${backupDirectory.path}/$fileName');
-      }
-    }
+    await snapshot.copy('${backupDirectory.path}/michifocus.sqlite');
+    await snapshot.delete();
 
     lastReportPath.value = backupDirectory.path;
     return backupDirectory.path;
@@ -560,6 +567,22 @@ class AppSettingsController {
       );
     }
 
+    final hasUnifiedDatabase = importFiles.any(
+      (file) => _fileName(file.path) == 'michifocus.sqlite',
+    );
+    final legacyFileCount = importFiles
+        .where(
+          (file) =>
+              _legacyDatabaseBackupFileNames.contains(_fileName(file.path)),
+        )
+        .length;
+    if (!hasUnifiedDatabase &&
+        legacyFileCount != _legacyDatabaseBackupFileNames.length) {
+      throw const FileSystemException(
+        'El backup legacy esta incompleto: se requieren sus cuatro bases de datos.',
+      );
+    }
+
     final sourceUnifiedDatabase = File(
       '${sourceDirectory.path}/michifocus.sqlite',
     );
@@ -575,67 +598,122 @@ class AppSettingsController {
     final pendingDirectory = Directory(
       '${appDirectory.path}/$_pendingImportDirectoryName',
     );
+    final stagingDirectory = Directory(
+      '${appDirectory.path}/$_stagingImportDirectoryName',
+    );
+    if (stagingDirectory.existsSync()) {
+      await stagingDirectory.delete(recursive: true);
+    }
+    stagingDirectory.createSync(recursive: true);
+
+    for (final source in importFiles) {
+      await source.copy('${stagingDirectory.path}/${_fileName(source.path)}');
+    }
+
+    final stagedUnifiedDatabase = File(
+      '${stagingDirectory.path}/michifocus.sqlite',
+    );
+    try {
+      if (!stagedUnifiedDatabase.existsSync()) {
+        await LegacyDatabaseMigrator.migrateIfNeeded(
+          directoryOverride: stagingDirectory,
+        );
+      }
+      if (!stagedUnifiedDatabase.existsSync()) {
+        throw const FormatException(
+          'No se pudo convertir el backup legacy.',
+        );
+      }
+      await const UnifiedDatabaseValidator().validateForImport(
+        stagedUnifiedDatabase,
+      );
+    } on Object catch (error) {
+      await stagingDirectory.delete(recursive: true);
+      throw FileSystemException(
+        'La base de datos no es compatible o esta danada: $error',
+        sourceUnifiedDatabase.path,
+      );
+    }
+
     if (pendingDirectory.existsSync()) {
       await pendingDirectory.delete(recursive: true);
     }
-    pendingDirectory.createSync(recursive: true);
-
-    for (final source in importFiles) {
-      await source.copy('${pendingDirectory.path}/${_fileName(source.path)}');
-    }
-
-    final pendingUnifiedDatabase = File(
-      '${pendingDirectory.path}/michifocus.sqlite',
-    );
-    if (pendingUnifiedDatabase.existsSync()) {
-      try {
-        await _validateUnifiedDatabase(pendingUnifiedDatabase);
-      } on Object catch (error) {
-        await pendingDirectory.delete(recursive: true);
-        throw FileSystemException(
-          'La base de datos no es compatible o esta danada: $error',
-          sourceUnifiedDatabase.path,
-        );
-      }
-    }
+    await stagingDirectory.rename(pendingDirectory.path);
 
     lastReportPath.value = pendingDirectory.path;
   }
 
   Future<bool> applyPendingDatabaseImport() async {
     final appDirectory = await _applicationDocumentsDirectory();
+    final liveDatabase = File('${appDirectory.path}/michifocus.sqlite');
+    final candidateDatabase = File(
+      '${appDirectory.path}/$_importCandidateFileName',
+    );
+    final previousDatabase = File(
+      '${appDirectory.path}/$_preImportFileName',
+    );
     final pendingDirectory = Directory(
       '${appDirectory.path}/$_pendingImportDirectoryName',
     );
+    final stagingDirectory = Directory(
+      '${appDirectory.path}/$_stagingImportDirectoryName',
+    );
+    if (stagingDirectory.existsSync()) {
+      await stagingDirectory.delete(recursive: true);
+    }
+
+    if (previousDatabase.existsSync()) {
+      if (liveDatabase.existsSync()) {
+        await previousDatabase.delete();
+        if (pendingDirectory.existsSync()) {
+          await pendingDirectory.delete(recursive: true);
+        }
+        if (candidateDatabase.existsSync()) {
+          await candidateDatabase.delete();
+        }
+        return true;
+      }
+      await previousDatabase.rename(liveDatabase.path);
+    }
+    if (candidateDatabase.existsSync()) {
+      await candidateDatabase.delete();
+    }
     if (!pendingDirectory.existsSync()) {
       return false;
     }
 
-    final importsLegacyDatabases = _legacyDatabaseBackupFileNames.any(
-      (fileName) => File('${pendingDirectory.path}/$fileName').existsSync(),
-    );
-    final importsUnifiedDatabase = File(
+    final pendingDatabase = File(
       '${pendingDirectory.path}/michifocus.sqlite',
-    ).existsSync();
-    if (importsLegacyDatabases && !importsUnifiedDatabase) {
-      final unifiedDatabase = File('${appDirectory.path}/michifocus.sqlite');
-      if (unifiedDatabase.existsSync()) {
-        await unifiedDatabase.delete();
-      }
+    );
+    if (!pendingDatabase.existsSync()) {
+      throw const FileSystemException(
+        'La importacion preparada no contiene michifocus.sqlite.',
+      );
     }
 
-    for (final fileName in [
-      ...databaseBackupFileNames,
-      ..._legacyDatabaseBackupFileNames,
-    ]) {
-      final source = File('${pendingDirectory.path}/$fileName');
-      if (!source.existsSync()) {
-        continue;
-      }
+    await pendingDatabase.copy(candidateDatabase.path);
+    await const UnifiedDatabaseValidator().validateForImport(
+      candidateDatabase,
+    );
 
-      await source.copy('${appDirectory.path}/$fileName');
+    try {
+      if (liveDatabase.existsSync()) {
+        await liveDatabase.rename(previousDatabase.path);
+      }
+      await candidateDatabase.rename(liveDatabase.path);
+    } on Object {
+      if (!liveDatabase.existsSync() && previousDatabase.existsSync()) {
+        await previousDatabase.rename(liveDatabase.path);
+      }
+      if (candidateDatabase.existsSync()) {
+        await candidateDatabase.delete();
+      }
+      rethrow;
     }
 
+    if (previousDatabase.existsSync()) {
+      await previousDatabase.delete();
+    }
     await pendingDirectory.delete(recursive: true);
     return true;
   }
@@ -717,61 +795,6 @@ class AppSettingsController {
           'SQLite format 3\u0000';
     } finally {
       await randomAccessFile.close();
-    }
-  }
-
-  Future<void> _validateUnifiedDatabase(File file) async {
-    final database = MichiFocusDatabase(NativeDatabase(file));
-    try {
-      final quickCheck = await database
-          .customSelect('PRAGMA quick_check')
-          .get();
-      if (quickCheck.length != 1 ||
-          quickCheck.single.data.values.single != 'ok') {
-        throw const FormatException('PRAGMA quick_check fallo.');
-      }
-
-      final foreignKeyIssues = await database
-          .customSelect('PRAGMA foreign_key_check')
-          .get();
-      if (foreignKeyIssues.isNotEmpty) {
-        throw const FormatException('Existen claves foraneas invalidas.');
-      }
-
-      final tableRows = await database
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE type = 'table'",
-          )
-          .get();
-      final tableNames = tableRows
-          .map((row) => row.read<String>('name'))
-          .toSet();
-      const requiredTables = {
-        'goals',
-        'tasks',
-        'pomodoro_sessions',
-        'pomodoro_runtime',
-        'calendar_events',
-        'task_completion_events',
-        'reporting_metadata',
-      };
-      if (!tableNames.containsAll(requiredTables)) {
-        throw const FormatException('Faltan tablas requeridas.');
-      }
-
-      final versionRow = await database
-          .customSelect('PRAGMA user_version')
-          .getSingle();
-      if (versionRow.read<int>('user_version') != database.schemaVersion) {
-        throw const FormatException('Version de esquema no compatible.');
-      }
-
-      await database.customStatement(
-        'UPDATE pomodoro_runtime '
-        'SET is_running = 0, last_tick_at = NULL',
-      );
-    } finally {
-      await database.close();
     }
   }
 }

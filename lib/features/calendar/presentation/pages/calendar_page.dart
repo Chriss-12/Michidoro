@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
@@ -12,6 +13,11 @@ import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/models/routine_schedule_projection.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/start_routine_focus_flow.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
@@ -26,6 +32,7 @@ class CalendarPage extends StatefulWidget {
     this.goalsController,
     this.tasksController,
     this.pomodoroController,
+    this.routinesController,
   });
 
   static const routePath = '/calendar';
@@ -34,6 +41,7 @@ class CalendarPage extends StatefulWidget {
   final GoalsController? goalsController;
   final TasksController? tasksController;
   final PomodoroController? pomodoroController;
+  final RoutinesController? routinesController;
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();
@@ -44,8 +52,10 @@ class _CalendarPageState extends State<CalendarPage> {
   late final GoalsController _goalsController;
   late final TasksController _tasksController;
   late final PomodoroController _pomodoroController;
+  RoutinesController? _routinesController;
   late DateTime _visibleMonth;
   late DateTime _selectedDay;
+  List<RoutineScheduleOccurrence> _routineSchedule = const [];
   bool _isLoading = true;
 
   @override
@@ -58,6 +68,11 @@ class _CalendarPageState extends State<CalendarPage> {
         widget.tasksController ?? serviceLocator<TasksController>();
     _pomodoroController =
         widget.pomodoroController ?? serviceLocator<PomodoroController>();
+    _routinesController =
+        widget.routinesController ??
+        (serviceLocator.isRegistered<RoutinesController>()
+            ? serviceLocator<RoutinesController>()
+            : null);
     final now = DateTime.now();
     _visibleMonth = DateTime(now.year, now.month);
     _selectedDay = DateTime(now.year, now.month, now.day);
@@ -71,10 +86,20 @@ class _CalendarPageState extends State<CalendarPage> {
     final selectedEvents = _controller.eventsForDay(_selectedDay);
     final selectedGoals = _goalsController.goalsForDay(_selectedDay);
     final selectedTasks = _tasksController.tasksForDay(_selectedDay);
+    final selectedRoutines = _routineSchedule
+        .where((occurrence) => _sameDate(occurrence.localDate, _selectedDay))
+        .toList(growable: false);
     final plannedDays = {
       ..._controller.plannedDaysForMonth(_visibleMonth),
       ..._goalsController.plannedDaysForMonth(_visibleMonth),
       ..._tasksController.plannedDaysForMonth(_visibleMonth),
+      ..._routineSchedule
+          .where(
+            (occurrence) =>
+                occurrence.localDate.year == _visibleMonth.year &&
+                occurrence.localDate.month == _visibleMonth.month,
+          )
+          .map((occurrence) => occurrence.localDate.day),
     };
     final taskProgressByDay = _tasksController.progressByDayForMonth(
       _visibleMonth,
@@ -115,6 +140,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 _visibleMonth.month,
               );
             });
+            unawaited(_loadRoutineSchedule());
           },
           onNextMonth: () {
             setState(() {
@@ -127,6 +153,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 _visibleMonth.month,
               );
             });
+            unawaited(_loadRoutineSchedule());
           },
           onDaySelected: (day) {
             setState(() => _selectedDay = day);
@@ -145,6 +172,7 @@ class _CalendarPageState extends State<CalendarPage> {
               tasks: selectedTasks,
               focusedSecondsByTask: focusedSecondsByTask,
               events: selectedEvents,
+              routines: selectedRoutines,
               isLoading: _isLoading,
               onAddGoal: _showCreateGoalDialog,
               onAddTask: _showCreateTaskDialog,
@@ -152,12 +180,33 @@ class _CalendarPageState extends State<CalendarPage> {
               onTaskStatusChanged: _updateTaskStatus,
               onEditTaskPlanning: _showEditTaskPlanningDialog,
               onDeleteTask: _confirmDeleteTask,
-              onStartTaskFocus: (task) => startTaskFocusFlow(
-                context: context,
-                task: task,
-              ),
+              onStartTaskFocus: (task) {
+                final routinesController = _routinesController;
+                final execution = routinesController == null
+                    ? null
+                    : findRoutineTaskExecution(
+                        controller: routinesController,
+                        taskId: task.id,
+                      );
+                if (routinesController != null && execution != null) {
+                  unawaited(
+                    startRoutineTaskFocusFlow(
+                      context: context,
+                      task: task,
+                      run: execution.run,
+                      item: execution.item,
+                      controller: routinesController,
+                    ),
+                  );
+                  return;
+                }
+                unawaited(startTaskFocusFlow(context: context, task: task));
+              },
               onEditGoal: _showEditGoalDialog,
               onDeleteGoal: _confirmDeleteGoal,
+              onOpenRoutine: (occurrence) => context.push(
+                '${RoutineEditorPage.routePath}?id=${occurrence.sourceRoutineId}',
+              ),
             );
           },
         ),
@@ -170,13 +219,36 @@ class _CalendarPageState extends State<CalendarPage> {
       _controller.loadEvents(),
       _goalsController.loadGoals(),
       _tasksController.loadTasks(),
+      if (_routinesController != null) _routinesController!.load(),
     ]);
+    await _loadRoutineSchedule(notify: false);
 
     if (!mounted) {
       return;
     }
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadRoutineSchedule({bool notify = true}) async {
+    final controller = _routinesController;
+    if (controller == null) return;
+    final requestedMonth = _visibleMonth;
+    final days = _monthGridDays(requestedMonth);
+    final schedule = await controller.scheduleBetween(
+      startDate: days.first,
+      endDate: days.last,
+    );
+    if (!mounted ||
+        requestedMonth.year != _visibleMonth.year ||
+        requestedMonth.month != _visibleMonth.month) {
+      return;
+    }
+    if (notify) {
+      setState(() => _routineSchedule = schedule);
+    } else {
+      _routineSchedule = schedule;
+    }
   }
 
   Future<void> _showCreateGoalDialog() async {
@@ -1409,6 +1481,7 @@ class _AgendaCard extends StatelessWidget {
     required this.tasks,
     required this.focusedSecondsByTask,
     required this.events,
+    required this.routines,
     required this.isLoading,
     required this.onAddGoal,
     required this.onAddTask,
@@ -1419,6 +1492,7 @@ class _AgendaCard extends StatelessWidget {
     required this.onStartTaskFocus,
     required this.onEditGoal,
     required this.onDeleteGoal,
+    required this.onOpenRoutine,
   });
 
   final DateTime selectedDay;
@@ -1426,6 +1500,7 @@ class _AgendaCard extends StatelessWidget {
   final List<Task> tasks;
   final Map<String, int> focusedSecondsByTask;
   final List<CalendarEvent> events;
+  final List<RoutineScheduleOccurrence> routines;
   final bool isLoading;
   final VoidCallback onAddGoal;
   final VoidCallback onAddTask;
@@ -1436,6 +1511,7 @@ class _AgendaCard extends StatelessWidget {
   final ValueChanged<Task> onStartTaskFocus;
   final ValueChanged<ProductivityGoal> onEditGoal;
   final ValueChanged<ProductivityGoal> onDeleteGoal;
+  final ValueChanged<RoutineScheduleOccurrence> onOpenRoutine;
 
   @override
   Widget build(BuildContext context) {
@@ -1518,7 +1594,10 @@ class _AgendaCard extends StatelessWidget {
           const SizedBox(height: 18),
           if (isLoading)
             const Center(child: CircularProgressIndicator())
-          else if (events.isEmpty && goals.isEmpty && tasks.isEmpty)
+          else if (events.isEmpty &&
+              goals.isEmpty &&
+              tasks.isEmpty &&
+              routines.isEmpty)
             _EmptyAgenda(day: selectedDay)
           else ...[
             for (final goal in goals) ...[
@@ -1528,6 +1607,21 @@ class _AgendaCard extends StatelessWidget {
                 onDelete: () => onDeleteGoal(goal),
               ),
               const SizedBox(height: 12),
+            ],
+            if (routines.isNotEmpty) ...[
+              _AgendaSectionTitle(
+                icon: Icons.event_repeat_rounded,
+                label: context.tr('Rutinas', 'Routines'),
+                count: routines.length,
+              ),
+              const SizedBox(height: 10),
+              for (final routine in routines) ...[
+                _RoutineOccurrenceTile(
+                  occurrence: routine,
+                  onOpen: () => onOpenRoutine(routine),
+                ),
+                const SizedBox(height: 12),
+              ],
             ],
             if (tasks.isNotEmpty) ...[
               _AgendaSectionTitle(
@@ -2047,6 +2141,144 @@ class _EmptyAgenda extends StatelessWidget {
     );
   }
 }
+
+class _RoutineOccurrenceTile extends StatelessWidget {
+  const _RoutineOccurrenceTile({
+    required this.occurrence,
+    required this.onOpen,
+  });
+
+  final RoutineScheduleOccurrence occurrence;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final color = switch (occurrence.status) {
+      RoutineRunStatus.completed => palette.primary,
+      RoutineRunStatus.inProgress => palette.secondary,
+      RoutineRunStatus.skipped => palette.textSecondary,
+      RoutineRunStatus.missed => palette.tertiary,
+      RoutineRunStatus.scheduled => palette.primary,
+    };
+    return Container(
+      key: ValueKey(
+        'routine-occurrence-${occurrence.sourceRoutineId}-'
+        '${occurrence.localDate.toIso8601String()}',
+      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: occurrence.isVirtual
+            ? palette.primaryMuted.withValues(alpha: 0.18)
+            : palette.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: occurrence.hasOverlap
+              ? palette.tertiary
+              : color.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.event_repeat_rounded, color: color, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  occurrence.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatMinute(context, occurrence.startMinute),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _Tag(
+                      label: _routineOccurrenceStatus(context, occurrence),
+                      color: color,
+                      background: color.withValues(alpha: 0.12),
+                    ),
+                    _Tag(
+                      label:
+                          '${occurrence.completedRequiredItems}/'
+                          '${occurrence.totalRequiredItems}',
+                    ),
+                    if (occurrence.isVirtual)
+                      _Tag(
+                        label: context.tr('Proyección', 'Projection'),
+                        color: palette.textSecondary,
+                        background: palette.neutralSoft.withValues(alpha: 0.5),
+                      ),
+                    if (occurrence.skippedOptionalItems > 0)
+                      _Tag(
+                        label: context.tr(
+                          '${occurrence.skippedOptionalItems} opcional omitida',
+                          '${occurrence.skippedOptionalItems} optional skipped',
+                        ),
+                        color: palette.textSecondary,
+                        background: palette.neutralSoft.withValues(alpha: 0.5),
+                      ),
+                    if (occurrence.missedRequiredItems > 0)
+                      _Tag(
+                        label: context.tr(
+                          '${occurrence.missedRequiredItems} pendiente perdida',
+                          '${occurrence.missedRequiredItems} required missed',
+                        ),
+                        color: palette.tertiary,
+                        background: palette.accentPeach.withValues(alpha: 0.5),
+                      ),
+                    if (occurrence.hasOverlap)
+                      _Tag(
+                        label: context.tr(
+                          'Horario superpuesto',
+                          'Time overlap',
+                        ),
+                        color: palette.tertiary,
+                        background: palette.accentPeach.withValues(alpha: 0.5),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: context.tr('Ver rutina', 'View routine'),
+            onPressed: onOpen,
+            icon: const Icon(Icons.arrow_forward_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _routineOccurrenceStatus(
+  BuildContext context,
+  RoutineScheduleOccurrence occurrence,
+) => switch (occurrence.status) {
+  RoutineRunStatus.scheduled => context.tr('Pendiente', 'Pending'),
+  RoutineRunStatus.inProgress => context.tr('En progreso', 'In progress'),
+  RoutineRunStatus.completed => context.tr('Completada', 'Completed'),
+  RoutineRunStatus.skipped => context.tr('Omitida', 'Skipped'),
+  RoutineRunStatus.missed => context.tr('Perdida', 'Missed'),
+};
+
+String _formatMinute(BuildContext context, int minute) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
+    );
 
 class _EventTile extends StatelessWidget {
   const _EventTile({required this.event});

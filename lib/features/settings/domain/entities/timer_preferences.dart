@@ -13,6 +13,7 @@ class TimerPreferences {
     required this.completionVibrationEnabled,
     required this.autoStartBreak,
     required this.autoStartFocus,
+    this.completedOnboardingVersion = 0,
     this.completionVibrationPattern = PomodoroVibrationPattern.normal,
     this.reportsDirectoryPath = '',
     this.profileName = 'Chriss',
@@ -27,7 +28,7 @@ class TimerPreferences {
     this.language = AppLanguage.spanish,
   });
 
-  const TimerPreferences.defaults()
+  const TimerPreferences.defaults({this.completedOnboardingVersion = 0})
     : focusMinutes = 25,
       shortBreakMinutes = 5,
       longBreakMinutes = 15,
@@ -58,6 +59,7 @@ class TimerPreferences {
   final PomodoroVibrationPattern completionVibrationPattern;
   final bool autoStartBreak;
   final bool autoStartFocus;
+  final int completedOnboardingVersion;
   final String reportsDirectoryPath;
   final String profileName;
   final String profileEmail;
@@ -81,6 +83,9 @@ class TimerPreferences {
       completionVibrationPattern: completionVibrationPattern,
       autoStartBreak: autoStartBreak,
       autoStartFocus: autoStartFocus,
+      completedOnboardingVersion: completedOnboardingVersion < 0
+          ? 0
+          : completedOnboardingVersion,
       reportsDirectoryPath: reportsDirectoryPath.trim(),
       profileName: profileName.trim().isEmpty ? 'Chriss' : profileName.trim(),
       profileEmail: profileEmail.trim(),

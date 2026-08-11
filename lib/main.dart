@@ -8,12 +8,14 @@ import 'package:pomodoro_app_v1/app/router/app_router.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/state/pomodoro_runtime_scope.dart';
+import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/state/scheduled_task_reminder_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:pomodoro_app_v1/features/splash/presentation/pages/splash_page.dart';
@@ -26,6 +28,10 @@ import 'package:signals_flutter/signals_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const AppBootstrap());
 }
 
@@ -46,6 +52,12 @@ class _AppBootstrapState extends State<AppBootstrap> {
   Future<void> _initializeApp() async {
     await appSettingsController.applyPendingDatabaseImport();
     await configureDependencies();
+    final routinesController = serviceLocator<RoutinesController>();
+    final reconciliation = await routinesController.reconcileToday();
+    if (reconciliation == null) {
+      throw StateError('Routine reconciliation failed during startup.');
+    }
+    await serviceLocator<TasksController>().loadTasks();
     await appSettingsController.loadTimerPreferences(
       serviceLocator<SettingsRepository>(),
     );
@@ -164,6 +176,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final ScheduledTaskReminderController _scheduledTaskReminders;
+  RoutineReminderScheduler? _routineReminders;
+  Timer? _routineRolloverTimer;
 
   @override
   void initState() {
@@ -173,12 +187,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       settingsController: appSettingsController,
       tasksController: serviceLocator<TasksController>(),
     )..start();
+    if (serviceLocator.isRegistered<RoutinesController>()) {
+      final routinesController = serviceLocator<RoutinesController>();
+      _routineReminders = RoutineReminderScheduler(
+        routinesController: routinesController,
+        settingsController: appSettingsController,
+      );
+      routinesController.onReminderScheduleChanged =
+          _routineReminders!.synchronize;
+      unawaited(_routineReminders!.synchronize());
+      _scheduleRoutineRollover();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scheduledTaskReminders.stop();
+    _routineRolloverTimer?.cancel();
     super.dispose();
   }
 
@@ -191,6 +217,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     unawaited(pomodoroController.synchronizeWithClock());
+    unawaited(_reconcileRoutineTasks());
+    _scheduleRoutineRollover();
+  }
+
+  Future<void> _reconcileRoutineTasks() async {
+    if (!serviceLocator.isRegistered<RoutinesController>()) return;
+    await serviceLocator<RoutinesController>().reconcileToday();
+    await serviceLocator<TasksController>().loadTasks();
+    await _routineReminders?.synchronize();
+  }
+
+  void _scheduleRoutineRollover() {
+    _routineRolloverTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    _routineRolloverTimer = Timer(nextMidnight.difference(now), () async {
+      await _reconcileRoutineTasks();
+      if (mounted) _scheduleRoutineRollover();
+    });
   }
 
   @override
@@ -198,15 +243,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final controller = appSettingsController;
     final goalsController = serviceLocator<GoalsController>();
     final tasksController = serviceLocator<TasksController>();
+    final routinesController = serviceLocator.isRegistered<RoutinesController>()
+        ? serviceLocator<RoutinesController>()
+        : null;
     final pomodoroController = serviceLocator<PomodoroController>()
       ..onSessionCompleted = controller.playCompletionFeedback
       ..onBreakCompleted = controller.playCompletionFeedback
       ..onGoalPomodoroCompleted = goalsController.incrementProgress
       ..onTaskFocusStarted = (String taskId) async {
         await tasksController.updateTaskStatus(taskId, TaskStatus.inProgress);
+        await routinesController?.refreshTodayProgress();
       }
       ..onTaskPlanCompleted = (String taskId) async {
         await tasksController.updateTaskStatus(taskId, TaskStatus.completed);
+        await routinesController?.refreshTodayProgress();
       };
     goalsController.onGoalDeleted = pomodoroController.clearSelectedGoal;
 
@@ -243,6 +293,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       avatarIndex: controller.avatarIndex.value,
                       typographyPreset: controller.typographyPreset.value,
                       language: controller.language.value,
+                      completedOnboardingVersion:
+                          controller.completedOnboardingVersion.value,
                       focusMinutes: controller.focusMinutes.value,
                       shortBreakMinutes: controller.shortBreakMinutes.value,
                       longBreakMinutes: controller.longBreakMinutes.value,
@@ -303,6 +355,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                         controller.language.value = value;
                         unawaited(controller.saveTimerPreferences());
                       },
+                      onCompleteOnboarding: controller.completeOnboarding,
                       onFocusMinutesChanged: (value) {
                         controller.setFocusMinutes(value);
                         pomodoroController.setFocusMinutes(value);
@@ -378,12 +431,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                             );
                             unawaited(controller.saveTimerPreferences());
                           },
-                      onNotificationsEnabledChanged: (value) =>
-                          controller.notificationsEnabled.value = value,
+                      onNotificationsEnabledChanged: (value) {
+                        controller.notificationsEnabled.value = value;
+                        unawaited(_routineReminders?.synchronize());
+                      },
                       onBreakAlertsEnabledChanged: (value) =>
                           controller.breakAlertsEnabled.value = value,
-                      onFocusAlertsEnabledChanged: (value) =>
-                          controller.focusAlertsEnabled.value = value,
+                      onFocusAlertsEnabledChanged: (value) {
+                        controller.focusAlertsEnabled.value = value;
+                        unawaited(_routineReminders?.synchronize());
+                      },
                       onDownloadReport: () => _downloadStatisticsPdf(
                         settingsController: controller,
                         request: const StatisticsReportRequest(

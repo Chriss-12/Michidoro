@@ -216,6 +216,7 @@ void main() {
       expect(repository.sessions.single.focusedSeconds, 60);
       expect(repository.sessions.single.plannedSeconds, 600);
       expect(repository.sessions.single.status, PomodoroSessionStatus.partial);
+      expect(controller.pendingReflectionSessionId.value, isNull);
     });
 
     test('finishes a break and returns to the next focus', () async {
@@ -462,6 +463,41 @@ void main() {
       expect(repository.sessions.single.endMoodScore, 2);
     });
 
+    test('restores and answers pending block reflections in order', () async {
+      final repository = _MemoryPomodoroSessionsRepository();
+      await repository.saveCompletedSession(
+        startedAt: DateTime(2026, 1, 1, 9),
+        endedAt: DateTime(2026, 1, 1, 9, 25),
+        plannedSeconds: 1500,
+        focusedSeconds: 1500,
+        taskId: 'task-1',
+      );
+      await repository.saveCompletedSession(
+        startedAt: DateTime(2026, 1, 1, 9, 30),
+        endedAt: DateTime(2026, 1, 1, 9, 55),
+        plannedSeconds: 1500,
+        focusedSeconds: 1500,
+        taskId: 'task-1',
+      );
+      final controller = PomodoroController(repository: repository);
+
+      await controller.loadSessions();
+
+      expect(controller.pendingReflectionSessionId.value, '0');
+      await controller.submitCompletionReflection(
+        endMoodScore: 4,
+        wasDistracted: false,
+        distractionMinutes: 5,
+      );
+      expect(controller.pendingReflectionSessionId.value, '1');
+      await controller.submitCompletionReflection(
+        endMoodScore: 5,
+        wasDistracted: false,
+        distractionMinutes: 5,
+      );
+      expect(controller.pendingReflectionSessionId.value, isNull);
+    });
+
     test('selects a task context with optional goal', () {
       final controller =
           PomodoroController(
@@ -664,6 +700,49 @@ void main() {
       expect(restored.currentBlockIndex.value, 1);
       expect(restored.totalBlocks.value, 3);
     });
+
+    test('restores an imported pause without counting hidden time', () async {
+      final clock = _FakeClock(DateTime(2026, 8, 9, 9));
+      final sessionsRepository = _MemoryPomodoroSessionsRepository();
+      final runtimeRepository = _MemoryPomodoroRuntimeRepository();
+      final first = PomodoroController(
+        repository: sessionsRepository,
+        runtimeRepository: runtimeRepository,
+        now: clock.now,
+      );
+      await first.prepareTaskPlan(
+        taskId: 'routine-task',
+        taskTitle: 'Routine task',
+        estimatedMinutes: 45,
+        cadence: const PomodoroCadence(focusMinutes: 25, breakMinutes: 5),
+        mode: PomodoroPlanMode.continuous,
+      );
+      first.start();
+      clock.advance(const Duration(seconds: 30));
+      await first.synchronizeWithClock();
+      first.pause();
+      await first.checkpointRuntime();
+      final pausedSeconds = first.remainingSeconds.value;
+      first.dispose();
+
+      clock.advance(const Duration(hours: 6));
+      final restored = PomodoroController(
+        repository: sessionsRepository,
+        runtimeRepository: runtimeRepository,
+        now: clock.now,
+      );
+      addTearDown(restored.dispose);
+      await restored.initialize();
+
+      expect(restored.selectedTaskId, 'routine-task');
+      expect(restored.isRunning.value, isFalse);
+      expect(restored.remainingSeconds.value, pausedSeconds);
+
+      restored.start();
+      clock.advance(const Duration(seconds: 10));
+      await restored.synchronizeWithClock();
+      expect(restored.remainingSeconds.value, pausedSeconds - 10);
+    });
   });
 }
 
@@ -711,6 +790,7 @@ class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
       goalId: goalId,
       taskId: taskId,
       startMoodScore: startMoodScore,
+      moodPromptPending: status == PomodoroSessionStatus.completed,
     );
     _sessions.insert(0, session);
     return session;
@@ -726,6 +806,7 @@ class _MemoryPomodoroSessionsRepository implements PomodoroSessionsRepository {
     final index = _sessions.indexWhere((session) => session.id == sessionId);
     final updated = _sessions[index].copyWith(
       endMoodScore: endMoodScore.clamp(1, 5),
+      moodPromptPending: false,
       wasDistracted: wasDistracted,
       distractionMinutes: wasDistracted ? distractionMinutes.clamp(1, 600) : 0,
     );

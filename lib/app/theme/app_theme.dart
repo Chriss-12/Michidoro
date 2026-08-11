@@ -538,7 +538,9 @@ class AppTheme {
           return TextStyle(
             color: color,
             fontFamily: typographyPreset.fontFamily,
-            fontSize: AppFontSizes.navigationLabel * fontScale,
+            fontSize: fontScale > 1
+                ? AppFontSizes.constrainedNavigationLabel
+                : AppFontSizes.navigationLabel * fontScale,
             fontWeight: FontWeight.w600,
           );
         }),

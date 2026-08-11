@@ -88,6 +88,7 @@ void main() {
           taskId: 'task-1',
           startMoodScore: 4,
         );
+        expect(createdSession.moodPromptPending, isTrue);
         await repository.updateSessionReflection(
           sessionId: createdSession.id,
           endMoodScore: 2,
@@ -114,6 +115,7 @@ void main() {
         expect(sessions.single.taskId, 'task-1');
         expect(sessions.single.startMoodScore, 4);
         expect(sessions.single.endMoodScore, 2);
+        expect(sessions.single.moodPromptPending, isFalse);
         expect(sessions.single.wasDistracted, isTrue);
         expect(sessions.single.distractionMinutes, 8);
       },

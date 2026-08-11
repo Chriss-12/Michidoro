@@ -36,10 +36,6 @@ class PomodoroPage extends StatelessWidget {
       children: [
         const SizedBox(height: 48),
         const _TimerRingSection(),
-        const SizedBox(height: 92),
-        const _TimerControlsSection(),
-        const SizedBox(height: 86),
-        const _FocusLifecycleActionsSection(),
         const SizedBox(height: 24),
         SignalBuilder(
           builder: (context) {
@@ -50,10 +46,15 @@ class PomodoroPage extends StatelessWidget {
             }
 
             return _FocusReflectionCard(
+              key: ValueKey(pendingSessionId),
               onSubmit: pomodoroController.submitCompletionReflection,
             );
           },
         ),
+        const SizedBox(height: 32),
+        const _TimerControlsSection(),
+        const SizedBox(height: 86),
+        const _FocusLifecycleActionsSection(),
         const SizedBox(height: 24),
         SignalBuilder(
           builder: (context) {
@@ -97,7 +98,7 @@ class PomodoroPage extends StatelessWidget {
 }
 
 class _FocusReflectionCard extends StatefulWidget {
-  const _FocusReflectionCard({required this.onSubmit});
+  const _FocusReflectionCard({required this.onSubmit, super.key});
 
   final Future<void> Function({
     required int endMoodScore,
@@ -111,7 +112,7 @@ class _FocusReflectionCard extends StatefulWidget {
 }
 
 class _FocusReflectionCardState extends State<_FocusReflectionCard> {
-  int _endMoodScore = 3;
+  int? _endMoodScore;
   bool _wasDistracted = false;
   int _distractionMinutes = 5;
   bool _isSaving = false;
@@ -142,8 +143,8 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
             const SizedBox(height: 12),
             Text(
               context.tr(
-                '¿Cómo te sientes después de esta sesión?',
-                'How do you feel after this session?',
+                '¿Cómo te sientes después de este bloque?',
+                'How do you feel after this block?',
               ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -202,12 +203,12 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isSaving
+                onPressed: _isSaving || _endMoodScore == null
                     ? null
                     : () async {
                         setState(() => _isSaving = true);
                         await widget.onSubmit(
-                          endMoodScore: _endMoodScore,
+                          endMoodScore: _endMoodScore!,
                           wasDistracted: _wasDistracted,
                           distractionMinutes: _distractionMinutes,
                         );
@@ -234,7 +235,7 @@ class _MoodScoreSelector extends StatelessWidget {
     required this.onChanged,
   });
 
-  final int selectedScore;
+  final int? selectedScore;
   final ValueChanged<int> onChanged;
 
   @override
@@ -261,14 +262,15 @@ class _MoodScoreSelector extends StatelessWidget {
                     border: Border.all(color: palette.neutralSoft),
                   ),
                   child: Center(
-                    child: Text(
-                      '$score',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: selectedScore == score
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : palette.textPrimary,
-                        fontWeight: FontWeight.w800,
+                    child: Icon(
+                      _moodIconForScore(score),
+                      semanticLabel: context.tr(
+                        'Ánimo $score de 5',
+                        'Mood $score out of 5',
                       ),
+                      color: selectedScore == score
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : palette.textPrimary,
                     ),
                   ),
                 ),
@@ -280,6 +282,16 @@ class _MoodScoreSelector extends StatelessWidget {
       ],
     );
   }
+}
+
+IconData _moodIconForScore(int score) {
+  return switch (score) {
+    1 => Icons.sentiment_very_dissatisfied_rounded,
+    2 => Icons.sentiment_dissatisfied_rounded,
+    3 => Icons.sentiment_neutral_rounded,
+    4 => Icons.sentiment_satisfied_rounded,
+    _ => Icons.sentiment_very_satisfied_rounded,
+  };
 }
 
 class _TimerRingSection extends StatelessWidget {

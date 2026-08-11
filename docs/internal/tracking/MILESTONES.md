@@ -1277,6 +1277,12 @@ Verification:
 - Remaining V5-M3.4 evidence: repeat the viewer smoke for month, year, and
   custom reports, render the extreme long-profile fixture, and record one
   warm-up plus ten measured runs for each p95 budget.
+- 2026-07-31: Home `Estado de tareas` was corrected to fetch listed,
+  in-progress, and completed totals from the registered task repository instead
+  of trusting controller memory. The dashboard still refreshes from task and
+  session change signals, while the visible task-status totals come through the
+  persistence boundary. `flutter analyze` passed and the full 157-test suite
+  passed.
 - Required implementation gates: Drift code generation when applicable,
   `dart format`, `flutter analyze`, focused persistence/report tests, complete
   `flutter test`, PDF structural and rendered-page checks, debug APK build, and
@@ -1984,6 +1990,7 @@ Tracks:
 - `REQ-V6-003`
 - `REQ-V6-004`
 - `REQ-V6-005`
+- `REQ-V6-006`
 
 Deliverables:
 - [x] Product behavior and minute-based formulas approved
@@ -2031,6 +2038,14 @@ Implementation slices:
 5. **V6-M0.4 - Presentation and verification**
    - Block/progress projection, recommendation tags, tests, analyzer, backup
      compatibility, APK build/install, and visual inspection.
+6. **V6-M0.5 - Timed recovery and wellbeing**
+   - Status: Implemented; direct Android reflection-state inspection remains.
+   - Run the configured break countdown after every completed non-final focus
+     block without adding break time to task progress.
+   - Queue unanswered post-block reflections across process recreation.
+   - Ask for the 1-to-5 mood with Material face icons, persist it on the focus
+     session, and expose the same average in Home and PDF.
+   - Keep the final task-completing block free of a mandatory trailing break.
 
 Quality gates:
 - [x] Requirement and milestone approved before implementation
@@ -2044,6 +2059,8 @@ Quality gates:
 - [x] Full `flutter test`
 - [x] Debug and release APK build/install/launch
 - [ ] Android visual inspection
+- [ ] V6-M0.5 face selector, visible break countdown, daily mood statistic, PDF
+      summary, and reflection restoration verified on Android
 
 Required docs:
 - [x] `docs/internal/requirements/REQ-PRODUCTIVITY_V6.md`
@@ -2069,12 +2086,20 @@ Verification evidence:
 - Both available headless emulators returned a black framebuffer even for the
   Android launcher. Manual screenshot-based theme/state inspection therefore
   remains pending and prevents moving the milestone to Verified.
+- 2026-08-04: V6-M0.5 reused timed focus/break phases, added a persistent
+  per-block reflection queue, replaced numeric mood choices with five Material
+  face icons, and exposed the range-aware average in Home and PDF.
+- Drift generated schema version 4, clean analysis, and all 159 tests passed.
+- The 64.3 MB release APK installed on RMX3301. Home's mood summary and a new
+  two-page day PDF passed direct visual inspection. A live post-block prompt was
+  not forced against the user's real data, so that final Android state remains
+  before Verified.
 
 ## Proposed roadmap - Productivity V7
 
 Status:
-V7-M0 is implemented, V7-M1/V7-M2 are verified, and V7-M2.1 is implemented on
-2026-07-31. V7-M3 remains proposed.
+V7-M0 is implemented and V7-M1/V7-M2/V7-M2.1 are verified on 2026-07-31.
+V7-M3 remains proposed.
 
 Priority rule:
 Build the normal fullscreen/menu foundation first, then maximum concentration
@@ -2198,30 +2223,44 @@ Tracks:
 
 Priority: 2
 
-Status: Implemented
+Status: Verified
 
 Objective:
-Replace the fixed single completion haptic with a user-selectable local pattern
-without changing the existing vibration switch or Pomodoro business state.
+Replace the fixed single completion feedback with a user-selectable physical
+Android vibration pattern without changing the existing switch or Pomodoro
+business state.
 
 Implementation decision:
-- Add `Suave`, `Normal`, `Doble`, and `Intensa` using Flutter platform haptics.
+- Add `Suave`, `Normal`, `Doble`, and `Intensa` using Android's real vibration
+  motor with distinct timing and amplitude patterns.
 - Keep `Normal` as the compatibility default for existing Settings JSON files.
 - Persist one enum name in `michidoro-settings.json`; do not change SQLite,
   Android Gradle, or dependencies.
+- Use the existing local method-channel boundary and Android `VIBRATE`
+  permission; retain haptics only as a non-Android fallback.
 
 Deliverables:
 - [x] Add a localized vibration-pattern selector to both Settings surfaces.
 - [x] Use the selected pattern for preview and completion feedback.
 - [x] Save and restore the selected pattern with a safe legacy fallback.
-- [ ] Verify every pattern, the disabled state, restart persistence, and layout.
+- [x] Dispatch previews and phase completion through Android
+      `Vibrator`/`VibrationEffect`.
+- [x] Verify every pattern, the disabled state, restart persistence, and layout.
 
 Verification:
 - Controller, JSON round-trip/legacy fallback, and bilingual widget coverage
   passed; the full suite passed with 144 tests and the analyzer is clean.
 - The 64.1 MB release APK built and installed on device `3bbacc93`.
 - Physical pattern selection, haptic comparison, restart, and layout inspection
-  remain pending because the connected device is locked with a user pattern.
+  were initially pending because the connected device was locked.
+- A later unlocked-device inspection proved the feedback was haptic-only;
+  V7-M2.1 returned to `In Progress` for real-vibration correction.
+- The correction added `VIBRATE` plus a native waveform bridge. Android's
+  vibrator service recorded four distinct MichiDoro-owned motor effects,
+  including maximum-amplitude intense pulses, while the disabled state emitted
+  no event.
+- Clean analysis, the full 157-test suite, release APK build/install, restart
+  persistence, and Spanish device layout inspection passed on 2026-07-31.
 
 Tracks:
 - `REQ-V7-004`
@@ -2258,14 +2297,14 @@ Tracks:
 ## Proposed roadmap - Productivity V8
 
 Status:
-Proposed. Start only after V7 integrated verification is complete and the
-first-run content/design is approved.
+V8-M0 was verified on 2026-07-31 after automated, release, and physical Android
+inspection without erasing the user's existing data.
 
 ### V8-M0 - First-Run Onboarding
 
 Priority: 0
 
-Status: Proposed
+Status: Verified
 
 Objective:
 Introduce MichiDoro through a short, useful onboarding sequence that appears
@@ -2289,15 +2328,15 @@ Proposed sequence:
    by `Empezar a usar MichiDoro`.
 
 Interaction requirements:
-- [ ] Show a clear progress indicator and concise Spanish/English copy.
-- [ ] Provide `Atrás`, `Continuar`, and a visible `Omitir` action.
-- [ ] Make `Omitir` immediately persist completion and open Home.
-- [ ] Make the final action persist completion before opening Home.
-- [ ] Preserve system back behavior without trapping the user or replaying a
+- [x] Show a clear progress indicator and concise Spanish/English copy.
+- [x] Provide `Atrás`, `Continuar`, and a visible `Omitir` action.
+- [x] Make `Omitir` immediately persist completion and open Home.
+- [x] Make the final action persist completion before opening Home.
+- [x] Preserve system back behavior without trapping the user or replaying a
       completed onboarding.
-- [ ] Use responsive, accessible layouts with no clipped text at supported font
+- [x] Use responsive, accessible layouts with no clipped text at supported font
       scales.
-- [ ] Use theme and typography settings already loaded at startup.
+- [x] Use theme and typography settings already loaded at startup.
 
 Persistence and migration decision:
 - Store a versioned local marker such as `completedOnboardingVersion` in
@@ -2309,16 +2348,16 @@ Persistence and migration decision:
   decision; changing copy alone must not replay it.
 
 Quality gates:
-- [ ] Fresh-install routing is `Splash -> Onboarding -> Home`.
-- [ ] Returning-install routing is `Splash -> Home`.
-- [ ] Skip and finish each persist before navigation and survive process restart.
-- [ ] Existing-install migration does not show onboarding unexpectedly.
-- [ ] Widget tests cover every page, progress, back, skip, finish, Spanish, and
+- [x] Fresh-install routing is `Splash -> Onboarding -> Home`.
+- [x] Returning-install routing is `Splash -> Home`.
+- [x] Skip and finish each persist before navigation and survive process restart.
+- [x] Existing-install migration does not show onboarding unexpectedly.
+- [x] Widget tests cover every page, progress, back, skip, finish, Spanish, and
       English.
-- [ ] Controller/repository tests cover missing, completed, invalid, and future
+- [x] Controller/repository tests cover missing, completed, invalid, and future
       marker values.
-- [ ] `dart format`, `flutter analyze`, and full `flutter test` pass.
-- [ ] Release APK build/install and Android fresh/returning-install inspection
+- [x] `dart format`, `flutter analyze`, and full `flutter test` pass.
+- [x] Release APK build/install and Android fresh/returning-install inspection
       pass without erasing the user's real data.
 
 Non-goals:
@@ -2327,6 +2366,539 @@ Non-goals:
 - Replaying onboarding on every update.
 
 Traceability impact:
-- Create and approve `REQ-V8-001` before implementation.
+- `REQ-V8-001` was approved for implementation on 2026-07-31.
 - Update routing, Settings JSON, UI guidance, client manual, and traceability
   only when implementation begins and verified behavior exists.
+
+Tracks:
+- `REQ-V8-001`
+
+## Proposed roadmap - Productivity V9
+
+Status:
+Product direction and V9-M0 through V9-M2 were verified on 2026-08-07; V9-M3
+was verified on 2026-08-09. V9-M0 through V9-M7 are Verified; V9-M8 is
+Implemented pending its remaining integrated verification gates.
+
+Product decision:
+Routines are reusable groups of scheduled, repeating tasks. Daily routine
+items become ordinary MichiDoro tasks and reuse the existing Goal, Pomodoro,
+mood, calendar, statistics, PDF, and unified-database behavior.
+
+Priority rule:
+Freeze compatibility and data semantics before schema work. Implement routine
+creation before daily generation, then connect execution and reminders. Add
+Home/Calendar and reporting only after materialization is trustworthy. Finish
+with destructive-case, migration, import/export, performance, and physical
+Android verification.
+
+### V9-M0 - Product Contract and Compatibility Baseline
+
+Priority: 0
+
+Status: Verified
+
+Objective:
+Define routines precisely and protect every existing workflow and stored row
+before implementation begins.
+
+Deliverables:
+- [x] Define a routine as a reusable group of timed recurring task templates.
+- [x] Keep ordinary Tasks and Pomodoro sessions as authoritative records.
+- [x] Select `Tareas -> Rutinas` instead of a sixth navigation destination.
+- [x] Define archive-first lifecycle, immutable history, and offline-only scope.
+- [x] Document the five-table proposal and its relationship to existing data.
+- [x] Approve implementation sequencing and final schema contract.
+- [x] Capture the migration fixture matrix for every supported schema source.
+
+Exit criteria:
+- [x] `REQ-V9-001` moved to Approved after V9-M0 approval.
+- [x] No existing table, column, identifier, status, or user workflow is
+      repurposed.
+- [x] Every later milestone traces to a testable requirement and dependency.
+
+Verification evidence:
+- `ROUTINES.md` fixes columns, nullability, enum values, checks, indexes,
+  durable occurrence keys, archive/hard-delete rules, time semantics,
+  materialization, editing choices, state derivation, and layer ownership.
+- The fixture matrix covers fresh install, unified schemas 1-4, four-file
+  legacy data, imports, V9 round trips, corruption, missing tables, invalid
+  references, duplicates, future versions, and interrupted migration.
+- Documentation links, requirement IDs, milestone statuses, and Markdown diff
+  checks passed. No Flutter, generated, Android, dependency, or database file
+  changed.
+
+Tracks:
+- `REQ-V9-001`
+
+### V9-M1 - Routine Schema and Safe Migration
+
+Priority: 1
+
+Status: Verified
+
+Depends on:
+- `V9-M0`
+
+Objective:
+Add `routines`, `routine_days`, `routine_items`, `routine_runs`, and
+`routine_item_runs` to the unified Drift database without changing existing
+row semantics.
+
+Deliverables:
+- [x] Finalize columns, enums, indexes, unique occurrence keys, and foreign-key
+      delete actions.
+- [x] Add the five Drift tables and a routines DAO in the data layer.
+- [x] Add domain entities, repository contracts, Drift mappings, and `get_it`
+      registration without exposing Drift to UI.
+- [x] Implement a forward-only transaction that creates only new tables and
+      indexes for existing installations.
+- [x] Preserve run/item snapshots after template, item, goal, or task removal.
+- [x] Enforce daily materialization idempotency at the database level.
+- [x] Add old-schema, empty, populated, foreign-key, delete-rule, rollback, and
+      repeated-upgrade tests.
+- [x] Regenerate Drift code and update the verified schema version and ERD.
+
+Quality gates:
+- [x] `dart run build_runner build --delete-conflicting-outputs` passes.
+- [x] Migration fixtures preserve all existing table counts and representative
+      row values.
+- [x] `PRAGMA integrity_check` and `PRAGMA foreign_key_check` pass.
+- [x] `dart format`, `flutter analyze`, and focused persistence tests pass.
+
+Verification evidence:
+- Unified schema version 5 contains the original seven tables plus the five
+  routine tables; the generated Drift schema and ERD were updated.
+- Populated schema 1-4 fixtures migrate without losing representative goal,
+  task, session, completion-history, or active-runtime data. Reopening version
+  5 is idempotent.
+- Thirteen focused tests cover migrations, staged import validation, required
+  indexes, future/corrupt backup rejection, aggregate rollback, foreign-key
+  deletion rules, immutable snapshots, hard-delete guards, and uniqueness.
+- `dart run build_runner build`, formatting, `flutter analyze`, and the full
+  170-test suite passed on 2026-08-07.
+
+Tracks:
+- `REQ-V9-002`
+
+### V9-M2 - Routine List and Editor
+
+Priority: 2
+
+Status: Verified
+
+Depends on:
+- `V9-M1`
+
+Objective:
+Create and manage routines from a clear `Tareas | Rutinas` surface with a
+guided, conflict-aware editor.
+
+Deliverables:
+- [x] Add the `Rutinas` view inside the existing Tasks destination.
+- [x] List active, paused, and archived routines with next occurrence, today's
+      schedule, and item count. Actual run progress remains in V9-M3.
+- [x] Implement create, edit, duplicate, pause, resume, archive, and restore.
+- [x] Implement editor steps for identity, weekdays, items/times, and review.
+- [x] Support ordered items with time, duration, optional goal, optionality,
+      reminder, and Pomodoro preference.
+- [x] Show occupied time, focus/break projection, finish time, overlap warnings,
+      and validation before save.
+- [x] Keep all actions responsive, full-width where appropriate, bilingual,
+      accessible, theme-aware, and portrait-safe.
+
+Quality gates:
+- [x] Controller and repository tests cover every mutation and validation rule.
+- [x] Widget tests cover empty, populated, paused, archived, validation,
+      overlap, Spanish, English, and large-text states.
+- [x] Phone-width golden/visual checks cover all editor steps without clipping.
+- [x] `dart format`, `flutter analyze`, and full `flutter test` pass.
+
+Verification evidence:
+- Routine aggregate loading uses three fixed queries; lifecycle changes update
+  only the routine row and preserve its days/items.
+- Twenty focused routine tests cover validation, overlap math, duplicate IDs,
+  every lifecycle action, rollback, empty/populated/status filters, the four
+  editor steps, safe dirty-draft discard, Spanish, English, 320 px, and 150%
+  text scaling.
+- Seven phone-width golden baselines were generated and inspected for the active
+  list, all four editor steps, the activity sheet, and in-context creation modal,
+  including the visible
+  non-blocking overlap warning and stable bottom actions.
+- `dart format`, clean `flutter analyze`, and the full 186-test suite passed.
+- The initial debug APK built with Java 17, installed, and launched on RMX3301.
+- The 2026-08-11 visual refinement added a stable segmented header, consistent
+  section surfaces, identity preview, weekday summary, ordered activity cards,
+  review summary, and matching modal editor. Seven focused tests, English at
+  320 px/150%, dark theme, clean analysis, and the complete 237-test suite passed.
+- The release APK updated RMX3301 with data preservation. Direct portrait
+  inspection passed all four steps, modal scrolling, contrast, fixed actions,
+  singular `1 paso`, and review. The temporary routine was discarded and the
+  original stored routine remained present.
+- The routine filter was refined on 2026-08-11: redundant `Mostrar` / `Show`
+  text was removed and the full-width form field became a 220 px anchored menu.
+  Widget dimensions, clean analysis, the 237-test suite, release update, and
+  direct RMX3301 closed/open-menu inspection passed without changing data.
+- Routine creation was refined on 2026-08-11 to open the existing four-step
+  editor as a centered, keyboard-safe modal over the blurred Routines view.
+  Existing-routine editing keeps its full-screen route. Golden inspection,
+  clean analysis, 237 tests, release installation, keyboard resizing, and
+  dirty-draft discard passed on RMX3301 without persisting the temporary draft.
+
+Tracks:
+- `REQ-V9-003`
+
+### V9-M3 - Daily Generation and Task Lifecycle
+
+Priority: 3
+
+Status: Verified
+
+Depends on:
+- `V9-M1`
+- `V9-M2`
+
+Objective:
+Materialize today's routine items as ordinary tasks exactly once and reconcile
+date changes without producing stale or invented task history.
+
+Deliverables:
+- [x] Reconcile on startup, resume, routine save, import, and local-date rollover.
+- [x] Insert only necessary current-day tasks with existing schedule, duration,
+      status, and optional goal fields.
+- [x] Link generated tasks through `routine_item_runs` transactionally.
+- [x] Keep future calendar occurrences virtual rather than generating unlimited
+      rows.
+- [x] Mark elapsed unreconciled occurrences missed without creating old pending
+      tasks or invented completions.
+- [x] Offer explicit current-occurrence versus future-template editing.
+- [x] Preserve snapshots when generated tasks or templates are removed.
+- [x] Handle concurrent/repeated reconciliation, restart, import, and clock/date
+      changes without duplicates.
+
+Quality gates:
+- [x] Property/boundary tests cover weekdays, month/year rollover, leap day,
+      daylight/timezone changes, and repeated execution.
+- [x] Database constraints prove duplicate generation cannot be committed.
+- [x] Existing quick/planned task tests pass unchanged.
+- [x] Analyzer and full test suite pass.
+
+Verification on 2026-08-09:
+- Startup, resume, local-midnight, routine-save, and post-import paths use one
+  idempotent reconciliation entry point.
+- Missing scheduled dates since the last active template update become missed
+  run/item snapshots without task rows or completion events; only the current
+  local day materializes ordinary tasks and future occurrences remain virtual.
+- Transactional run/task/item linking plus unique occurrence, materialization,
+  and task-link indexes prevent duplicate commits under repeated or concurrent
+  reconciliation.
+- Current-only versus current-and-future title editing, task status
+  synchronization, nullable delete links, and immutable snapshots passed direct
+  persistence and existing UI-flow coverage.
+- Build Runner completed; 16 focused persistence tests, clean `flutter analyze`,
+  and the complete 220-test suite passed, covering weekdays, year rollover,
+  leap day, clock/UTC-local adjustment, concurrency, restart-equivalent repeat,
+  deletion, existing quick tasks, planning, import, Pomodoro, and reports.
+- The release APK rebuilt with JDK 17, updated in place, and launched twice on
+  RMX3301. Both startup reconciliations preserved two Pending tasks, zero In
+  Progress, zero Completed, and one current routine occurrence without a
+  duplicate task.
+
+Tracks:
+- `REQ-V9-004`
+
+### V9-M4 - Routine Execution and Pomodoro Continuity
+
+Priority: 4
+
+Status: Verified
+
+Depends on:
+- `V9-M3`
+- `V6-M0`
+
+Objective:
+Start or continue the current routine item by reusing existing task focus,
+break, mood, progress, and exclusive-runtime behavior.
+
+Deliverables:
+- [x] Start/continue from the routine list, today's run, Home, and Calendar.
+- [x] Reuse the current task Pomodoro recommendation and custom cadence flow.
+- [x] Preserve total task-ring progress, shortened final block, timed breaks,
+      mood reflection, and automatic task completion.
+- [x] Synchronize routine run/item state from ordinary task transitions.
+- [x] Preserve the one-active-owner conflict dialog and stop/switch semantics.
+- [x] Support pause, continue, stop for now, optional skip, whole-run skip, and
+      late-start fixed/shifted occurrence choices.
+- [x] Restore routine context through backgrounding and process recreation
+      without duplicating focused seconds or completing hidden work.
+
+Quality gates:
+- [x] Domain/controller tests cover every state transition and exclusivity case.
+- [x] Runtime restoration tests cross focus, break, pause, completion, and date
+      boundaries.
+- [x] Widget tests prove existing task and unassigned Pomodoro behavior remains
+      unchanged.
+- [x] Release Android smoke verifies active, paused, break, return, and switch.
+
+Implementation evidence:
+- One routine execution flow now serves the routine list, Home, and Calendar,
+  including late-start fixed/shifted decisions and cadence snapshots.
+- Task start/completion callbacks immediately refresh routine run/item state.
+- Clean analysis, six focused tests, the 226-test suite, release APK build,
+  update-in-place installation, app launch, and non-mutating Home/late-start UI
+  inspection passed on RMX3301.
+- Physical RMX3301 verification on 2026-08-11 used the one-minute focus and
+  twenty-second break preset. Active focus counted down, pause stayed at `00:22`
+  through Android Home and app return, resume continued the same block, and the
+  timed short break appeared with the post-focus mood reflection.
+- Starting `Lectura` while routine task `f` owned the runtime showed Cancel,
+  Finalize and switch, and Return to Pomodoro. Return preserved `f`; Finalize and
+  switch explicitly opened `Lectura` without a silent owner replacement.
+- `flutter analyze` and 47 focused routine/Pomodoro tests passed. The pre-test
+  unified database backup was imported after inspection; restart restored the
+  routine to Pending `0/1`, six Pending tasks, zero In Progress, one Completed,
+  and no active timer.
+
+Tracks:
+- `REQ-V9-005`
+
+### V9-M5 - Background Routine Reminders
+
+Priority: 5
+
+Status: Verified
+
+Depends on:
+- `V9-M3`
+- `V4-M0`
+- `V4-M1`
+
+Objective:
+Deliver real scheduled routine-item reminders when the app is backgrounded or
+closed, with deterministic cancellation and rescheduling.
+
+Deliverables:
+- [x] Resolve the approved local notification mechanism, Android permissions,
+      exact/inexact scheduling policy, reboot behavior, and battery constraints.
+- [x] Schedule only a bounded next-occurrence window from routine templates.
+- [x] Keep per-item reminder settings in SQLite and global notification/sound
+      preferences in Settings.
+- [x] Reschedule after edit, pause, archive, import, restart, timezone/date
+      change, and permission change.
+- [x] Cancel obsolete reminders and prevent duplicate notification identifiers.
+- [x] Degrade clearly when permission or exact scheduling is unavailable while
+      leaving the routine usable.
+- [x] Keep internal notification-center behavior separate from Android system
+      notification overlays.
+
+Quality gates:
+- [x] Scheduler tests cover idempotency, cancellation, delayed delivery, restart,
+      denied permission, and imported data.
+- [x] Physical Android verification covers foreground, background, app closed,
+      reboot/process death where supported, silent mode, and denied permission.
+- [x] No backend, network dependency, or unapproved package/Gradle change exists.
+
+Verification progress (2026-08-09):
+- Android manifest duplicate permission/receiver declarations were removed.
+- Native capability reporting and a localized Settings status now distinguish
+  ready, exact-alarm fallback, and denied-notification behavior. The denied state
+  links to the correct Android settings while routines remain usable.
+- Six scheduler tests and two capability-widget tests cover projection,
+  idempotency, cancellation, import replacement, denied permission, inexact
+  delivery, and the settings action. Clean analysis and all 233 tests pass.
+- RMX3301 verified bounded foreground scheduling, background delivery at
+  19:00:00.014, consumed-alarm removal, reboot/package restoration, silent
+  delivery, denied permission and recovery, and same-offset timezone rebuilding
+  with seven alarms before/after and no duplicates.
+- The 67.0 MB release APK was built, installed, and launched. Cleanup restored
+  `America/La_Paz`, granted notifications, the routine at 08:00 without a
+  reminder, and zero active routine alarms.
+
+Tracks:
+- `REQ-V9-006`
+
+### V9-M6 - Home and Calendar Integration
+
+Priority: 6
+
+Status: Verified
+
+Depends on:
+- `V9-M3`
+- `V9-M4`
+
+Objective:
+Expose today's routine context and future schedule where users already plan and
+act, without duplicating the full editor or overcrowding navigation.
+
+Deliverables:
+- [x] Home shows next routine, current/next item, local time, required progress,
+      and one start/continue action.
+- [x] Calendar merges ordinary tasks, materialized items, and virtual future
+      occurrences without duplicate rows.
+- [x] Visually distinguish projections from persisted tasks and completed history.
+- [x] Open the relevant routine or dated run from Home and Calendar.
+- [x] Represent completed, optional skipped, whole-run skipped, and missed states
+      consistently.
+- [x] Warn about overlaps without silently moving user data.
+- [x] Preserve existing Home charts, planning, profile header, and calendar events
+      when the database contains no routines.
+
+Quality gates:
+- [x] Query/controller tests cover merged and empty schedules across date ranges.
+- [x] Widget/golden tests cover dense days, long names, themes, typography,
+      Spanish/English, and supported portrait sizes.
+- [x] Physical Android inspection verifies navigation, scrolling, no overlap,
+      and no duplicate occurrence presentation.
+
+Verification evidence (2026-08-11):
+- Home widget coverage passed at 320 px with a long routine, maximum typography,
+  Spanish/English, light/dark palettes, and Sora/Merriweather. Dense Calendar
+  coverage passed with four overlapping routines, persisted completed/skipped/
+  missed outcomes, one virtual pending projection, and stable occurrence keys.
+- The matrix found the English `Settings` destination wrapping at 125%. The
+  navigation label now preserves the selected font and palette while using the
+  compact size above 100%, with a rendered one-line regression assertion.
+- `flutter analyze`, 16 focused tests, and the complete 236-test suite passed.
+- The JDK 17 release APK built and updated RMX3301 without clearing data. Direct
+  portrait inspection passed Home/Calendar navigation, vertical scrolling,
+  overlap presentation, and duplicate-free rendering with two distinct stored
+  routines and two tasks under both tested language/theme/typography states.
+- The device was restored to Spanish, Nature Focus light, 100%, Sora, routine
+  progress `0/1`, six Pending tasks, zero In Progress tasks, and unchanged timer
+  state.
+
+Tracks:
+- `REQ-V9-007`
+
+### V9-M7 - Routine Analytics and PDF
+
+Priority: 7
+
+Status: Verified
+
+Depends on:
+- `V9-M3`
+- `V9-M4`
+- `V5-M3`
+
+Objective:
+Add honest routine consistency, timing, focus, and mood analysis to the shared
+SQLite reporting engine and PDF output.
+
+Deliverables:
+- [x] Define scheduled/completed/skipped/missed denominators and legacy behavior.
+- [x] Make consistency percentage primary and streaks secondary.
+- [x] Add bounded aggregates for routine completion, item abandonment, start
+      delay, planned/actual focus, focused minutes, and average mood.
+- [x] Derive focus and mood from linked existing tasks/Pomodoro sessions rather
+      than duplicating values in routine tables.
+- [x] Add range-aware Home charts/details using the shared report snapshot.
+- [x] Add a concise PDF routine section only when data exists.
+- [x] Handle archived/deleted templates, partial runs, empty ranges, legacy data,
+      and imported history honestly.
+
+Quality gates:
+- [x] Formula tests cover every status and denominator edge case.
+- [x] SQLite query plans use range and relationship indexes with high-volume
+      fixtures and recorded p95 targets.
+- [x] Shared Home/PDF snapshot parity tests pass for day, month, year, and custom.
+- [x] Rendered multi-page PDFs pass visual inspection in Spanish and English.
+
+Verification evidence (2026-08-09):
+- Indexed `[start, end)` Drift aggregates passed exact formula tests for routine
+  and item states, optional-only denominators, partial sessions, and a completed
+  session crossing midnight.
+- The high-volume fixture uses 20,000 routine runs, 20,000 item runs, 20,000
+  tasks, and 50,000 Pomodoro sessions; ten measured snapshots stayed within the
+  1,000 ms p95 report budget.
+- Six rendered PDF pages (three Spanish and three English) passed 144 DPI visual
+  inspection without clipping, overlap, blank pages, or broken accents.
+- Per-routine streaks follow consecutive scheduled occurrences, so weekends and
+  weekly recurrence gaps do not penalize the result; an incomplete occurrence
+  resets the sequence.
+- `flutter analyze` passed and the complete 202-test suite passed.
+- The final debug APK built with JDK 17, updated with data preservation, launched,
+  and displayed routine analytics without overflow on RMX3301 / Android 15.
+
+Tracks:
+- `REQ-V9-008`
+
+### V9-M8 - Unified Backup and Integrated Verification
+
+Priority: 8
+
+Status: Implemented
+
+Depends on:
+- `V9-M1`
+- `V9-M2`
+- `V9-M3`
+- `V9-M4`
+- `V9-M5`
+- `V9-M6`
+- `V9-M7`
+
+Objective:
+Prove V9 end to end, including old-data migration and one-file database
+export/import, before declaring any routine behavior Verified.
+
+Deliverables:
+- [x] Export one consistent `michifocus.sqlite` containing current and routine
+      tables after checkpointing active runtime.
+- [x] Migrate imported older schemas in staging before replacing the live file.
+- [x] Validate schema, integrity, foreign keys, uniqueness, and routine/task links.
+- [x] Preserve templates, item order, weekdays, schedules, run snapshots, task
+      links, Pomodoro history, mood, reminders, and archive state in round trips.
+- [x] Pause an imported active runtime safely while retaining its task/routine
+      context.
+- [x] Keep supported legacy four-file imports working without fabricated routine
+      data.
+- [ ] Run adversarial deletion, partial/corrupt import, interruption, clock/date,
+      high-volume, accessibility, localization, and visual regression checks.
+
+Definition of done:
+- [x] Build Runner, formatting, analyzer, focused tests, and full test suite pass.
+- [x] Debug and release APKs build, install, launch, and preserve real device data.
+- [ ] Physical Android portrait inspection covers editor, generation, execution,
+      background reminder, Home, Calendar, statistics, PDF, restart, and import.
+- [ ] Database ERD, schema docs, routing/UI guidance, requirements, traceability,
+      client manual, and changelog reflect only verified behavior.
+- [ ] All nine V9 requirements have evidence and no unresolved critical finding.
+
+Implementation evidence on 2026-08-09:
+- Export uses a checkpointed `VACUUM INTO` snapshot and includes all 12 tables
+  in one `michifocus.sqlite` file without settings JSON.
+- Import rejects empty/version-zero, future, corrupt, partial-legacy, missing
+  table/index, altered-column, non-unique-index, invalid-date, and broken-FK
+  fixtures before replacing the live database.
+- Complete legacy backups migrate in isolated staging without routine rows.
+  Unified round trips preserve routine order, days, reminders, snapshots, task
+  links, sessions, mood, archive state, and paused runtime context.
+- Interrupted staging leaves the live database untouched; interrupted swapping
+  restores the previous database or finalizes a completed replacement.
+- Build Runner, formatting, clean analysis, 75 focused tests, and the full
+  215-test suite passed. Final debug/release APKs built, installed, and launched
+  with `adb install -r`; RMX3301 retained its 217088-byte database.
+- Unlocked RMX3301 portrait inspection exported one 217088-byte database to an
+  Android document-tree folder. The pulled snapshot passed schema 5, integrity,
+  foreign-key, all-table, and readable-row validation, then imported and applied
+  after restart with the same routines, tasks, schedules, and statuses.
+- Home, routine list/editor, routine start, automatic In Progress state, Focus
+  countdown/details, Calendar, routine statistics, the X/Y curve, PDF creation,
+  and the three-page Android viewer passed direct inspection. The original
+  snapshot was restored afterward, returning to two Pending tasks, zero In
+  Progress tasks, and no active timer.
+- The singular routine count was corrected to `1 paso` / `1 step`; its focused
+  golden, clean analyzer, full 215-test suite, rebuilt release APK, update
+  installation, data preservation, and final RMX3301 text inspection passed.
+- V9-M5 subsequently passed future reminder delivery, reboot restoration,
+  denied permission, silent mode, and timezone reconstruction. V9-M4 passed its
+  active/paused/break/return/switch physical matrix, and V9-M6 passed its
+  populated bilingual theme/typography Home and Calendar matrix. V9-M8 remains
+  Implemented until its explicit adversarial, complete physical-flow,
+  documentation, and all-requirement closure gates pass.
+
+Tracks:
+- `REQ-V9-009`

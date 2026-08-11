@@ -82,6 +82,62 @@ class PomodoroRuntimeDaoManager {
       );
 }
 
+mixin _$RoutinesDaoMixin on DatabaseAccessor<MichiFocusDatabase> {
+  $RoutineRecordsTable get routineRecords => attachedDatabase.routineRecords;
+  $RoutineDayRecordsTable get routineDayRecords =>
+      attachedDatabase.routineDayRecords;
+  $GoalRecordsTable get goalRecords => attachedDatabase.goalRecords;
+  $RoutineItemRecordsTable get routineItemRecords =>
+      attachedDatabase.routineItemRecords;
+  $RoutineRunRecordsTable get routineRunRecords =>
+      attachedDatabase.routineRunRecords;
+  $TaskRecordsTable get taskRecords => attachedDatabase.taskRecords;
+  $RoutineItemRunRecordsTable get routineItemRunRecords =>
+      attachedDatabase.routineItemRunRecords;
+  $PomodoroRuntimeRecordsTable get pomodoroRuntimeRecords =>
+      attachedDatabase.pomodoroRuntimeRecords;
+  RoutinesDaoManager get managers => RoutinesDaoManager(this);
+}
+
+class RoutinesDaoManager {
+  final _$RoutinesDaoMixin _db;
+  RoutinesDaoManager(this._db);
+  $$RoutineRecordsTableTableManager get routineRecords =>
+      $$RoutineRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineRecords,
+      );
+  $$RoutineDayRecordsTableTableManager get routineDayRecords =>
+      $$RoutineDayRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineDayRecords,
+      );
+  $$GoalRecordsTableTableManager get goalRecords =>
+      $$GoalRecordsTableTableManager(_db.attachedDatabase, _db.goalRecords);
+  $$RoutineItemRecordsTableTableManager get routineItemRecords =>
+      $$RoutineItemRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineItemRecords,
+      );
+  $$RoutineRunRecordsTableTableManager get routineRunRecords =>
+      $$RoutineRunRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineRunRecords,
+      );
+  $$TaskRecordsTableTableManager get taskRecords =>
+      $$TaskRecordsTableTableManager(_db.attachedDatabase, _db.taskRecords);
+  $$RoutineItemRunRecordsTableTableManager get routineItemRunRecords =>
+      $$RoutineItemRunRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineItemRunRecords,
+      );
+  $$PomodoroRuntimeRecordsTableTableManager get pomodoroRuntimeRecords =>
+      $$PomodoroRuntimeRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.pomodoroRuntimeRecords,
+      );
+}
+
 mixin _$CalendarEventsDaoMixin on DatabaseAccessor<MichiFocusDatabase> {
   $CalendarEventRecordsTable get calendarEventRecords =>
       attachedDatabase.calendarEventRecords;
@@ -107,6 +163,13 @@ mixin _$ReportsDaoMixin on DatabaseAccessor<MichiFocusDatabase> {
       attachedDatabase.reportingMetadataRecords;
   $PomodoroSessionRecordsTable get pomodoroSessionRecords =>
       attachedDatabase.pomodoroSessionRecords;
+  $RoutineRecordsTable get routineRecords => attachedDatabase.routineRecords;
+  $RoutineRunRecordsTable get routineRunRecords =>
+      attachedDatabase.routineRunRecords;
+  $RoutineItemRecordsTable get routineItemRecords =>
+      attachedDatabase.routineItemRecords;
+  $RoutineItemRunRecordsTable get routineItemRunRecords =>
+      attachedDatabase.routineItemRunRecords;
   ReportsDaoManager get managers => ReportsDaoManager(this);
 }
 
@@ -132,6 +195,26 @@ class ReportsDaoManager {
       $$PomodoroSessionRecordsTableTableManager(
         _db.attachedDatabase,
         _db.pomodoroSessionRecords,
+      );
+  $$RoutineRecordsTableTableManager get routineRecords =>
+      $$RoutineRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineRecords,
+      );
+  $$RoutineRunRecordsTableTableManager get routineRunRecords =>
+      $$RoutineRunRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineRunRecords,
+      );
+  $$RoutineItemRecordsTableTableManager get routineItemRecords =>
+      $$RoutineItemRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineItemRecords,
+      );
+  $$RoutineItemRunRecordsTableTableManager get routineItemRunRecords =>
+      $$RoutineItemRunRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.routineItemRunRecords,
       );
 }
 
@@ -2003,6 +2086,21 @@ class $PomodoroSessionRecordsTable extends PomodoroSessionRecords
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _moodPromptPendingMeta = const VerificationMeta(
+    'moodPromptPending',
+  );
+  @override
+  late final GeneratedColumn<bool> moodPromptPending = GeneratedColumn<bool>(
+    'mood_prompt_pending',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("mood_prompt_pending" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _wasDistractedMeta = const VerificationMeta(
     'wasDistracted',
   );
@@ -2058,6 +2156,7 @@ class $PomodoroSessionRecordsTable extends PomodoroSessionRecords
     taskId,
     startMoodScore,
     endMoodScore,
+    moodPromptPending,
     wasDistracted,
     distractionMinutes,
     status,
@@ -2148,6 +2247,15 @@ class $PomodoroSessionRecordsTable extends PomodoroSessionRecords
         ),
       );
     }
+    if (data.containsKey('mood_prompt_pending')) {
+      context.handle(
+        _moodPromptPendingMeta,
+        moodPromptPending.isAcceptableOrUnknown(
+          data['mood_prompt_pending']!,
+          _moodPromptPendingMeta,
+        ),
+      );
+    }
     if (data.containsKey('was_distracted')) {
       context.handle(
         _wasDistractedMeta,
@@ -2227,6 +2335,10 @@ class $PomodoroSessionRecordsTable extends PomodoroSessionRecords
         DriftSqlType.int,
         data['${effectivePrefix}end_mood_score'],
       ),
+      moodPromptPending: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}mood_prompt_pending'],
+      )!,
       wasDistracted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}was_distracted'],
@@ -2263,6 +2375,7 @@ class PomodoroSessionRecord extends DataClass
   final String? taskId;
   final int? startMoodScore;
   final int? endMoodScore;
+  final bool moodPromptPending;
   final bool? wasDistracted;
   final int? distractionMinutes;
   final String status;
@@ -2277,6 +2390,7 @@ class PomodoroSessionRecord extends DataClass
     this.taskId,
     this.startMoodScore,
     this.endMoodScore,
+    required this.moodPromptPending,
     this.wasDistracted,
     this.distractionMinutes,
     required this.status,
@@ -2302,6 +2416,7 @@ class PomodoroSessionRecord extends DataClass
     if (!nullToAbsent || endMoodScore != null) {
       map['end_mood_score'] = Variable<int>(endMoodScore);
     }
+    map['mood_prompt_pending'] = Variable<bool>(moodPromptPending);
     if (!nullToAbsent || wasDistracted != null) {
       map['was_distracted'] = Variable<bool>(wasDistracted);
     }
@@ -2332,6 +2447,7 @@ class PomodoroSessionRecord extends DataClass
       endMoodScore: endMoodScore == null && nullToAbsent
           ? const Value.absent()
           : Value(endMoodScore),
+      moodPromptPending: Value(moodPromptPending),
       wasDistracted: wasDistracted == null && nullToAbsent
           ? const Value.absent()
           : Value(wasDistracted),
@@ -2358,6 +2474,7 @@ class PomodoroSessionRecord extends DataClass
       taskId: serializer.fromJson<String?>(json['taskId']),
       startMoodScore: serializer.fromJson<int?>(json['startMoodScore']),
       endMoodScore: serializer.fromJson<int?>(json['endMoodScore']),
+      moodPromptPending: serializer.fromJson<bool>(json['moodPromptPending']),
       wasDistracted: serializer.fromJson<bool?>(json['wasDistracted']),
       distractionMinutes: serializer.fromJson<int?>(json['distractionMinutes']),
       status: serializer.fromJson<String>(json['status']),
@@ -2377,6 +2494,7 @@ class PomodoroSessionRecord extends DataClass
       'taskId': serializer.toJson<String?>(taskId),
       'startMoodScore': serializer.toJson<int?>(startMoodScore),
       'endMoodScore': serializer.toJson<int?>(endMoodScore),
+      'moodPromptPending': serializer.toJson<bool>(moodPromptPending),
       'wasDistracted': serializer.toJson<bool?>(wasDistracted),
       'distractionMinutes': serializer.toJson<int?>(distractionMinutes),
       'status': serializer.toJson<String>(status),
@@ -2394,6 +2512,7 @@ class PomodoroSessionRecord extends DataClass
     Value<String?> taskId = const Value.absent(),
     Value<int?> startMoodScore = const Value.absent(),
     Value<int?> endMoodScore = const Value.absent(),
+    bool? moodPromptPending,
     Value<bool?> wasDistracted = const Value.absent(),
     Value<int?> distractionMinutes = const Value.absent(),
     String? status,
@@ -2410,6 +2529,7 @@ class PomodoroSessionRecord extends DataClass
         ? startMoodScore.value
         : this.startMoodScore,
     endMoodScore: endMoodScore.present ? endMoodScore.value : this.endMoodScore,
+    moodPromptPending: moodPromptPending ?? this.moodPromptPending,
     wasDistracted: wasDistracted.present
         ? wasDistracted.value
         : this.wasDistracted,
@@ -2440,6 +2560,9 @@ class PomodoroSessionRecord extends DataClass
       endMoodScore: data.endMoodScore.present
           ? data.endMoodScore.value
           : this.endMoodScore,
+      moodPromptPending: data.moodPromptPending.present
+          ? data.moodPromptPending.value
+          : this.moodPromptPending,
       wasDistracted: data.wasDistracted.present
           ? data.wasDistracted.value
           : this.wasDistracted,
@@ -2463,6 +2586,7 @@ class PomodoroSessionRecord extends DataClass
           ..write('taskId: $taskId, ')
           ..write('startMoodScore: $startMoodScore, ')
           ..write('endMoodScore: $endMoodScore, ')
+          ..write('moodPromptPending: $moodPromptPending, ')
           ..write('wasDistracted: $wasDistracted, ')
           ..write('distractionMinutes: $distractionMinutes, ')
           ..write('status: $status, ')
@@ -2482,6 +2606,7 @@ class PomodoroSessionRecord extends DataClass
     taskId,
     startMoodScore,
     endMoodScore,
+    moodPromptPending,
     wasDistracted,
     distractionMinutes,
     status,
@@ -2500,6 +2625,7 @@ class PomodoroSessionRecord extends DataClass
           other.taskId == this.taskId &&
           other.startMoodScore == this.startMoodScore &&
           other.endMoodScore == this.endMoodScore &&
+          other.moodPromptPending == this.moodPromptPending &&
           other.wasDistracted == this.wasDistracted &&
           other.distractionMinutes == this.distractionMinutes &&
           other.status == this.status &&
@@ -2517,6 +2643,7 @@ class PomodoroSessionRecordsCompanion
   final Value<String?> taskId;
   final Value<int?> startMoodScore;
   final Value<int?> endMoodScore;
+  final Value<bool> moodPromptPending;
   final Value<bool?> wasDistracted;
   final Value<int?> distractionMinutes;
   final Value<String> status;
@@ -2532,6 +2659,7 @@ class PomodoroSessionRecordsCompanion
     this.taskId = const Value.absent(),
     this.startMoodScore = const Value.absent(),
     this.endMoodScore = const Value.absent(),
+    this.moodPromptPending = const Value.absent(),
     this.wasDistracted = const Value.absent(),
     this.distractionMinutes = const Value.absent(),
     this.status = const Value.absent(),
@@ -2548,6 +2676,7 @@ class PomodoroSessionRecordsCompanion
     this.taskId = const Value.absent(),
     this.startMoodScore = const Value.absent(),
     this.endMoodScore = const Value.absent(),
+    this.moodPromptPending = const Value.absent(),
     this.wasDistracted = const Value.absent(),
     this.distractionMinutes = const Value.absent(),
     required String status,
@@ -2570,6 +2699,7 @@ class PomodoroSessionRecordsCompanion
     Expression<String>? taskId,
     Expression<int>? startMoodScore,
     Expression<int>? endMoodScore,
+    Expression<bool>? moodPromptPending,
     Expression<bool>? wasDistracted,
     Expression<int>? distractionMinutes,
     Expression<String>? status,
@@ -2586,6 +2716,7 @@ class PomodoroSessionRecordsCompanion
       if (taskId != null) 'task_id': taskId,
       if (startMoodScore != null) 'start_mood_score': startMoodScore,
       if (endMoodScore != null) 'end_mood_score': endMoodScore,
+      if (moodPromptPending != null) 'mood_prompt_pending': moodPromptPending,
       if (wasDistracted != null) 'was_distracted': wasDistracted,
       if (distractionMinutes != null) 'distraction_minutes': distractionMinutes,
       if (status != null) 'status': status,
@@ -2604,6 +2735,7 @@ class PomodoroSessionRecordsCompanion
     Value<String?>? taskId,
     Value<int?>? startMoodScore,
     Value<int?>? endMoodScore,
+    Value<bool>? moodPromptPending,
     Value<bool?>? wasDistracted,
     Value<int?>? distractionMinutes,
     Value<String>? status,
@@ -2620,6 +2752,7 @@ class PomodoroSessionRecordsCompanion
       taskId: taskId ?? this.taskId,
       startMoodScore: startMoodScore ?? this.startMoodScore,
       endMoodScore: endMoodScore ?? this.endMoodScore,
+      moodPromptPending: moodPromptPending ?? this.moodPromptPending,
       wasDistracted: wasDistracted ?? this.wasDistracted,
       distractionMinutes: distractionMinutes ?? this.distractionMinutes,
       status: status ?? this.status,
@@ -2658,6 +2791,9 @@ class PomodoroSessionRecordsCompanion
     if (endMoodScore.present) {
       map['end_mood_score'] = Variable<int>(endMoodScore.value);
     }
+    if (moodPromptPending.present) {
+      map['mood_prompt_pending'] = Variable<bool>(moodPromptPending.value);
+    }
     if (wasDistracted.present) {
       map['was_distracted'] = Variable<bool>(wasDistracted.value);
     }
@@ -2688,6 +2824,7 @@ class PomodoroSessionRecordsCompanion
           ..write('taskId: $taskId, ')
           ..write('startMoodScore: $startMoodScore, ')
           ..write('endMoodScore: $endMoodScore, ')
+          ..write('moodPromptPending: $moodPromptPending, ')
           ..write('wasDistracted: $wasDistracted, ')
           ..write('distractionMinutes: $distractionMinutes, ')
           ..write('status: $status, ')
@@ -4035,6 +4172,3886 @@ class PomodoroRuntimeRecordsCompanion
   }
 }
 
+class $RoutineRecordsTable extends RoutineRecords
+    with TableInfo<$RoutineRecordsTable, RoutineRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _iconKeyMeta = const VerificationMeta(
+    'iconKey',
+  );
+  @override
+  late final GeneratedColumn<String> iconKey = GeneratedColumn<String>(
+    'icon_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('routine'),
+  );
+  static const VerificationMeta _colorKeyMeta = const VerificationMeta(
+    'colorKey',
+  );
+  @override
+  late final GeneratedColumn<String> colorKey = GeneratedColumn<String>(
+    'color_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('primary'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _pausedUntilLocalDateMeta =
+      const VerificationMeta('pausedUntilLocalDate');
+  @override
+  late final GeneratedColumn<String> pausedUntilLocalDate =
+      GeneratedColumn<String>(
+        'paused_until_local_date',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _archivedAtMeta = const VerificationMeta(
+    'archivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archivedAt = GeneratedColumn<DateTime>(
+    'archived_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    iconKey,
+    colorKey,
+    status,
+    pausedUntilLocalDate,
+    archivedAt,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routines';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('icon_key')) {
+      context.handle(
+        _iconKeyMeta,
+        iconKey.isAcceptableOrUnknown(data['icon_key']!, _iconKeyMeta),
+      );
+    }
+    if (data.containsKey('color_key')) {
+      context.handle(
+        _colorKeyMeta,
+        colorKey.isAcceptableOrUnknown(data['color_key']!, _colorKeyMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('paused_until_local_date')) {
+      context.handle(
+        _pausedUntilLocalDateMeta,
+        pausedUntilLocalDate.isAcceptableOrUnknown(
+          data['paused_until_local_date']!,
+          _pausedUntilLocalDateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('archived_at')) {
+      context.handle(
+        _archivedAtMeta,
+        archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoutineRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      iconKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_key'],
+      )!,
+      colorKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_key'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      pausedUntilLocalDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paused_until_local_date'],
+      ),
+      archivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archived_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineRecordsTable createAlias(String alias) {
+    return $RoutineRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
+  final String id;
+  final String name;
+  final String? description;
+  final String iconKey;
+  final String colorKey;
+  final String status;
+  final String? pausedUntilLocalDate;
+  final DateTime? archivedAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const RoutineRecord({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.iconKey,
+    required this.colorKey,
+    required this.status,
+    this.pausedUntilLocalDate,
+    this.archivedAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['icon_key'] = Variable<String>(iconKey);
+    map['color_key'] = Variable<String>(colorKey);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || pausedUntilLocalDate != null) {
+      map['paused_until_local_date'] = Variable<String>(pausedUntilLocalDate);
+    }
+    if (!nullToAbsent || archivedAt != null) {
+      map['archived_at'] = Variable<DateTime>(archivedAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RoutineRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineRecordsCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      iconKey: Value(iconKey),
+      colorKey: Value(colorKey),
+      status: Value(status),
+      pausedUntilLocalDate: pausedUntilLocalDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntilLocalDate),
+      archivedAt: archivedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivedAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RoutineRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineRecord(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      iconKey: serializer.fromJson<String>(json['iconKey']),
+      colorKey: serializer.fromJson<String>(json['colorKey']),
+      status: serializer.fromJson<String>(json['status']),
+      pausedUntilLocalDate: serializer.fromJson<String?>(
+        json['pausedUntilLocalDate'],
+      ),
+      archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'iconKey': serializer.toJson<String>(iconKey),
+      'colorKey': serializer.toJson<String>(colorKey),
+      'status': serializer.toJson<String>(status),
+      'pausedUntilLocalDate': serializer.toJson<String?>(pausedUntilLocalDate),
+      'archivedAt': serializer.toJson<DateTime?>(archivedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RoutineRecord copyWith({
+    String? id,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    String? iconKey,
+    String? colorKey,
+    String? status,
+    Value<String?> pausedUntilLocalDate = const Value.absent(),
+    Value<DateTime?> archivedAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RoutineRecord(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    iconKey: iconKey ?? this.iconKey,
+    colorKey: colorKey ?? this.colorKey,
+    status: status ?? this.status,
+    pausedUntilLocalDate: pausedUntilLocalDate.present
+        ? pausedUntilLocalDate.value
+        : this.pausedUntilLocalDate,
+    archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RoutineRecord copyWithCompanion(RoutineRecordsCompanion data) {
+    return RoutineRecord(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      iconKey: data.iconKey.present ? data.iconKey.value : this.iconKey,
+      colorKey: data.colorKey.present ? data.colorKey.value : this.colorKey,
+      status: data.status.present ? data.status.value : this.status,
+      pausedUntilLocalDate: data.pausedUntilLocalDate.present
+          ? data.pausedUntilLocalDate.value
+          : this.pausedUntilLocalDate,
+      archivedAt: data.archivedAt.present
+          ? data.archivedAt.value
+          : this.archivedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineRecord(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconKey: $iconKey, ')
+          ..write('colorKey: $colorKey, ')
+          ..write('status: $status, ')
+          ..write('pausedUntilLocalDate: $pausedUntilLocalDate, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    iconKey,
+    colorKey,
+    status,
+    pausedUntilLocalDate,
+    archivedAt,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineRecord &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.iconKey == this.iconKey &&
+          other.colorKey == this.colorKey &&
+          other.status == this.status &&
+          other.pausedUntilLocalDate == this.pausedUntilLocalDate &&
+          other.archivedAt == this.archivedAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<String> iconKey;
+  final Value<String> colorKey;
+  final Value<String> status;
+  final Value<String?> pausedUntilLocalDate;
+  final Value<DateTime?> archivedAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RoutineRecordsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.iconKey = const Value.absent(),
+    this.colorKey = const Value.absent(),
+    this.status = const Value.absent(),
+    this.pausedUntilLocalDate = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoutineRecordsCompanion.insert({
+    required String id,
+    required String name,
+    this.description = const Value.absent(),
+    this.iconKey = const Value.absent(),
+    this.colorKey = const Value.absent(),
+    this.status = const Value.absent(),
+    this.pausedUntilLocalDate = const Value.absent(),
+    this.archivedAt = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<RoutineRecord> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<String>? iconKey,
+    Expression<String>? colorKey,
+    Expression<String>? status,
+    Expression<String>? pausedUntilLocalDate,
+    Expression<DateTime>? archivedAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (iconKey != null) 'icon_key': iconKey,
+      if (colorKey != null) 'color_key': colorKey,
+      if (status != null) 'status': status,
+      if (pausedUntilLocalDate != null)
+        'paused_until_local_date': pausedUntilLocalDate,
+      if (archivedAt != null) 'archived_at': archivedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoutineRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<String>? iconKey,
+    Value<String>? colorKey,
+    Value<String>? status,
+    Value<String?>? pausedUntilLocalDate,
+    Value<DateTime?>? archivedAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RoutineRecordsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      iconKey: iconKey ?? this.iconKey,
+      colorKey: colorKey ?? this.colorKey,
+      status: status ?? this.status,
+      pausedUntilLocalDate: pausedUntilLocalDate ?? this.pausedUntilLocalDate,
+      archivedAt: archivedAt ?? this.archivedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (iconKey.present) {
+      map['icon_key'] = Variable<String>(iconKey.value);
+    }
+    if (colorKey.present) {
+      map['color_key'] = Variable<String>(colorKey.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (pausedUntilLocalDate.present) {
+      map['paused_until_local_date'] = Variable<String>(
+        pausedUntilLocalDate.value,
+      );
+    }
+    if (archivedAt.present) {
+      map['archived_at'] = Variable<DateTime>(archivedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('iconKey: $iconKey, ')
+          ..write('colorKey: $colorKey, ')
+          ..write('status: $status, ')
+          ..write('pausedUntilLocalDate: $pausedUntilLocalDate, ')
+          ..write('archivedAt: $archivedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RoutineDayRecordsTable extends RoutineDayRecords
+    with TableInfo<$RoutineDayRecordsTable, RoutineDayRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineDayRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _routineIdMeta = const VerificationMeta(
+    'routineId',
+  );
+  @override
+  late final GeneratedColumn<String> routineId = GeneratedColumn<String>(
+    'routine_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES routines (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _weekdayMeta = const VerificationMeta(
+    'weekday',
+  );
+  @override
+  late final GeneratedColumn<int> weekday = GeneratedColumn<int>(
+    'weekday',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [routineId, weekday];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routine_days';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineDayRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('routine_id')) {
+      context.handle(
+        _routineIdMeta,
+        routineId.isAcceptableOrUnknown(data['routine_id']!, _routineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_routineIdMeta);
+    }
+    if (data.containsKey('weekday')) {
+      context.handle(
+        _weekdayMeta,
+        weekday.isAcceptableOrUnknown(data['weekday']!, _weekdayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_weekdayMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {routineId, weekday};
+  @override
+  RoutineDayRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineDayRecord(
+      routineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}routine_id'],
+      )!,
+      weekday: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}weekday'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineDayRecordsTable createAlias(String alias) {
+    return $RoutineDayRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineDayRecord extends DataClass
+    implements Insertable<RoutineDayRecord> {
+  final String routineId;
+  final int weekday;
+  const RoutineDayRecord({required this.routineId, required this.weekday});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['routine_id'] = Variable<String>(routineId);
+    map['weekday'] = Variable<int>(weekday);
+    return map;
+  }
+
+  RoutineDayRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineDayRecordsCompanion(
+      routineId: Value(routineId),
+      weekday: Value(weekday),
+    );
+  }
+
+  factory RoutineDayRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineDayRecord(
+      routineId: serializer.fromJson<String>(json['routineId']),
+      weekday: serializer.fromJson<int>(json['weekday']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'routineId': serializer.toJson<String>(routineId),
+      'weekday': serializer.toJson<int>(weekday),
+    };
+  }
+
+  RoutineDayRecord copyWith({String? routineId, int? weekday}) =>
+      RoutineDayRecord(
+        routineId: routineId ?? this.routineId,
+        weekday: weekday ?? this.weekday,
+      );
+  RoutineDayRecord copyWithCompanion(RoutineDayRecordsCompanion data) {
+    return RoutineDayRecord(
+      routineId: data.routineId.present ? data.routineId.value : this.routineId,
+      weekday: data.weekday.present ? data.weekday.value : this.weekday,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineDayRecord(')
+          ..write('routineId: $routineId, ')
+          ..write('weekday: $weekday')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(routineId, weekday);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineDayRecord &&
+          other.routineId == this.routineId &&
+          other.weekday == this.weekday);
+}
+
+class RoutineDayRecordsCompanion extends UpdateCompanion<RoutineDayRecord> {
+  final Value<String> routineId;
+  final Value<int> weekday;
+  final Value<int> rowid;
+  const RoutineDayRecordsCompanion({
+    this.routineId = const Value.absent(),
+    this.weekday = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoutineDayRecordsCompanion.insert({
+    required String routineId,
+    required int weekday,
+    this.rowid = const Value.absent(),
+  }) : routineId = Value(routineId),
+       weekday = Value(weekday);
+  static Insertable<RoutineDayRecord> custom({
+    Expression<String>? routineId,
+    Expression<int>? weekday,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (routineId != null) 'routine_id': routineId,
+      if (weekday != null) 'weekday': weekday,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoutineDayRecordsCompanion copyWith({
+    Value<String>? routineId,
+    Value<int>? weekday,
+    Value<int>? rowid,
+  }) {
+    return RoutineDayRecordsCompanion(
+      routineId: routineId ?? this.routineId,
+      weekday: weekday ?? this.weekday,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (routineId.present) {
+      map['routine_id'] = Variable<String>(routineId.value);
+    }
+    if (weekday.present) {
+      map['weekday'] = Variable<int>(weekday.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineDayRecordsCompanion(')
+          ..write('routineId: $routineId, ')
+          ..write('weekday: $weekday, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RoutineItemRecordsTable extends RoutineItemRecords
+    with TableInfo<$RoutineItemRecordsTable, RoutineItemRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineItemRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routineIdMeta = const VerificationMeta(
+    'routineId',
+  );
+  @override
+  late final GeneratedColumn<String> routineId = GeneratedColumn<String>(
+    'routine_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES routines (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledMinuteMeta = const VerificationMeta(
+    'scheduledMinute',
+  );
+  @override
+  late final GeneratedColumn<int> scheduledMinute = GeneratedColumn<int>(
+    'scheduled_minute',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _durationMinutesMeta = const VerificationMeta(
+    'durationMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> durationMinutes = GeneratedColumn<int>(
+    'duration_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _goalIdMeta = const VerificationMeta('goalId');
+  @override
+  late final GeneratedColumn<String> goalId = GeneratedColumn<String>(
+    'goal_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES goals (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _isOptionalMeta = const VerificationMeta(
+    'isOptional',
+  );
+  @override
+  late final GeneratedColumn<bool> isOptional = GeneratedColumn<bool>(
+    'is_optional',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_optional" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _reminderMinutesBeforeMeta =
+      const VerificationMeta('reminderMinutesBefore');
+  @override
+  late final GeneratedColumn<int> reminderMinutesBefore = GeneratedColumn<int>(
+    'reminder_minutes_before',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pomodoroModeMeta = const VerificationMeta(
+    'pomodoroMode',
+  );
+  @override
+  late final GeneratedColumn<String> pomodoroMode = GeneratedColumn<String>(
+    'pomodoro_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('none'),
+  );
+  static const VerificationMeta _customFocusMinutesMeta =
+      const VerificationMeta('customFocusMinutes');
+  @override
+  late final GeneratedColumn<int> customFocusMinutes = GeneratedColumn<int>(
+    'custom_focus_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _customBreakMinutesMeta =
+      const VerificationMeta('customBreakMinutes');
+  @override
+  late final GeneratedColumn<int> customBreakMinutes = GeneratedColumn<int>(
+    'custom_break_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    routineId,
+    position,
+    title,
+    scheduledMinute,
+    durationMinutes,
+    goalId,
+    isOptional,
+    reminderMinutesBefore,
+    pomodoroMode,
+    customFocusMinutes,
+    customBreakMinutes,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routine_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineItemRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('routine_id')) {
+      context.handle(
+        _routineIdMeta,
+        routineId.isAcceptableOrUnknown(data['routine_id']!, _routineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_routineIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('scheduled_minute')) {
+      context.handle(
+        _scheduledMinuteMeta,
+        scheduledMinute.isAcceptableOrUnknown(
+          data['scheduled_minute']!,
+          _scheduledMinuteMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledMinuteMeta);
+    }
+    if (data.containsKey('duration_minutes')) {
+      context.handle(
+        _durationMinutesMeta,
+        durationMinutes.isAcceptableOrUnknown(
+          data['duration_minutes']!,
+          _durationMinutesMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_durationMinutesMeta);
+    }
+    if (data.containsKey('goal_id')) {
+      context.handle(
+        _goalIdMeta,
+        goalId.isAcceptableOrUnknown(data['goal_id']!, _goalIdMeta),
+      );
+    }
+    if (data.containsKey('is_optional')) {
+      context.handle(
+        _isOptionalMeta,
+        isOptional.isAcceptableOrUnknown(data['is_optional']!, _isOptionalMeta),
+      );
+    }
+    if (data.containsKey('reminder_minutes_before')) {
+      context.handle(
+        _reminderMinutesBeforeMeta,
+        reminderMinutesBefore.isAcceptableOrUnknown(
+          data['reminder_minutes_before']!,
+          _reminderMinutesBeforeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pomodoro_mode')) {
+      context.handle(
+        _pomodoroModeMeta,
+        pomodoroMode.isAcceptableOrUnknown(
+          data['pomodoro_mode']!,
+          _pomodoroModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('custom_focus_minutes')) {
+      context.handle(
+        _customFocusMinutesMeta,
+        customFocusMinutes.isAcceptableOrUnknown(
+          data['custom_focus_minutes']!,
+          _customFocusMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('custom_break_minutes')) {
+      context.handle(
+        _customBreakMinutesMeta,
+        customBreakMinutes.isAcceptableOrUnknown(
+          data['custom_break_minutes']!,
+          _customBreakMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoutineItemRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineItemRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      routineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}routine_id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      scheduledMinute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}scheduled_minute'],
+      )!,
+      durationMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_minutes'],
+      )!,
+      goalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}goal_id'],
+      ),
+      isOptional: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_optional'],
+      )!,
+      reminderMinutesBefore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes_before'],
+      ),
+      pomodoroMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pomodoro_mode'],
+      )!,
+      customFocusMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_focus_minutes'],
+      ),
+      customBreakMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_break_minutes'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineItemRecordsTable createAlias(String alias) {
+    return $RoutineItemRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineItemRecord extends DataClass
+    implements Insertable<RoutineItemRecord> {
+  final String id;
+  final String routineId;
+  final int position;
+  final String title;
+  final int scheduledMinute;
+  final int durationMinutes;
+  final String? goalId;
+  final bool isOptional;
+  final int? reminderMinutesBefore;
+  final String pomodoroMode;
+  final int? customFocusMinutes;
+  final int? customBreakMinutes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const RoutineItemRecord({
+    required this.id,
+    required this.routineId,
+    required this.position,
+    required this.title,
+    required this.scheduledMinute,
+    required this.durationMinutes,
+    this.goalId,
+    required this.isOptional,
+    this.reminderMinutesBefore,
+    required this.pomodoroMode,
+    this.customFocusMinutes,
+    this.customBreakMinutes,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['routine_id'] = Variable<String>(routineId);
+    map['position'] = Variable<int>(position);
+    map['title'] = Variable<String>(title);
+    map['scheduled_minute'] = Variable<int>(scheduledMinute);
+    map['duration_minutes'] = Variable<int>(durationMinutes);
+    if (!nullToAbsent || goalId != null) {
+      map['goal_id'] = Variable<String>(goalId);
+    }
+    map['is_optional'] = Variable<bool>(isOptional);
+    if (!nullToAbsent || reminderMinutesBefore != null) {
+      map['reminder_minutes_before'] = Variable<int>(reminderMinutesBefore);
+    }
+    map['pomodoro_mode'] = Variable<String>(pomodoroMode);
+    if (!nullToAbsent || customFocusMinutes != null) {
+      map['custom_focus_minutes'] = Variable<int>(customFocusMinutes);
+    }
+    if (!nullToAbsent || customBreakMinutes != null) {
+      map['custom_break_minutes'] = Variable<int>(customBreakMinutes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RoutineItemRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineItemRecordsCompanion(
+      id: Value(id),
+      routineId: Value(routineId),
+      position: Value(position),
+      title: Value(title),
+      scheduledMinute: Value(scheduledMinute),
+      durationMinutes: Value(durationMinutes),
+      goalId: goalId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(goalId),
+      isOptional: Value(isOptional),
+      reminderMinutesBefore: reminderMinutesBefore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMinutesBefore),
+      pomodoroMode: Value(pomodoroMode),
+      customFocusMinutes: customFocusMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customFocusMinutes),
+      customBreakMinutes: customBreakMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customBreakMinutes),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RoutineItemRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineItemRecord(
+      id: serializer.fromJson<String>(json['id']),
+      routineId: serializer.fromJson<String>(json['routineId']),
+      position: serializer.fromJson<int>(json['position']),
+      title: serializer.fromJson<String>(json['title']),
+      scheduledMinute: serializer.fromJson<int>(json['scheduledMinute']),
+      durationMinutes: serializer.fromJson<int>(json['durationMinutes']),
+      goalId: serializer.fromJson<String?>(json['goalId']),
+      isOptional: serializer.fromJson<bool>(json['isOptional']),
+      reminderMinutesBefore: serializer.fromJson<int?>(
+        json['reminderMinutesBefore'],
+      ),
+      pomodoroMode: serializer.fromJson<String>(json['pomodoroMode']),
+      customFocusMinutes: serializer.fromJson<int?>(json['customFocusMinutes']),
+      customBreakMinutes: serializer.fromJson<int?>(json['customBreakMinutes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'routineId': serializer.toJson<String>(routineId),
+      'position': serializer.toJson<int>(position),
+      'title': serializer.toJson<String>(title),
+      'scheduledMinute': serializer.toJson<int>(scheduledMinute),
+      'durationMinutes': serializer.toJson<int>(durationMinutes),
+      'goalId': serializer.toJson<String?>(goalId),
+      'isOptional': serializer.toJson<bool>(isOptional),
+      'reminderMinutesBefore': serializer.toJson<int?>(reminderMinutesBefore),
+      'pomodoroMode': serializer.toJson<String>(pomodoroMode),
+      'customFocusMinutes': serializer.toJson<int?>(customFocusMinutes),
+      'customBreakMinutes': serializer.toJson<int?>(customBreakMinutes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RoutineItemRecord copyWith({
+    String? id,
+    String? routineId,
+    int? position,
+    String? title,
+    int? scheduledMinute,
+    int? durationMinutes,
+    Value<String?> goalId = const Value.absent(),
+    bool? isOptional,
+    Value<int?> reminderMinutesBefore = const Value.absent(),
+    String? pomodoroMode,
+    Value<int?> customFocusMinutes = const Value.absent(),
+    Value<int?> customBreakMinutes = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RoutineItemRecord(
+    id: id ?? this.id,
+    routineId: routineId ?? this.routineId,
+    position: position ?? this.position,
+    title: title ?? this.title,
+    scheduledMinute: scheduledMinute ?? this.scheduledMinute,
+    durationMinutes: durationMinutes ?? this.durationMinutes,
+    goalId: goalId.present ? goalId.value : this.goalId,
+    isOptional: isOptional ?? this.isOptional,
+    reminderMinutesBefore: reminderMinutesBefore.present
+        ? reminderMinutesBefore.value
+        : this.reminderMinutesBefore,
+    pomodoroMode: pomodoroMode ?? this.pomodoroMode,
+    customFocusMinutes: customFocusMinutes.present
+        ? customFocusMinutes.value
+        : this.customFocusMinutes,
+    customBreakMinutes: customBreakMinutes.present
+        ? customBreakMinutes.value
+        : this.customBreakMinutes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RoutineItemRecord copyWithCompanion(RoutineItemRecordsCompanion data) {
+    return RoutineItemRecord(
+      id: data.id.present ? data.id.value : this.id,
+      routineId: data.routineId.present ? data.routineId.value : this.routineId,
+      position: data.position.present ? data.position.value : this.position,
+      title: data.title.present ? data.title.value : this.title,
+      scheduledMinute: data.scheduledMinute.present
+          ? data.scheduledMinute.value
+          : this.scheduledMinute,
+      durationMinutes: data.durationMinutes.present
+          ? data.durationMinutes.value
+          : this.durationMinutes,
+      goalId: data.goalId.present ? data.goalId.value : this.goalId,
+      isOptional: data.isOptional.present
+          ? data.isOptional.value
+          : this.isOptional,
+      reminderMinutesBefore: data.reminderMinutesBefore.present
+          ? data.reminderMinutesBefore.value
+          : this.reminderMinutesBefore,
+      pomodoroMode: data.pomodoroMode.present
+          ? data.pomodoroMode.value
+          : this.pomodoroMode,
+      customFocusMinutes: data.customFocusMinutes.present
+          ? data.customFocusMinutes.value
+          : this.customFocusMinutes,
+      customBreakMinutes: data.customBreakMinutes.present
+          ? data.customBreakMinutes.value
+          : this.customBreakMinutes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineItemRecord(')
+          ..write('id: $id, ')
+          ..write('routineId: $routineId, ')
+          ..write('position: $position, ')
+          ..write('title: $title, ')
+          ..write('scheduledMinute: $scheduledMinute, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('goalId: $goalId, ')
+          ..write('isOptional: $isOptional, ')
+          ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
+          ..write('pomodoroMode: $pomodoroMode, ')
+          ..write('customFocusMinutes: $customFocusMinutes, ')
+          ..write('customBreakMinutes: $customBreakMinutes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    routineId,
+    position,
+    title,
+    scheduledMinute,
+    durationMinutes,
+    goalId,
+    isOptional,
+    reminderMinutesBefore,
+    pomodoroMode,
+    customFocusMinutes,
+    customBreakMinutes,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineItemRecord &&
+          other.id == this.id &&
+          other.routineId == this.routineId &&
+          other.position == this.position &&
+          other.title == this.title &&
+          other.scheduledMinute == this.scheduledMinute &&
+          other.durationMinutes == this.durationMinutes &&
+          other.goalId == this.goalId &&
+          other.isOptional == this.isOptional &&
+          other.reminderMinutesBefore == this.reminderMinutesBefore &&
+          other.pomodoroMode == this.pomodoroMode &&
+          other.customFocusMinutes == this.customFocusMinutes &&
+          other.customBreakMinutes == this.customBreakMinutes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RoutineItemRecordsCompanion extends UpdateCompanion<RoutineItemRecord> {
+  final Value<String> id;
+  final Value<String> routineId;
+  final Value<int> position;
+  final Value<String> title;
+  final Value<int> scheduledMinute;
+  final Value<int> durationMinutes;
+  final Value<String?> goalId;
+  final Value<bool> isOptional;
+  final Value<int?> reminderMinutesBefore;
+  final Value<String> pomodoroMode;
+  final Value<int?> customFocusMinutes;
+  final Value<int?> customBreakMinutes;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RoutineItemRecordsCompanion({
+    this.id = const Value.absent(),
+    this.routineId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.title = const Value.absent(),
+    this.scheduledMinute = const Value.absent(),
+    this.durationMinutes = const Value.absent(),
+    this.goalId = const Value.absent(),
+    this.isOptional = const Value.absent(),
+    this.reminderMinutesBefore = const Value.absent(),
+    this.pomodoroMode = const Value.absent(),
+    this.customFocusMinutes = const Value.absent(),
+    this.customBreakMinutes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoutineItemRecordsCompanion.insert({
+    required String id,
+    required String routineId,
+    required int position,
+    required String title,
+    required int scheduledMinute,
+    required int durationMinutes,
+    this.goalId = const Value.absent(),
+    this.isOptional = const Value.absent(),
+    this.reminderMinutesBefore = const Value.absent(),
+    this.pomodoroMode = const Value.absent(),
+    this.customFocusMinutes = const Value.absent(),
+    this.customBreakMinutes = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       routineId = Value(routineId),
+       position = Value(position),
+       title = Value(title),
+       scheduledMinute = Value(scheduledMinute),
+       durationMinutes = Value(durationMinutes),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<RoutineItemRecord> custom({
+    Expression<String>? id,
+    Expression<String>? routineId,
+    Expression<int>? position,
+    Expression<String>? title,
+    Expression<int>? scheduledMinute,
+    Expression<int>? durationMinutes,
+    Expression<String>? goalId,
+    Expression<bool>? isOptional,
+    Expression<int>? reminderMinutesBefore,
+    Expression<String>? pomodoroMode,
+    Expression<int>? customFocusMinutes,
+    Expression<int>? customBreakMinutes,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (routineId != null) 'routine_id': routineId,
+      if (position != null) 'position': position,
+      if (title != null) 'title': title,
+      if (scheduledMinute != null) 'scheduled_minute': scheduledMinute,
+      if (durationMinutes != null) 'duration_minutes': durationMinutes,
+      if (goalId != null) 'goal_id': goalId,
+      if (isOptional != null) 'is_optional': isOptional,
+      if (reminderMinutesBefore != null)
+        'reminder_minutes_before': reminderMinutesBefore,
+      if (pomodoroMode != null) 'pomodoro_mode': pomodoroMode,
+      if (customFocusMinutes != null)
+        'custom_focus_minutes': customFocusMinutes,
+      if (customBreakMinutes != null)
+        'custom_break_minutes': customBreakMinutes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoutineItemRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? routineId,
+    Value<int>? position,
+    Value<String>? title,
+    Value<int>? scheduledMinute,
+    Value<int>? durationMinutes,
+    Value<String?>? goalId,
+    Value<bool>? isOptional,
+    Value<int?>? reminderMinutesBefore,
+    Value<String>? pomodoroMode,
+    Value<int?>? customFocusMinutes,
+    Value<int?>? customBreakMinutes,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RoutineItemRecordsCompanion(
+      id: id ?? this.id,
+      routineId: routineId ?? this.routineId,
+      position: position ?? this.position,
+      title: title ?? this.title,
+      scheduledMinute: scheduledMinute ?? this.scheduledMinute,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      goalId: goalId ?? this.goalId,
+      isOptional: isOptional ?? this.isOptional,
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
+      pomodoroMode: pomodoroMode ?? this.pomodoroMode,
+      customFocusMinutes: customFocusMinutes ?? this.customFocusMinutes,
+      customBreakMinutes: customBreakMinutes ?? this.customBreakMinutes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (routineId.present) {
+      map['routine_id'] = Variable<String>(routineId.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (scheduledMinute.present) {
+      map['scheduled_minute'] = Variable<int>(scheduledMinute.value);
+    }
+    if (durationMinutes.present) {
+      map['duration_minutes'] = Variable<int>(durationMinutes.value);
+    }
+    if (goalId.present) {
+      map['goal_id'] = Variable<String>(goalId.value);
+    }
+    if (isOptional.present) {
+      map['is_optional'] = Variable<bool>(isOptional.value);
+    }
+    if (reminderMinutesBefore.present) {
+      map['reminder_minutes_before'] = Variable<int>(
+        reminderMinutesBefore.value,
+      );
+    }
+    if (pomodoroMode.present) {
+      map['pomodoro_mode'] = Variable<String>(pomodoroMode.value);
+    }
+    if (customFocusMinutes.present) {
+      map['custom_focus_minutes'] = Variable<int>(customFocusMinutes.value);
+    }
+    if (customBreakMinutes.present) {
+      map['custom_break_minutes'] = Variable<int>(customBreakMinutes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineItemRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('routineId: $routineId, ')
+          ..write('position: $position, ')
+          ..write('title: $title, ')
+          ..write('scheduledMinute: $scheduledMinute, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('goalId: $goalId, ')
+          ..write('isOptional: $isOptional, ')
+          ..write('reminderMinutesBefore: $reminderMinutesBefore, ')
+          ..write('pomodoroMode: $pomodoroMode, ')
+          ..write('customFocusMinutes: $customFocusMinutes, ')
+          ..write('customBreakMinutes: $customBreakMinutes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RoutineRunRecordsTable extends RoutineRunRecords
+    with TableInfo<$RoutineRunRecordsTable, RoutineRunRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineRunRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routineIdMeta = const VerificationMeta(
+    'routineId',
+  );
+  @override
+  late final GeneratedColumn<String> routineId = GeneratedColumn<String>(
+    'routine_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES routines (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _sourceRoutineIdMeta = const VerificationMeta(
+    'sourceRoutineId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceRoutineId = GeneratedColumn<String>(
+    'source_routine_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _localDateMeta = const VerificationMeta(
+    'localDate',
+  );
+  @override
+  late final GeneratedColumn<String> localDate = GeneratedColumn<String>(
+    'local_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('scheduled'),
+  );
+  static const VerificationMeta _nameSnapshotMeta = const VerificationMeta(
+    'nameSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> nameSnapshot = GeneratedColumn<String>(
+    'name_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iconKeySnapshotMeta = const VerificationMeta(
+    'iconKeySnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> iconKeySnapshot = GeneratedColumn<String>(
+    'icon_key_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorKeySnapshotMeta = const VerificationMeta(
+    'colorKeySnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> colorKeySnapshot = GeneratedColumn<String>(
+    'color_key_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledStartMinuteSnapshotMeta =
+      const VerificationMeta('scheduledStartMinuteSnapshot');
+  @override
+  late final GeneratedColumn<int> scheduledStartMinuteSnapshot =
+      GeneratedColumn<int>(
+        'scheduled_start_minute_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skippedAtMeta = const VerificationMeta(
+    'skippedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> skippedAt = GeneratedColumn<DateTime>(
+    'skipped_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    routineId,
+    sourceRoutineId,
+    localDate,
+    status,
+    nameSnapshot,
+    iconKeySnapshot,
+    colorKeySnapshot,
+    scheduledStartMinuteSnapshot,
+    startedAt,
+    completedAt,
+    skippedAt,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routine_runs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineRunRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('routine_id')) {
+      context.handle(
+        _routineIdMeta,
+        routineId.isAcceptableOrUnknown(data['routine_id']!, _routineIdMeta),
+      );
+    }
+    if (data.containsKey('source_routine_id')) {
+      context.handle(
+        _sourceRoutineIdMeta,
+        sourceRoutineId.isAcceptableOrUnknown(
+          data['source_routine_id']!,
+          _sourceRoutineIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceRoutineIdMeta);
+    }
+    if (data.containsKey('local_date')) {
+      context.handle(
+        _localDateMeta,
+        localDate.isAcceptableOrUnknown(data['local_date']!, _localDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_localDateMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('name_snapshot')) {
+      context.handle(
+        _nameSnapshotMeta,
+        nameSnapshot.isAcceptableOrUnknown(
+          data['name_snapshot']!,
+          _nameSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nameSnapshotMeta);
+    }
+    if (data.containsKey('icon_key_snapshot')) {
+      context.handle(
+        _iconKeySnapshotMeta,
+        iconKeySnapshot.isAcceptableOrUnknown(
+          data['icon_key_snapshot']!,
+          _iconKeySnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_iconKeySnapshotMeta);
+    }
+    if (data.containsKey('color_key_snapshot')) {
+      context.handle(
+        _colorKeySnapshotMeta,
+        colorKeySnapshot.isAcceptableOrUnknown(
+          data['color_key_snapshot']!,
+          _colorKeySnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_colorKeySnapshotMeta);
+    }
+    if (data.containsKey('scheduled_start_minute_snapshot')) {
+      context.handle(
+        _scheduledStartMinuteSnapshotMeta,
+        scheduledStartMinuteSnapshot.isAcceptableOrUnknown(
+          data['scheduled_start_minute_snapshot']!,
+          _scheduledStartMinuteSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledStartMinuteSnapshotMeta);
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skipped_at')) {
+      context.handle(
+        _skippedAtMeta,
+        skippedAt.isAcceptableOrUnknown(data['skipped_at']!, _skippedAtMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoutineRunRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineRunRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      routineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}routine_id'],
+      ),
+      sourceRoutineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_routine_id'],
+      )!,
+      localDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_date'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      nameSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_snapshot'],
+      )!,
+      iconKeySnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_key_snapshot'],
+      )!,
+      colorKeySnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color_key_snapshot'],
+      )!,
+      scheduledStartMinuteSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}scheduled_start_minute_snapshot'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
+      skippedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}skipped_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineRunRecordsTable createAlias(String alias) {
+    return $RoutineRunRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineRunRecord extends DataClass
+    implements Insertable<RoutineRunRecord> {
+  final String id;
+  final String? routineId;
+  final String sourceRoutineId;
+  final String localDate;
+  final String status;
+  final String nameSnapshot;
+  final String iconKeySnapshot;
+  final String colorKeySnapshot;
+  final int scheduledStartMinuteSnapshot;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+  final DateTime? skippedAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const RoutineRunRecord({
+    required this.id,
+    this.routineId,
+    required this.sourceRoutineId,
+    required this.localDate,
+    required this.status,
+    required this.nameSnapshot,
+    required this.iconKeySnapshot,
+    required this.colorKeySnapshot,
+    required this.scheduledStartMinuteSnapshot,
+    this.startedAt,
+    this.completedAt,
+    this.skippedAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || routineId != null) {
+      map['routine_id'] = Variable<String>(routineId);
+    }
+    map['source_routine_id'] = Variable<String>(sourceRoutineId);
+    map['local_date'] = Variable<String>(localDate);
+    map['status'] = Variable<String>(status);
+    map['name_snapshot'] = Variable<String>(nameSnapshot);
+    map['icon_key_snapshot'] = Variable<String>(iconKeySnapshot);
+    map['color_key_snapshot'] = Variable<String>(colorKeySnapshot);
+    map['scheduled_start_minute_snapshot'] = Variable<int>(
+      scheduledStartMinuteSnapshot,
+    );
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<DateTime>(startedAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    if (!nullToAbsent || skippedAt != null) {
+      map['skipped_at'] = Variable<DateTime>(skippedAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RoutineRunRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineRunRecordsCompanion(
+      id: Value(id),
+      routineId: routineId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(routineId),
+      sourceRoutineId: Value(sourceRoutineId),
+      localDate: Value(localDate),
+      status: Value(status),
+      nameSnapshot: Value(nameSnapshot),
+      iconKeySnapshot: Value(iconKeySnapshot),
+      colorKeySnapshot: Value(colorKeySnapshot),
+      scheduledStartMinuteSnapshot: Value(scheduledStartMinuteSnapshot),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      skippedAt: skippedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skippedAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RoutineRunRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineRunRecord(
+      id: serializer.fromJson<String>(json['id']),
+      routineId: serializer.fromJson<String?>(json['routineId']),
+      sourceRoutineId: serializer.fromJson<String>(json['sourceRoutineId']),
+      localDate: serializer.fromJson<String>(json['localDate']),
+      status: serializer.fromJson<String>(json['status']),
+      nameSnapshot: serializer.fromJson<String>(json['nameSnapshot']),
+      iconKeySnapshot: serializer.fromJson<String>(json['iconKeySnapshot']),
+      colorKeySnapshot: serializer.fromJson<String>(json['colorKeySnapshot']),
+      scheduledStartMinuteSnapshot: serializer.fromJson<int>(
+        json['scheduledStartMinuteSnapshot'],
+      ),
+      startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      skippedAt: serializer.fromJson<DateTime?>(json['skippedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'routineId': serializer.toJson<String?>(routineId),
+      'sourceRoutineId': serializer.toJson<String>(sourceRoutineId),
+      'localDate': serializer.toJson<String>(localDate),
+      'status': serializer.toJson<String>(status),
+      'nameSnapshot': serializer.toJson<String>(nameSnapshot),
+      'iconKeySnapshot': serializer.toJson<String>(iconKeySnapshot),
+      'colorKeySnapshot': serializer.toJson<String>(colorKeySnapshot),
+      'scheduledStartMinuteSnapshot': serializer.toJson<int>(
+        scheduledStartMinuteSnapshot,
+      ),
+      'startedAt': serializer.toJson<DateTime?>(startedAt),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'skippedAt': serializer.toJson<DateTime?>(skippedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RoutineRunRecord copyWith({
+    String? id,
+    Value<String?> routineId = const Value.absent(),
+    String? sourceRoutineId,
+    String? localDate,
+    String? status,
+    String? nameSnapshot,
+    String? iconKeySnapshot,
+    String? colorKeySnapshot,
+    int? scheduledStartMinuteSnapshot,
+    Value<DateTime?> startedAt = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
+    Value<DateTime?> skippedAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RoutineRunRecord(
+    id: id ?? this.id,
+    routineId: routineId.present ? routineId.value : this.routineId,
+    sourceRoutineId: sourceRoutineId ?? this.sourceRoutineId,
+    localDate: localDate ?? this.localDate,
+    status: status ?? this.status,
+    nameSnapshot: nameSnapshot ?? this.nameSnapshot,
+    iconKeySnapshot: iconKeySnapshot ?? this.iconKeySnapshot,
+    colorKeySnapshot: colorKeySnapshot ?? this.colorKeySnapshot,
+    scheduledStartMinuteSnapshot:
+        scheduledStartMinuteSnapshot ?? this.scheduledStartMinuteSnapshot,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    skippedAt: skippedAt.present ? skippedAt.value : this.skippedAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RoutineRunRecord copyWithCompanion(RoutineRunRecordsCompanion data) {
+    return RoutineRunRecord(
+      id: data.id.present ? data.id.value : this.id,
+      routineId: data.routineId.present ? data.routineId.value : this.routineId,
+      sourceRoutineId: data.sourceRoutineId.present
+          ? data.sourceRoutineId.value
+          : this.sourceRoutineId,
+      localDate: data.localDate.present ? data.localDate.value : this.localDate,
+      status: data.status.present ? data.status.value : this.status,
+      nameSnapshot: data.nameSnapshot.present
+          ? data.nameSnapshot.value
+          : this.nameSnapshot,
+      iconKeySnapshot: data.iconKeySnapshot.present
+          ? data.iconKeySnapshot.value
+          : this.iconKeySnapshot,
+      colorKeySnapshot: data.colorKeySnapshot.present
+          ? data.colorKeySnapshot.value
+          : this.colorKeySnapshot,
+      scheduledStartMinuteSnapshot: data.scheduledStartMinuteSnapshot.present
+          ? data.scheduledStartMinuteSnapshot.value
+          : this.scheduledStartMinuteSnapshot,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      skippedAt: data.skippedAt.present ? data.skippedAt.value : this.skippedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineRunRecord(')
+          ..write('id: $id, ')
+          ..write('routineId: $routineId, ')
+          ..write('sourceRoutineId: $sourceRoutineId, ')
+          ..write('localDate: $localDate, ')
+          ..write('status: $status, ')
+          ..write('nameSnapshot: $nameSnapshot, ')
+          ..write('iconKeySnapshot: $iconKeySnapshot, ')
+          ..write('colorKeySnapshot: $colorKeySnapshot, ')
+          ..write(
+            'scheduledStartMinuteSnapshot: $scheduledStartMinuteSnapshot, ',
+          )
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('skippedAt: $skippedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    routineId,
+    sourceRoutineId,
+    localDate,
+    status,
+    nameSnapshot,
+    iconKeySnapshot,
+    colorKeySnapshot,
+    scheduledStartMinuteSnapshot,
+    startedAt,
+    completedAt,
+    skippedAt,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineRunRecord &&
+          other.id == this.id &&
+          other.routineId == this.routineId &&
+          other.sourceRoutineId == this.sourceRoutineId &&
+          other.localDate == this.localDate &&
+          other.status == this.status &&
+          other.nameSnapshot == this.nameSnapshot &&
+          other.iconKeySnapshot == this.iconKeySnapshot &&
+          other.colorKeySnapshot == this.colorKeySnapshot &&
+          other.scheduledStartMinuteSnapshot ==
+              this.scheduledStartMinuteSnapshot &&
+          other.startedAt == this.startedAt &&
+          other.completedAt == this.completedAt &&
+          other.skippedAt == this.skippedAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
+  final Value<String> id;
+  final Value<String?> routineId;
+  final Value<String> sourceRoutineId;
+  final Value<String> localDate;
+  final Value<String> status;
+  final Value<String> nameSnapshot;
+  final Value<String> iconKeySnapshot;
+  final Value<String> colorKeySnapshot;
+  final Value<int> scheduledStartMinuteSnapshot;
+  final Value<DateTime?> startedAt;
+  final Value<DateTime?> completedAt;
+  final Value<DateTime?> skippedAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RoutineRunRecordsCompanion({
+    this.id = const Value.absent(),
+    this.routineId = const Value.absent(),
+    this.sourceRoutineId = const Value.absent(),
+    this.localDate = const Value.absent(),
+    this.status = const Value.absent(),
+    this.nameSnapshot = const Value.absent(),
+    this.iconKeySnapshot = const Value.absent(),
+    this.colorKeySnapshot = const Value.absent(),
+    this.scheduledStartMinuteSnapshot = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.skippedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoutineRunRecordsCompanion.insert({
+    required String id,
+    this.routineId = const Value.absent(),
+    required String sourceRoutineId,
+    required String localDate,
+    this.status = const Value.absent(),
+    required String nameSnapshot,
+    required String iconKeySnapshot,
+    required String colorKeySnapshot,
+    required int scheduledStartMinuteSnapshot,
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.skippedAt = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sourceRoutineId = Value(sourceRoutineId),
+       localDate = Value(localDate),
+       nameSnapshot = Value(nameSnapshot),
+       iconKeySnapshot = Value(iconKeySnapshot),
+       colorKeySnapshot = Value(colorKeySnapshot),
+       scheduledStartMinuteSnapshot = Value(scheduledStartMinuteSnapshot),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<RoutineRunRecord> custom({
+    Expression<String>? id,
+    Expression<String>? routineId,
+    Expression<String>? sourceRoutineId,
+    Expression<String>? localDate,
+    Expression<String>? status,
+    Expression<String>? nameSnapshot,
+    Expression<String>? iconKeySnapshot,
+    Expression<String>? colorKeySnapshot,
+    Expression<int>? scheduledStartMinuteSnapshot,
+    Expression<DateTime>? startedAt,
+    Expression<DateTime>? completedAt,
+    Expression<DateTime>? skippedAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (routineId != null) 'routine_id': routineId,
+      if (sourceRoutineId != null) 'source_routine_id': sourceRoutineId,
+      if (localDate != null) 'local_date': localDate,
+      if (status != null) 'status': status,
+      if (nameSnapshot != null) 'name_snapshot': nameSnapshot,
+      if (iconKeySnapshot != null) 'icon_key_snapshot': iconKeySnapshot,
+      if (colorKeySnapshot != null) 'color_key_snapshot': colorKeySnapshot,
+      if (scheduledStartMinuteSnapshot != null)
+        'scheduled_start_minute_snapshot': scheduledStartMinuteSnapshot,
+      if (startedAt != null) 'started_at': startedAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (skippedAt != null) 'skipped_at': skippedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoutineRunRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? routineId,
+    Value<String>? sourceRoutineId,
+    Value<String>? localDate,
+    Value<String>? status,
+    Value<String>? nameSnapshot,
+    Value<String>? iconKeySnapshot,
+    Value<String>? colorKeySnapshot,
+    Value<int>? scheduledStartMinuteSnapshot,
+    Value<DateTime?>? startedAt,
+    Value<DateTime?>? completedAt,
+    Value<DateTime?>? skippedAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RoutineRunRecordsCompanion(
+      id: id ?? this.id,
+      routineId: routineId ?? this.routineId,
+      sourceRoutineId: sourceRoutineId ?? this.sourceRoutineId,
+      localDate: localDate ?? this.localDate,
+      status: status ?? this.status,
+      nameSnapshot: nameSnapshot ?? this.nameSnapshot,
+      iconKeySnapshot: iconKeySnapshot ?? this.iconKeySnapshot,
+      colorKeySnapshot: colorKeySnapshot ?? this.colorKeySnapshot,
+      scheduledStartMinuteSnapshot:
+          scheduledStartMinuteSnapshot ?? this.scheduledStartMinuteSnapshot,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      skippedAt: skippedAt ?? this.skippedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (routineId.present) {
+      map['routine_id'] = Variable<String>(routineId.value);
+    }
+    if (sourceRoutineId.present) {
+      map['source_routine_id'] = Variable<String>(sourceRoutineId.value);
+    }
+    if (localDate.present) {
+      map['local_date'] = Variable<String>(localDate.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (nameSnapshot.present) {
+      map['name_snapshot'] = Variable<String>(nameSnapshot.value);
+    }
+    if (iconKeySnapshot.present) {
+      map['icon_key_snapshot'] = Variable<String>(iconKeySnapshot.value);
+    }
+    if (colorKeySnapshot.present) {
+      map['color_key_snapshot'] = Variable<String>(colorKeySnapshot.value);
+    }
+    if (scheduledStartMinuteSnapshot.present) {
+      map['scheduled_start_minute_snapshot'] = Variable<int>(
+        scheduledStartMinuteSnapshot.value,
+      );
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (skippedAt.present) {
+      map['skipped_at'] = Variable<DateTime>(skippedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineRunRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('routineId: $routineId, ')
+          ..write('sourceRoutineId: $sourceRoutineId, ')
+          ..write('localDate: $localDate, ')
+          ..write('status: $status, ')
+          ..write('nameSnapshot: $nameSnapshot, ')
+          ..write('iconKeySnapshot: $iconKeySnapshot, ')
+          ..write('colorKeySnapshot: $colorKeySnapshot, ')
+          ..write(
+            'scheduledStartMinuteSnapshot: $scheduledStartMinuteSnapshot, ',
+          )
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('skippedAt: $skippedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RoutineItemRunRecordsTable extends RoutineItemRunRecords
+    with TableInfo<$RoutineItemRunRecordsTable, RoutineItemRunRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineItemRunRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _routineRunIdMeta = const VerificationMeta(
+    'routineRunId',
+  );
+  @override
+  late final GeneratedColumn<String> routineRunId = GeneratedColumn<String>(
+    'routine_run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES routine_runs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _routineItemIdMeta = const VerificationMeta(
+    'routineItemId',
+  );
+  @override
+  late final GeneratedColumn<String> routineItemId = GeneratedColumn<String>(
+    'routine_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES routine_items (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _sourceItemIdMeta = const VerificationMeta(
+    'sourceItemId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceItemId = GeneratedColumn<String>(
+    'source_item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _taskIdMeta = const VerificationMeta('taskId');
+  @override
+  late final GeneratedColumn<String> taskId = GeneratedColumn<String>(
+    'task_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES tasks (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _taskIdSnapshotMeta = const VerificationMeta(
+    'taskIdSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> taskIdSnapshot = GeneratedColumn<String>(
+    'task_id_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _positionSnapshotMeta = const VerificationMeta(
+    'positionSnapshot',
+  );
+  @override
+  late final GeneratedColumn<int> positionSnapshot = GeneratedColumn<int>(
+    'position_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleSnapshotMeta = const VerificationMeta(
+    'titleSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> titleSnapshot = GeneratedColumn<String>(
+    'title_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledAtSnapshotMeta =
+      const VerificationMeta('scheduledAtSnapshot');
+  @override
+  late final GeneratedColumn<DateTime> scheduledAtSnapshot =
+      GeneratedColumn<DateTime>(
+        'scheduled_at_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _durationMinutesSnapshotMeta =
+      const VerificationMeta('durationMinutesSnapshot');
+  @override
+  late final GeneratedColumn<int> durationMinutesSnapshot =
+      GeneratedColumn<int>(
+        'duration_minutes_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _goalTitleSnapshotMeta = const VerificationMeta(
+    'goalTitleSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> goalTitleSnapshot =
+      GeneratedColumn<String>(
+        'goal_title_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _isOptionalSnapshotMeta =
+      const VerificationMeta('isOptionalSnapshot');
+  @override
+  late final GeneratedColumn<bool> isOptionalSnapshot = GeneratedColumn<bool>(
+    'is_optional_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_optional_snapshot" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _reminderMinutesSnapshotMeta =
+      const VerificationMeta('reminderMinutesSnapshot');
+  @override
+  late final GeneratedColumn<int> reminderMinutesSnapshot =
+      GeneratedColumn<int>(
+        'reminder_minutes_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pomodoroModeSnapshotMeta =
+      const VerificationMeta('pomodoroModeSnapshot');
+  @override
+  late final GeneratedColumn<String> pomodoroModeSnapshot =
+      GeneratedColumn<String>(
+        'pomodoro_mode_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _customFocusMinutesSnapshotMeta =
+      const VerificationMeta('customFocusMinutesSnapshot');
+  @override
+  late final GeneratedColumn<int> customFocusMinutesSnapshot =
+      GeneratedColumn<int>(
+        'custom_focus_minutes_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _customBreakMinutesSnapshotMeta =
+      const VerificationMeta('customBreakMinutesSnapshot');
+  @override
+  late final GeneratedColumn<int> customBreakMinutesSnapshot =
+      GeneratedColumn<int>(
+        'custom_break_minutes_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('scheduled'),
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skippedAtMeta = const VerificationMeta(
+    'skippedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> skippedAt = GeneratedColumn<DateTime>(
+    'skipped_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    routineRunId,
+    routineItemId,
+    sourceItemId,
+    taskId,
+    taskIdSnapshot,
+    positionSnapshot,
+    titleSnapshot,
+    scheduledAtSnapshot,
+    durationMinutesSnapshot,
+    goalTitleSnapshot,
+    isOptionalSnapshot,
+    reminderMinutesSnapshot,
+    pomodoroModeSnapshot,
+    customFocusMinutesSnapshot,
+    customBreakMinutesSnapshot,
+    status,
+    startedAt,
+    completedAt,
+    skippedAt,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routine_item_runs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineItemRunRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('routine_run_id')) {
+      context.handle(
+        _routineRunIdMeta,
+        routineRunId.isAcceptableOrUnknown(
+          data['routine_run_id']!,
+          _routineRunIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_routineRunIdMeta);
+    }
+    if (data.containsKey('routine_item_id')) {
+      context.handle(
+        _routineItemIdMeta,
+        routineItemId.isAcceptableOrUnknown(
+          data['routine_item_id']!,
+          _routineItemIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_item_id')) {
+      context.handle(
+        _sourceItemIdMeta,
+        sourceItemId.isAcceptableOrUnknown(
+          data['source_item_id']!,
+          _sourceItemIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceItemIdMeta);
+    }
+    if (data.containsKey('task_id')) {
+      context.handle(
+        _taskIdMeta,
+        taskId.isAcceptableOrUnknown(data['task_id']!, _taskIdMeta),
+      );
+    }
+    if (data.containsKey('task_id_snapshot')) {
+      context.handle(
+        _taskIdSnapshotMeta,
+        taskIdSnapshot.isAcceptableOrUnknown(
+          data['task_id_snapshot']!,
+          _taskIdSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('position_snapshot')) {
+      context.handle(
+        _positionSnapshotMeta,
+        positionSnapshot.isAcceptableOrUnknown(
+          data['position_snapshot']!,
+          _positionSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_positionSnapshotMeta);
+    }
+    if (data.containsKey('title_snapshot')) {
+      context.handle(
+        _titleSnapshotMeta,
+        titleSnapshot.isAcceptableOrUnknown(
+          data['title_snapshot']!,
+          _titleSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_titleSnapshotMeta);
+    }
+    if (data.containsKey('scheduled_at_snapshot')) {
+      context.handle(
+        _scheduledAtSnapshotMeta,
+        scheduledAtSnapshot.isAcceptableOrUnknown(
+          data['scheduled_at_snapshot']!,
+          _scheduledAtSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledAtSnapshotMeta);
+    }
+    if (data.containsKey('duration_minutes_snapshot')) {
+      context.handle(
+        _durationMinutesSnapshotMeta,
+        durationMinutesSnapshot.isAcceptableOrUnknown(
+          data['duration_minutes_snapshot']!,
+          _durationMinutesSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_durationMinutesSnapshotMeta);
+    }
+    if (data.containsKey('goal_title_snapshot')) {
+      context.handle(
+        _goalTitleSnapshotMeta,
+        goalTitleSnapshot.isAcceptableOrUnknown(
+          data['goal_title_snapshot']!,
+          _goalTitleSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_optional_snapshot')) {
+      context.handle(
+        _isOptionalSnapshotMeta,
+        isOptionalSnapshot.isAcceptableOrUnknown(
+          data['is_optional_snapshot']!,
+          _isOptionalSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reminder_minutes_snapshot')) {
+      context.handle(
+        _reminderMinutesSnapshotMeta,
+        reminderMinutesSnapshot.isAcceptableOrUnknown(
+          data['reminder_minutes_snapshot']!,
+          _reminderMinutesSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pomodoro_mode_snapshot')) {
+      context.handle(
+        _pomodoroModeSnapshotMeta,
+        pomodoroModeSnapshot.isAcceptableOrUnknown(
+          data['pomodoro_mode_snapshot']!,
+          _pomodoroModeSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pomodoroModeSnapshotMeta);
+    }
+    if (data.containsKey('custom_focus_minutes_snapshot')) {
+      context.handle(
+        _customFocusMinutesSnapshotMeta,
+        customFocusMinutesSnapshot.isAcceptableOrUnknown(
+          data['custom_focus_minutes_snapshot']!,
+          _customFocusMinutesSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('custom_break_minutes_snapshot')) {
+      context.handle(
+        _customBreakMinutesSnapshotMeta,
+        customBreakMinutesSnapshot.isAcceptableOrUnknown(
+          data['custom_break_minutes_snapshot']!,
+          _customBreakMinutesSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skipped_at')) {
+      context.handle(
+        _skippedAtMeta,
+        skippedAt.isAcceptableOrUnknown(data['skipped_at']!, _skippedAtMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoutineItemRunRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineItemRunRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      routineRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}routine_run_id'],
+      )!,
+      routineItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}routine_item_id'],
+      ),
+      sourceItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_item_id'],
+      )!,
+      taskId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_id'],
+      ),
+      taskIdSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}task_id_snapshot'],
+      ),
+      positionSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position_snapshot'],
+      )!,
+      titleSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title_snapshot'],
+      )!,
+      scheduledAtSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at_snapshot'],
+      )!,
+      durationMinutesSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_minutes_snapshot'],
+      )!,
+      goalTitleSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}goal_title_snapshot'],
+      ),
+      isOptionalSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_optional_snapshot'],
+      )!,
+      reminderMinutesSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes_snapshot'],
+      ),
+      pomodoroModeSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pomodoro_mode_snapshot'],
+      )!,
+      customFocusMinutesSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_focus_minutes_snapshot'],
+      ),
+      customBreakMinutesSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_break_minutes_snapshot'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
+      skippedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}skipped_at'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineItemRunRecordsTable createAlias(String alias) {
+    return $RoutineItemRunRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineItemRunRecord extends DataClass
+    implements Insertable<RoutineItemRunRecord> {
+  final String id;
+  final String routineRunId;
+  final String? routineItemId;
+  final String sourceItemId;
+  final String? taskId;
+  final String? taskIdSnapshot;
+  final int positionSnapshot;
+  final String titleSnapshot;
+  final DateTime scheduledAtSnapshot;
+  final int durationMinutesSnapshot;
+  final String? goalTitleSnapshot;
+  final bool isOptionalSnapshot;
+  final int? reminderMinutesSnapshot;
+  final String pomodoroModeSnapshot;
+  final int? customFocusMinutesSnapshot;
+  final int? customBreakMinutesSnapshot;
+  final String status;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+  final DateTime? skippedAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const RoutineItemRunRecord({
+    required this.id,
+    required this.routineRunId,
+    this.routineItemId,
+    required this.sourceItemId,
+    this.taskId,
+    this.taskIdSnapshot,
+    required this.positionSnapshot,
+    required this.titleSnapshot,
+    required this.scheduledAtSnapshot,
+    required this.durationMinutesSnapshot,
+    this.goalTitleSnapshot,
+    required this.isOptionalSnapshot,
+    this.reminderMinutesSnapshot,
+    required this.pomodoroModeSnapshot,
+    this.customFocusMinutesSnapshot,
+    this.customBreakMinutesSnapshot,
+    required this.status,
+    this.startedAt,
+    this.completedAt,
+    this.skippedAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['routine_run_id'] = Variable<String>(routineRunId);
+    if (!nullToAbsent || routineItemId != null) {
+      map['routine_item_id'] = Variable<String>(routineItemId);
+    }
+    map['source_item_id'] = Variable<String>(sourceItemId);
+    if (!nullToAbsent || taskId != null) {
+      map['task_id'] = Variable<String>(taskId);
+    }
+    if (!nullToAbsent || taskIdSnapshot != null) {
+      map['task_id_snapshot'] = Variable<String>(taskIdSnapshot);
+    }
+    map['position_snapshot'] = Variable<int>(positionSnapshot);
+    map['title_snapshot'] = Variable<String>(titleSnapshot);
+    map['scheduled_at_snapshot'] = Variable<DateTime>(scheduledAtSnapshot);
+    map['duration_minutes_snapshot'] = Variable<int>(durationMinutesSnapshot);
+    if (!nullToAbsent || goalTitleSnapshot != null) {
+      map['goal_title_snapshot'] = Variable<String>(goalTitleSnapshot);
+    }
+    map['is_optional_snapshot'] = Variable<bool>(isOptionalSnapshot);
+    if (!nullToAbsent || reminderMinutesSnapshot != null) {
+      map['reminder_minutes_snapshot'] = Variable<int>(reminderMinutesSnapshot);
+    }
+    map['pomodoro_mode_snapshot'] = Variable<String>(pomodoroModeSnapshot);
+    if (!nullToAbsent || customFocusMinutesSnapshot != null) {
+      map['custom_focus_minutes_snapshot'] = Variable<int>(
+        customFocusMinutesSnapshot,
+      );
+    }
+    if (!nullToAbsent || customBreakMinutesSnapshot != null) {
+      map['custom_break_minutes_snapshot'] = Variable<int>(
+        customBreakMinutesSnapshot,
+      );
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<DateTime>(startedAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    if (!nullToAbsent || skippedAt != null) {
+      map['skipped_at'] = Variable<DateTime>(skippedAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RoutineItemRunRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineItemRunRecordsCompanion(
+      id: Value(id),
+      routineRunId: Value(routineRunId),
+      routineItemId: routineItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(routineItemId),
+      sourceItemId: Value(sourceItemId),
+      taskId: taskId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(taskId),
+      taskIdSnapshot: taskIdSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(taskIdSnapshot),
+      positionSnapshot: Value(positionSnapshot),
+      titleSnapshot: Value(titleSnapshot),
+      scheduledAtSnapshot: Value(scheduledAtSnapshot),
+      durationMinutesSnapshot: Value(durationMinutesSnapshot),
+      goalTitleSnapshot: goalTitleSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(goalTitleSnapshot),
+      isOptionalSnapshot: Value(isOptionalSnapshot),
+      reminderMinutesSnapshot: reminderMinutesSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMinutesSnapshot),
+      pomodoroModeSnapshot: Value(pomodoroModeSnapshot),
+      customFocusMinutesSnapshot:
+          customFocusMinutesSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customFocusMinutesSnapshot),
+      customBreakMinutesSnapshot:
+          customBreakMinutesSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customBreakMinutesSnapshot),
+      status: Value(status),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      skippedAt: skippedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skippedAt),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RoutineItemRunRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineItemRunRecord(
+      id: serializer.fromJson<String>(json['id']),
+      routineRunId: serializer.fromJson<String>(json['routineRunId']),
+      routineItemId: serializer.fromJson<String?>(json['routineItemId']),
+      sourceItemId: serializer.fromJson<String>(json['sourceItemId']),
+      taskId: serializer.fromJson<String?>(json['taskId']),
+      taskIdSnapshot: serializer.fromJson<String?>(json['taskIdSnapshot']),
+      positionSnapshot: serializer.fromJson<int>(json['positionSnapshot']),
+      titleSnapshot: serializer.fromJson<String>(json['titleSnapshot']),
+      scheduledAtSnapshot: serializer.fromJson<DateTime>(
+        json['scheduledAtSnapshot'],
+      ),
+      durationMinutesSnapshot: serializer.fromJson<int>(
+        json['durationMinutesSnapshot'],
+      ),
+      goalTitleSnapshot: serializer.fromJson<String?>(
+        json['goalTitleSnapshot'],
+      ),
+      isOptionalSnapshot: serializer.fromJson<bool>(json['isOptionalSnapshot']),
+      reminderMinutesSnapshot: serializer.fromJson<int?>(
+        json['reminderMinutesSnapshot'],
+      ),
+      pomodoroModeSnapshot: serializer.fromJson<String>(
+        json['pomodoroModeSnapshot'],
+      ),
+      customFocusMinutesSnapshot: serializer.fromJson<int?>(
+        json['customFocusMinutesSnapshot'],
+      ),
+      customBreakMinutesSnapshot: serializer.fromJson<int?>(
+        json['customBreakMinutesSnapshot'],
+      ),
+      status: serializer.fromJson<String>(json['status']),
+      startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      skippedAt: serializer.fromJson<DateTime?>(json['skippedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'routineRunId': serializer.toJson<String>(routineRunId),
+      'routineItemId': serializer.toJson<String?>(routineItemId),
+      'sourceItemId': serializer.toJson<String>(sourceItemId),
+      'taskId': serializer.toJson<String?>(taskId),
+      'taskIdSnapshot': serializer.toJson<String?>(taskIdSnapshot),
+      'positionSnapshot': serializer.toJson<int>(positionSnapshot),
+      'titleSnapshot': serializer.toJson<String>(titleSnapshot),
+      'scheduledAtSnapshot': serializer.toJson<DateTime>(scheduledAtSnapshot),
+      'durationMinutesSnapshot': serializer.toJson<int>(
+        durationMinutesSnapshot,
+      ),
+      'goalTitleSnapshot': serializer.toJson<String?>(goalTitleSnapshot),
+      'isOptionalSnapshot': serializer.toJson<bool>(isOptionalSnapshot),
+      'reminderMinutesSnapshot': serializer.toJson<int?>(
+        reminderMinutesSnapshot,
+      ),
+      'pomodoroModeSnapshot': serializer.toJson<String>(pomodoroModeSnapshot),
+      'customFocusMinutesSnapshot': serializer.toJson<int?>(
+        customFocusMinutesSnapshot,
+      ),
+      'customBreakMinutesSnapshot': serializer.toJson<int?>(
+        customBreakMinutesSnapshot,
+      ),
+      'status': serializer.toJson<String>(status),
+      'startedAt': serializer.toJson<DateTime?>(startedAt),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'skippedAt': serializer.toJson<DateTime?>(skippedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RoutineItemRunRecord copyWith({
+    String? id,
+    String? routineRunId,
+    Value<String?> routineItemId = const Value.absent(),
+    String? sourceItemId,
+    Value<String?> taskId = const Value.absent(),
+    Value<String?> taskIdSnapshot = const Value.absent(),
+    int? positionSnapshot,
+    String? titleSnapshot,
+    DateTime? scheduledAtSnapshot,
+    int? durationMinutesSnapshot,
+    Value<String?> goalTitleSnapshot = const Value.absent(),
+    bool? isOptionalSnapshot,
+    Value<int?> reminderMinutesSnapshot = const Value.absent(),
+    String? pomodoroModeSnapshot,
+    Value<int?> customFocusMinutesSnapshot = const Value.absent(),
+    Value<int?> customBreakMinutesSnapshot = const Value.absent(),
+    String? status,
+    Value<DateTime?> startedAt = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
+    Value<DateTime?> skippedAt = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RoutineItemRunRecord(
+    id: id ?? this.id,
+    routineRunId: routineRunId ?? this.routineRunId,
+    routineItemId: routineItemId.present
+        ? routineItemId.value
+        : this.routineItemId,
+    sourceItemId: sourceItemId ?? this.sourceItemId,
+    taskId: taskId.present ? taskId.value : this.taskId,
+    taskIdSnapshot: taskIdSnapshot.present
+        ? taskIdSnapshot.value
+        : this.taskIdSnapshot,
+    positionSnapshot: positionSnapshot ?? this.positionSnapshot,
+    titleSnapshot: titleSnapshot ?? this.titleSnapshot,
+    scheduledAtSnapshot: scheduledAtSnapshot ?? this.scheduledAtSnapshot,
+    durationMinutesSnapshot:
+        durationMinutesSnapshot ?? this.durationMinutesSnapshot,
+    goalTitleSnapshot: goalTitleSnapshot.present
+        ? goalTitleSnapshot.value
+        : this.goalTitleSnapshot,
+    isOptionalSnapshot: isOptionalSnapshot ?? this.isOptionalSnapshot,
+    reminderMinutesSnapshot: reminderMinutesSnapshot.present
+        ? reminderMinutesSnapshot.value
+        : this.reminderMinutesSnapshot,
+    pomodoroModeSnapshot: pomodoroModeSnapshot ?? this.pomodoroModeSnapshot,
+    customFocusMinutesSnapshot: customFocusMinutesSnapshot.present
+        ? customFocusMinutesSnapshot.value
+        : this.customFocusMinutesSnapshot,
+    customBreakMinutesSnapshot: customBreakMinutesSnapshot.present
+        ? customBreakMinutesSnapshot.value
+        : this.customBreakMinutesSnapshot,
+    status: status ?? this.status,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    skippedAt: skippedAt.present ? skippedAt.value : this.skippedAt,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RoutineItemRunRecord copyWithCompanion(RoutineItemRunRecordsCompanion data) {
+    return RoutineItemRunRecord(
+      id: data.id.present ? data.id.value : this.id,
+      routineRunId: data.routineRunId.present
+          ? data.routineRunId.value
+          : this.routineRunId,
+      routineItemId: data.routineItemId.present
+          ? data.routineItemId.value
+          : this.routineItemId,
+      sourceItemId: data.sourceItemId.present
+          ? data.sourceItemId.value
+          : this.sourceItemId,
+      taskId: data.taskId.present ? data.taskId.value : this.taskId,
+      taskIdSnapshot: data.taskIdSnapshot.present
+          ? data.taskIdSnapshot.value
+          : this.taskIdSnapshot,
+      positionSnapshot: data.positionSnapshot.present
+          ? data.positionSnapshot.value
+          : this.positionSnapshot,
+      titleSnapshot: data.titleSnapshot.present
+          ? data.titleSnapshot.value
+          : this.titleSnapshot,
+      scheduledAtSnapshot: data.scheduledAtSnapshot.present
+          ? data.scheduledAtSnapshot.value
+          : this.scheduledAtSnapshot,
+      durationMinutesSnapshot: data.durationMinutesSnapshot.present
+          ? data.durationMinutesSnapshot.value
+          : this.durationMinutesSnapshot,
+      goalTitleSnapshot: data.goalTitleSnapshot.present
+          ? data.goalTitleSnapshot.value
+          : this.goalTitleSnapshot,
+      isOptionalSnapshot: data.isOptionalSnapshot.present
+          ? data.isOptionalSnapshot.value
+          : this.isOptionalSnapshot,
+      reminderMinutesSnapshot: data.reminderMinutesSnapshot.present
+          ? data.reminderMinutesSnapshot.value
+          : this.reminderMinutesSnapshot,
+      pomodoroModeSnapshot: data.pomodoroModeSnapshot.present
+          ? data.pomodoroModeSnapshot.value
+          : this.pomodoroModeSnapshot,
+      customFocusMinutesSnapshot: data.customFocusMinutesSnapshot.present
+          ? data.customFocusMinutesSnapshot.value
+          : this.customFocusMinutesSnapshot,
+      customBreakMinutesSnapshot: data.customBreakMinutesSnapshot.present
+          ? data.customBreakMinutesSnapshot.value
+          : this.customBreakMinutesSnapshot,
+      status: data.status.present ? data.status.value : this.status,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      skippedAt: data.skippedAt.present ? data.skippedAt.value : this.skippedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineItemRunRecord(')
+          ..write('id: $id, ')
+          ..write('routineRunId: $routineRunId, ')
+          ..write('routineItemId: $routineItemId, ')
+          ..write('sourceItemId: $sourceItemId, ')
+          ..write('taskId: $taskId, ')
+          ..write('taskIdSnapshot: $taskIdSnapshot, ')
+          ..write('positionSnapshot: $positionSnapshot, ')
+          ..write('titleSnapshot: $titleSnapshot, ')
+          ..write('scheduledAtSnapshot: $scheduledAtSnapshot, ')
+          ..write('durationMinutesSnapshot: $durationMinutesSnapshot, ')
+          ..write('goalTitleSnapshot: $goalTitleSnapshot, ')
+          ..write('isOptionalSnapshot: $isOptionalSnapshot, ')
+          ..write('reminderMinutesSnapshot: $reminderMinutesSnapshot, ')
+          ..write('pomodoroModeSnapshot: $pomodoroModeSnapshot, ')
+          ..write('customFocusMinutesSnapshot: $customFocusMinutesSnapshot, ')
+          ..write('customBreakMinutesSnapshot: $customBreakMinutesSnapshot, ')
+          ..write('status: $status, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('skippedAt: $skippedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    routineRunId,
+    routineItemId,
+    sourceItemId,
+    taskId,
+    taskIdSnapshot,
+    positionSnapshot,
+    titleSnapshot,
+    scheduledAtSnapshot,
+    durationMinutesSnapshot,
+    goalTitleSnapshot,
+    isOptionalSnapshot,
+    reminderMinutesSnapshot,
+    pomodoroModeSnapshot,
+    customFocusMinutesSnapshot,
+    customBreakMinutesSnapshot,
+    status,
+    startedAt,
+    completedAt,
+    skippedAt,
+    createdAt,
+    updatedAt,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineItemRunRecord &&
+          other.id == this.id &&
+          other.routineRunId == this.routineRunId &&
+          other.routineItemId == this.routineItemId &&
+          other.sourceItemId == this.sourceItemId &&
+          other.taskId == this.taskId &&
+          other.taskIdSnapshot == this.taskIdSnapshot &&
+          other.positionSnapshot == this.positionSnapshot &&
+          other.titleSnapshot == this.titleSnapshot &&
+          other.scheduledAtSnapshot == this.scheduledAtSnapshot &&
+          other.durationMinutesSnapshot == this.durationMinutesSnapshot &&
+          other.goalTitleSnapshot == this.goalTitleSnapshot &&
+          other.isOptionalSnapshot == this.isOptionalSnapshot &&
+          other.reminderMinutesSnapshot == this.reminderMinutesSnapshot &&
+          other.pomodoroModeSnapshot == this.pomodoroModeSnapshot &&
+          other.customFocusMinutesSnapshot == this.customFocusMinutesSnapshot &&
+          other.customBreakMinutesSnapshot == this.customBreakMinutesSnapshot &&
+          other.status == this.status &&
+          other.startedAt == this.startedAt &&
+          other.completedAt == this.completedAt &&
+          other.skippedAt == this.skippedAt &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RoutineItemRunRecordsCompanion
+    extends UpdateCompanion<RoutineItemRunRecord> {
+  final Value<String> id;
+  final Value<String> routineRunId;
+  final Value<String?> routineItemId;
+  final Value<String> sourceItemId;
+  final Value<String?> taskId;
+  final Value<String?> taskIdSnapshot;
+  final Value<int> positionSnapshot;
+  final Value<String> titleSnapshot;
+  final Value<DateTime> scheduledAtSnapshot;
+  final Value<int> durationMinutesSnapshot;
+  final Value<String?> goalTitleSnapshot;
+  final Value<bool> isOptionalSnapshot;
+  final Value<int?> reminderMinutesSnapshot;
+  final Value<String> pomodoroModeSnapshot;
+  final Value<int?> customFocusMinutesSnapshot;
+  final Value<int?> customBreakMinutesSnapshot;
+  final Value<String> status;
+  final Value<DateTime?> startedAt;
+  final Value<DateTime?> completedAt;
+  final Value<DateTime?> skippedAt;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RoutineItemRunRecordsCompanion({
+    this.id = const Value.absent(),
+    this.routineRunId = const Value.absent(),
+    this.routineItemId = const Value.absent(),
+    this.sourceItemId = const Value.absent(),
+    this.taskId = const Value.absent(),
+    this.taskIdSnapshot = const Value.absent(),
+    this.positionSnapshot = const Value.absent(),
+    this.titleSnapshot = const Value.absent(),
+    this.scheduledAtSnapshot = const Value.absent(),
+    this.durationMinutesSnapshot = const Value.absent(),
+    this.goalTitleSnapshot = const Value.absent(),
+    this.isOptionalSnapshot = const Value.absent(),
+    this.reminderMinutesSnapshot = const Value.absent(),
+    this.pomodoroModeSnapshot = const Value.absent(),
+    this.customFocusMinutesSnapshot = const Value.absent(),
+    this.customBreakMinutesSnapshot = const Value.absent(),
+    this.status = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.skippedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RoutineItemRunRecordsCompanion.insert({
+    required String id,
+    required String routineRunId,
+    this.routineItemId = const Value.absent(),
+    required String sourceItemId,
+    this.taskId = const Value.absent(),
+    this.taskIdSnapshot = const Value.absent(),
+    required int positionSnapshot,
+    required String titleSnapshot,
+    required DateTime scheduledAtSnapshot,
+    required int durationMinutesSnapshot,
+    this.goalTitleSnapshot = const Value.absent(),
+    this.isOptionalSnapshot = const Value.absent(),
+    this.reminderMinutesSnapshot = const Value.absent(),
+    required String pomodoroModeSnapshot,
+    this.customFocusMinutesSnapshot = const Value.absent(),
+    this.customBreakMinutesSnapshot = const Value.absent(),
+    this.status = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.skippedAt = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       routineRunId = Value(routineRunId),
+       sourceItemId = Value(sourceItemId),
+       positionSnapshot = Value(positionSnapshot),
+       titleSnapshot = Value(titleSnapshot),
+       scheduledAtSnapshot = Value(scheduledAtSnapshot),
+       durationMinutesSnapshot = Value(durationMinutesSnapshot),
+       pomodoroModeSnapshot = Value(pomodoroModeSnapshot),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<RoutineItemRunRecord> custom({
+    Expression<String>? id,
+    Expression<String>? routineRunId,
+    Expression<String>? routineItemId,
+    Expression<String>? sourceItemId,
+    Expression<String>? taskId,
+    Expression<String>? taskIdSnapshot,
+    Expression<int>? positionSnapshot,
+    Expression<String>? titleSnapshot,
+    Expression<DateTime>? scheduledAtSnapshot,
+    Expression<int>? durationMinutesSnapshot,
+    Expression<String>? goalTitleSnapshot,
+    Expression<bool>? isOptionalSnapshot,
+    Expression<int>? reminderMinutesSnapshot,
+    Expression<String>? pomodoroModeSnapshot,
+    Expression<int>? customFocusMinutesSnapshot,
+    Expression<int>? customBreakMinutesSnapshot,
+    Expression<String>? status,
+    Expression<DateTime>? startedAt,
+    Expression<DateTime>? completedAt,
+    Expression<DateTime>? skippedAt,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (routineRunId != null) 'routine_run_id': routineRunId,
+      if (routineItemId != null) 'routine_item_id': routineItemId,
+      if (sourceItemId != null) 'source_item_id': sourceItemId,
+      if (taskId != null) 'task_id': taskId,
+      if (taskIdSnapshot != null) 'task_id_snapshot': taskIdSnapshot,
+      if (positionSnapshot != null) 'position_snapshot': positionSnapshot,
+      if (titleSnapshot != null) 'title_snapshot': titleSnapshot,
+      if (scheduledAtSnapshot != null)
+        'scheduled_at_snapshot': scheduledAtSnapshot,
+      if (durationMinutesSnapshot != null)
+        'duration_minutes_snapshot': durationMinutesSnapshot,
+      if (goalTitleSnapshot != null) 'goal_title_snapshot': goalTitleSnapshot,
+      if (isOptionalSnapshot != null)
+        'is_optional_snapshot': isOptionalSnapshot,
+      if (reminderMinutesSnapshot != null)
+        'reminder_minutes_snapshot': reminderMinutesSnapshot,
+      if (pomodoroModeSnapshot != null)
+        'pomodoro_mode_snapshot': pomodoroModeSnapshot,
+      if (customFocusMinutesSnapshot != null)
+        'custom_focus_minutes_snapshot': customFocusMinutesSnapshot,
+      if (customBreakMinutesSnapshot != null)
+        'custom_break_minutes_snapshot': customBreakMinutesSnapshot,
+      if (status != null) 'status': status,
+      if (startedAt != null) 'started_at': startedAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (skippedAt != null) 'skipped_at': skippedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RoutineItemRunRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? routineRunId,
+    Value<String?>? routineItemId,
+    Value<String>? sourceItemId,
+    Value<String?>? taskId,
+    Value<String?>? taskIdSnapshot,
+    Value<int>? positionSnapshot,
+    Value<String>? titleSnapshot,
+    Value<DateTime>? scheduledAtSnapshot,
+    Value<int>? durationMinutesSnapshot,
+    Value<String?>? goalTitleSnapshot,
+    Value<bool>? isOptionalSnapshot,
+    Value<int?>? reminderMinutesSnapshot,
+    Value<String>? pomodoroModeSnapshot,
+    Value<int?>? customFocusMinutesSnapshot,
+    Value<int?>? customBreakMinutesSnapshot,
+    Value<String>? status,
+    Value<DateTime?>? startedAt,
+    Value<DateTime?>? completedAt,
+    Value<DateTime?>? skippedAt,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RoutineItemRunRecordsCompanion(
+      id: id ?? this.id,
+      routineRunId: routineRunId ?? this.routineRunId,
+      routineItemId: routineItemId ?? this.routineItemId,
+      sourceItemId: sourceItemId ?? this.sourceItemId,
+      taskId: taskId ?? this.taskId,
+      taskIdSnapshot: taskIdSnapshot ?? this.taskIdSnapshot,
+      positionSnapshot: positionSnapshot ?? this.positionSnapshot,
+      titleSnapshot: titleSnapshot ?? this.titleSnapshot,
+      scheduledAtSnapshot: scheduledAtSnapshot ?? this.scheduledAtSnapshot,
+      durationMinutesSnapshot:
+          durationMinutesSnapshot ?? this.durationMinutesSnapshot,
+      goalTitleSnapshot: goalTitleSnapshot ?? this.goalTitleSnapshot,
+      isOptionalSnapshot: isOptionalSnapshot ?? this.isOptionalSnapshot,
+      reminderMinutesSnapshot:
+          reminderMinutesSnapshot ?? this.reminderMinutesSnapshot,
+      pomodoroModeSnapshot: pomodoroModeSnapshot ?? this.pomodoroModeSnapshot,
+      customFocusMinutesSnapshot:
+          customFocusMinutesSnapshot ?? this.customFocusMinutesSnapshot,
+      customBreakMinutesSnapshot:
+          customBreakMinutesSnapshot ?? this.customBreakMinutesSnapshot,
+      status: status ?? this.status,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      skippedAt: skippedAt ?? this.skippedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (routineRunId.present) {
+      map['routine_run_id'] = Variable<String>(routineRunId.value);
+    }
+    if (routineItemId.present) {
+      map['routine_item_id'] = Variable<String>(routineItemId.value);
+    }
+    if (sourceItemId.present) {
+      map['source_item_id'] = Variable<String>(sourceItemId.value);
+    }
+    if (taskId.present) {
+      map['task_id'] = Variable<String>(taskId.value);
+    }
+    if (taskIdSnapshot.present) {
+      map['task_id_snapshot'] = Variable<String>(taskIdSnapshot.value);
+    }
+    if (positionSnapshot.present) {
+      map['position_snapshot'] = Variable<int>(positionSnapshot.value);
+    }
+    if (titleSnapshot.present) {
+      map['title_snapshot'] = Variable<String>(titleSnapshot.value);
+    }
+    if (scheduledAtSnapshot.present) {
+      map['scheduled_at_snapshot'] = Variable<DateTime>(
+        scheduledAtSnapshot.value,
+      );
+    }
+    if (durationMinutesSnapshot.present) {
+      map['duration_minutes_snapshot'] = Variable<int>(
+        durationMinutesSnapshot.value,
+      );
+    }
+    if (goalTitleSnapshot.present) {
+      map['goal_title_snapshot'] = Variable<String>(goalTitleSnapshot.value);
+    }
+    if (isOptionalSnapshot.present) {
+      map['is_optional_snapshot'] = Variable<bool>(isOptionalSnapshot.value);
+    }
+    if (reminderMinutesSnapshot.present) {
+      map['reminder_minutes_snapshot'] = Variable<int>(
+        reminderMinutesSnapshot.value,
+      );
+    }
+    if (pomodoroModeSnapshot.present) {
+      map['pomodoro_mode_snapshot'] = Variable<String>(
+        pomodoroModeSnapshot.value,
+      );
+    }
+    if (customFocusMinutesSnapshot.present) {
+      map['custom_focus_minutes_snapshot'] = Variable<int>(
+        customFocusMinutesSnapshot.value,
+      );
+    }
+    if (customBreakMinutesSnapshot.present) {
+      map['custom_break_minutes_snapshot'] = Variable<int>(
+        customBreakMinutesSnapshot.value,
+      );
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (skippedAt.present) {
+      map['skipped_at'] = Variable<DateTime>(skippedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineItemRunRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('routineRunId: $routineRunId, ')
+          ..write('routineItemId: $routineItemId, ')
+          ..write('sourceItemId: $sourceItemId, ')
+          ..write('taskId: $taskId, ')
+          ..write('taskIdSnapshot: $taskIdSnapshot, ')
+          ..write('positionSnapshot: $positionSnapshot, ')
+          ..write('titleSnapshot: $titleSnapshot, ')
+          ..write('scheduledAtSnapshot: $scheduledAtSnapshot, ')
+          ..write('durationMinutesSnapshot: $durationMinutesSnapshot, ')
+          ..write('goalTitleSnapshot: $goalTitleSnapshot, ')
+          ..write('isOptionalSnapshot: $isOptionalSnapshot, ')
+          ..write('reminderMinutesSnapshot: $reminderMinutesSnapshot, ')
+          ..write('pomodoroModeSnapshot: $pomodoroModeSnapshot, ')
+          ..write('customFocusMinutesSnapshot: $customFocusMinutesSnapshot, ')
+          ..write('customBreakMinutesSnapshot: $customBreakMinutesSnapshot, ')
+          ..write('status: $status, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('skippedAt: $skippedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CalendarEventRecordsTable extends CalendarEventRecords
     with TableInfo<$CalendarEventRecordsTable, CalendarEventRecord> {
   @override
@@ -4421,6 +8438,15 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
       $PomodoroSessionRecordsTable(this);
   late final $PomodoroRuntimeRecordsTable pomodoroRuntimeRecords =
       $PomodoroRuntimeRecordsTable(this);
+  late final $RoutineRecordsTable routineRecords = $RoutineRecordsTable(this);
+  late final $RoutineDayRecordsTable routineDayRecords =
+      $RoutineDayRecordsTable(this);
+  late final $RoutineItemRecordsTable routineItemRecords =
+      $RoutineItemRecordsTable(this);
+  late final $RoutineRunRecordsTable routineRunRecords =
+      $RoutineRunRecordsTable(this);
+  late final $RoutineItemRunRecordsTable routineItemRunRecords =
+      $RoutineItemRunRecordsTable(this);
   late final $CalendarEventRecordsTable calendarEventRecords =
       $CalendarEventRecordsTable(this);
   late final Index tasksGoalIdIdx = Index(
@@ -4459,6 +8485,62 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     'pomodoro_sessions_ended_at_idx',
     'CREATE INDEX pomodoro_sessions_ended_at_idx ON pomodoro_sessions (ended_at)',
   );
+  late final Index routinesStatusIdx = Index(
+    'routines_status_idx',
+    'CREATE INDEX routines_status_idx ON routines (status)',
+  );
+  late final Index routinesUpdatedAtIdx = Index(
+    'routines_updated_at_idx',
+    'CREATE INDEX routines_updated_at_idx ON routines (updated_at)',
+  );
+  late final Index routineDaysWeekdayRoutineIdx = Index(
+    'routine_days_weekday_routine_idx',
+    'CREATE INDEX routine_days_weekday_routine_idx ON routine_days (weekday, routine_id)',
+  );
+  late final Index routineItemsRoutinePositionUq = Index(
+    'routine_items_routine_position_uq',
+    'CREATE UNIQUE INDEX routine_items_routine_position_uq ON routine_items (routine_id, position)',
+  );
+  late final Index routineItemsRoutineTimeIdx = Index(
+    'routine_items_routine_time_idx',
+    'CREATE INDEX routine_items_routine_time_idx ON routine_items (routine_id, scheduled_minute)',
+  );
+  late final Index routineItemsGoalIdIdx = Index(
+    'routine_items_goal_id_idx',
+    'CREATE INDEX routine_items_goal_id_idx ON routine_items (goal_id)',
+  );
+  late final Index routineRunsOccurrenceUq = Index(
+    'routine_runs_occurrence_uq',
+    'CREATE UNIQUE INDEX routine_runs_occurrence_uq ON routine_runs (source_routine_id, local_date)',
+  );
+  late final Index routineRunsDateStatusIdx = Index(
+    'routine_runs_date_status_idx',
+    'CREATE INDEX routine_runs_date_status_idx ON routine_runs (local_date, status)',
+  );
+  late final Index routineRunsRoutineDateIdx = Index(
+    'routine_runs_routine_date_idx',
+    'CREATE INDEX routine_runs_routine_date_idx ON routine_runs (routine_id, local_date)',
+  );
+  late final Index routineItemRunsMaterializationUq = Index(
+    'routine_item_runs_materialization_uq',
+    'CREATE UNIQUE INDEX routine_item_runs_materialization_uq ON routine_item_runs (routine_run_id, source_item_id)',
+  );
+  late final Index routineItemRunsTaskIdUq = Index(
+    'routine_item_runs_task_id_uq',
+    'CREATE UNIQUE INDEX routine_item_runs_task_id_uq ON routine_item_runs (task_id)',
+  );
+  late final Index routineItemRunsRoutineItemIdIdx = Index(
+    'routine_item_runs_routine_item_id_idx',
+    'CREATE INDEX routine_item_runs_routine_item_id_idx ON routine_item_runs (routine_item_id)',
+  );
+  late final Index routineItemRunsScheduleStatusIdx = Index(
+    'routine_item_runs_schedule_status_idx',
+    'CREATE INDEX routine_item_runs_schedule_status_idx ON routine_item_runs (scheduled_at_snapshot, status)',
+  );
+  late final Index routineItemRunsRunPositionIdx = Index(
+    'routine_item_runs_run_position_idx',
+    'CREATE INDEX routine_item_runs_run_position_idx ON routine_item_runs (routine_run_id, position_snapshot)',
+  );
   late final Index calendarEventsScheduledAtIdx = Index(
     'calendar_events_scheduled_at_idx',
     'CREATE INDEX calendar_events_scheduled_at_idx ON calendar_events (scheduled_at)',
@@ -4471,6 +8553,7 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
   late final PomodoroRuntimeDao pomodoroRuntimeDao = PomodoroRuntimeDao(
     this as MichiFocusDatabase,
   );
+  late final RoutinesDao routinesDao = RoutinesDao(this as MichiFocusDatabase);
   late final CalendarEventsDao calendarEventsDao = CalendarEventsDao(
     this as MichiFocusDatabase,
   );
@@ -4486,6 +8569,11 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     reportingMetadataRecords,
     pomodoroSessionRecords,
     pomodoroRuntimeRecords,
+    routineRecords,
+    routineDayRecords,
+    routineItemRecords,
+    routineRunRecords,
+    routineItemRunRecords,
     calendarEventRecords,
     tasksGoalIdIdx,
     tasksScheduledDateIdx,
@@ -4496,6 +8584,20 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     pomodoroSessionsTaskIdIdx,
     pomodoroSessionsStartedAtIdx,
     pomodoroSessionsEndedAtIdx,
+    routinesStatusIdx,
+    routinesUpdatedAtIdx,
+    routineDaysWeekdayRoutineIdx,
+    routineItemsRoutinePositionUq,
+    routineItemsRoutineTimeIdx,
+    routineItemsGoalIdIdx,
+    routineRunsOccurrenceUq,
+    routineRunsDateStatusIdx,
+    routineRunsRoutineDateIdx,
+    routineItemRunsMaterializationUq,
+    routineItemRunsTaskIdUq,
+    routineItemRunsRoutineItemIdIdx,
+    routineItemRunsScheduleStatusIdx,
+    routineItemRunsRunPositionIdx,
     calendarEventsScheduledAtIdx,
   ];
   @override
@@ -4534,6 +8636,55 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('pomodoro_runtime', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'routines',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_days', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'routines',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_items', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'goals',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_items', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'routines',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_runs', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'routine_runs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_item_runs', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'routine_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_item_runs', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tasks',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('routine_item_runs', kind: UpdateKind.update)],
     ),
   ]);
 }
@@ -4638,6 +8789,30 @@ final class $$GoalRecordsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _pomodoroRuntimeRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$RoutineItemRecordsTable, List<RoutineItemRecord>>
+  _routineItemRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineItemRecords,
+        aliasName: $_aliasNameGenerator(
+          db.goalRecords.id,
+          db.routineItemRecords.goalId,
+        ),
+      );
+
+  $$RoutineItemRecordsTableProcessedTableManager get routineItemRecordsRefs {
+    final manager = $$RoutineItemRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRecords,
+    ).filter((f) => f.goalId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineItemRecordsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -4763,6 +8938,31 @@ class $$GoalRecordsTableFilterComposer
                     $removeJoinBuilderFromRootComposer,
               ),
         );
+    return f(composer);
+  }
+
+  Expression<bool> routineItemRecordsRefs(
+    Expression<bool> Function($$RoutineItemRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineItemRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.routineItemRecords,
+      getReferencedColumn: (t) => t.goalId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineItemRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineItemRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
     return f(composer);
   }
 }
@@ -4924,6 +9124,32 @@ class $$GoalRecordsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> routineItemRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineItemRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineItemRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRecords,
+          getReferencedColumn: (t) => t.goalId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$GoalRecordsTableTableManager
@@ -4943,6 +9169,7 @@ class $$GoalRecordsTableTableManager
             bool taskRecordsRefs,
             bool pomodoroSessionRecordsRefs,
             bool pomodoroRuntimeRecordsRefs,
+            bool routineItemRecordsRefs,
           })
         > {
   $$GoalRecordsTableTableManager(
@@ -5011,6 +9238,7 @@ class $$GoalRecordsTableTableManager
                 taskRecordsRefs = false,
                 pomodoroSessionRecordsRefs = false,
                 pomodoroRuntimeRecordsRefs = false,
+                routineItemRecordsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5018,6 +9246,7 @@ class $$GoalRecordsTableTableManager
                     if (taskRecordsRefs) db.taskRecords,
                     if (pomodoroSessionRecordsRefs) db.pomodoroSessionRecords,
                     if (pomodoroRuntimeRecordsRefs) db.pomodoroRuntimeRecords,
+                    if (routineItemRecordsRefs) db.routineItemRecords,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5085,6 +9314,27 @@ class $$GoalRecordsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (routineItemRecordsRefs)
+                        await $_getPrefetchedData<
+                          GoalRecord,
+                          $GoalRecordsTable,
+                          RoutineItemRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$GoalRecordsTableReferences
+                              ._routineItemRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GoalRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineItemRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.goalId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5109,6 +9359,7 @@ typedef $$GoalRecordsTableProcessedTableManager =
         bool taskRecordsRefs,
         bool pomodoroSessionRecordsRefs,
         bool pomodoroRuntimeRecordsRefs,
+        bool routineItemRecordsRefs,
       })
     >;
 typedef $$TaskRecordsTableCreateCompanionBuilder =
@@ -5242,6 +9493,34 @@ final class $$TaskRecordsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _pomodoroRuntimeRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $RoutineItemRunRecordsTable,
+    List<RoutineItemRunRecord>
+  >
+  _routineItemRunRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineItemRunRecords,
+        aliasName: $_aliasNameGenerator(
+          db.taskRecords.id,
+          db.routineItemRunRecords.taskId,
+        ),
+      );
+
+  $$RoutineItemRunRecordsTableProcessedTableManager
+  get routineItemRunRecordsRefs {
+    final manager = $$RoutineItemRunRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRunRecords,
+    ).filter((f) => f.taskId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineItemRunRecordsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -5396,6 +9675,32 @@ class $$TaskRecordsTableFilterComposer
               }) => $$PomodoroRuntimeRecordsTableFilterComposer(
                 $db: $db,
                 $table: $db.pomodoroRuntimeRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> routineItemRunRecordsRefs(
+    Expression<bool> Function($$RoutineItemRunRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineItemRunRecordsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.taskId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableFilterComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
                 $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
                 joinBuilder: joinBuilder,
                 $removeJoinBuilderFromRootComposer:
@@ -5631,6 +9936,32 @@ class $$TaskRecordsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> routineItemRunRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineItemRunRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineItemRunRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.taskId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$TaskRecordsTableTableManager
@@ -5651,6 +9982,7 @@ class $$TaskRecordsTableTableManager
             bool taskCompletionEventRecordsRefs,
             bool pomodoroSessionRecordsRefs,
             bool pomodoroRuntimeRecordsRefs,
+            bool routineItemRunRecordsRefs,
           })
         > {
   $$TaskRecordsTableTableManager(
@@ -5732,6 +10064,7 @@ class $$TaskRecordsTableTableManager
                 taskCompletionEventRecordsRefs = false,
                 pomodoroSessionRecordsRefs = false,
                 pomodoroRuntimeRecordsRefs = false,
+                routineItemRunRecordsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5740,6 +10073,7 @@ class $$TaskRecordsTableTableManager
                       db.taskCompletionEventRecords,
                     if (pomodoroSessionRecordsRefs) db.pomodoroSessionRecords,
                     if (pomodoroRuntimeRecordsRefs) db.pomodoroRuntimeRecords,
+                    if (routineItemRunRecordsRefs) db.routineItemRunRecords,
                   ],
                   addJoins:
                       <
@@ -5840,6 +10174,27 @@ class $$TaskRecordsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (routineItemRunRecordsRefs)
+                        await $_getPrefetchedData<
+                          TaskRecord,
+                          $TaskRecordsTable,
+                          RoutineItemRunRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TaskRecordsTableReferences
+                              ._routineItemRunRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TaskRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineItemRunRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.taskId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5865,6 +10220,7 @@ typedef $$TaskRecordsTableProcessedTableManager =
         bool taskCompletionEventRecordsRefs,
         bool pomodoroSessionRecordsRefs,
         bool pomodoroRuntimeRecordsRefs,
+        bool routineItemRunRecordsRefs,
       })
     >;
 typedef $$TaskCompletionEventRecordsTableCreateCompanionBuilder =
@@ -6398,6 +10754,7 @@ typedef $$PomodoroSessionRecordsTableCreateCompanionBuilder =
       Value<String?> taskId,
       Value<int?> startMoodScore,
       Value<int?> endMoodScore,
+      Value<bool> moodPromptPending,
       Value<bool?> wasDistracted,
       Value<int?> distractionMinutes,
       required String status,
@@ -6415,6 +10772,7 @@ typedef $$PomodoroSessionRecordsTableUpdateCompanionBuilder =
       Value<String?> taskId,
       Value<int?> startMoodScore,
       Value<int?> endMoodScore,
+      Value<bool> moodPromptPending,
       Value<bool?> wasDistracted,
       Value<int?> distractionMinutes,
       Value<String> status,
@@ -6521,6 +10879,11 @@ class $$PomodoroSessionRecordsTableFilterComposer
 
   ColumnFilters<int> get endMoodScore => $composableBuilder(
     column: $table.endMoodScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get moodPromptPending => $composableBuilder(
+    column: $table.moodPromptPending,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6635,6 +10998,11 @@ class $$PomodoroSessionRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get moodPromptPending => $composableBuilder(
+    column: $table.moodPromptPending,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get wasDistracted => $composableBuilder(
     column: $table.wasDistracted,
     builder: (column) => ColumnOrderings(column),
@@ -6737,6 +11105,11 @@ class $$PomodoroSessionRecordsTableAnnotationComposer
 
   GeneratedColumn<int> get endMoodScore => $composableBuilder(
     column: $table.endMoodScore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get moodPromptPending => $composableBuilder(
+    column: $table.moodPromptPending,
     builder: (column) => column,
   );
 
@@ -6851,6 +11224,7 @@ class $$PomodoroSessionRecordsTableTableManager
                 Value<String?> taskId = const Value.absent(),
                 Value<int?> startMoodScore = const Value.absent(),
                 Value<int?> endMoodScore = const Value.absent(),
+                Value<bool> moodPromptPending = const Value.absent(),
                 Value<bool?> wasDistracted = const Value.absent(),
                 Value<int?> distractionMinutes = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -6866,6 +11240,7 @@ class $$PomodoroSessionRecordsTableTableManager
                 taskId: taskId,
                 startMoodScore: startMoodScore,
                 endMoodScore: endMoodScore,
+                moodPromptPending: moodPromptPending,
                 wasDistracted: wasDistracted,
                 distractionMinutes: distractionMinutes,
                 status: status,
@@ -6883,6 +11258,7 @@ class $$PomodoroSessionRecordsTableTableManager
                 Value<String?> taskId = const Value.absent(),
                 Value<int?> startMoodScore = const Value.absent(),
                 Value<int?> endMoodScore = const Value.absent(),
+                Value<bool> moodPromptPending = const Value.absent(),
                 Value<bool?> wasDistracted = const Value.absent(),
                 Value<int?> distractionMinutes = const Value.absent(),
                 required String status,
@@ -6898,6 +11274,7 @@ class $$PomodoroSessionRecordsTableTableManager
                 taskId: taskId,
                 startMoodScore: startMoodScore,
                 endMoodScore: endMoodScore,
+                moodPromptPending: moodPromptPending,
                 wasDistracted: wasDistracted,
                 distractionMinutes: distractionMinutes,
                 status: status,
@@ -7795,6 +12172,3168 @@ typedef $$PomodoroRuntimeRecordsTableProcessedTableManager =
       PomodoroRuntimeRecord,
       PrefetchHooks Function({bool taskId, bool goalId})
     >;
+typedef $$RoutineRecordsTableCreateCompanionBuilder =
+    RoutineRecordsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> description,
+      Value<String> iconKey,
+      Value<String> colorKey,
+      Value<String> status,
+      Value<String?> pausedUntilLocalDate,
+      Value<DateTime?> archivedAt,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RoutineRecordsTableUpdateCompanionBuilder =
+    RoutineRecordsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> description,
+      Value<String> iconKey,
+      Value<String> colorKey,
+      Value<String> status,
+      Value<String?> pausedUntilLocalDate,
+      Value<DateTime?> archivedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$RoutineRecordsTableReferences
+    extends
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $RoutineRecordsTable,
+          RoutineRecord
+        > {
+  $$RoutineRecordsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$RoutineDayRecordsTable, List<RoutineDayRecord>>
+  _routineDayRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineDayRecords,
+        aliasName: $_aliasNameGenerator(
+          db.routineRecords.id,
+          db.routineDayRecords.routineId,
+        ),
+      );
+
+  $$RoutineDayRecordsTableProcessedTableManager get routineDayRecordsRefs {
+    final manager = $$RoutineDayRecordsTableTableManager(
+      $_db,
+      $_db.routineDayRecords,
+    ).filter((f) => f.routineId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineDayRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$RoutineItemRecordsTable, List<RoutineItemRecord>>
+  _routineItemRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineItemRecords,
+        aliasName: $_aliasNameGenerator(
+          db.routineRecords.id,
+          db.routineItemRecords.routineId,
+        ),
+      );
+
+  $$RoutineItemRecordsTableProcessedTableManager get routineItemRecordsRefs {
+    final manager = $$RoutineItemRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRecords,
+    ).filter((f) => f.routineId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineItemRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$RoutineRunRecordsTable, List<RoutineRunRecord>>
+  _routineRunRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineRunRecords,
+        aliasName: $_aliasNameGenerator(
+          db.routineRecords.id,
+          db.routineRunRecords.routineId,
+        ),
+      );
+
+  $$RoutineRunRecordsTableProcessedTableManager get routineRunRecordsRefs {
+    final manager = $$RoutineRunRecordsTableTableManager(
+      $_db,
+      $_db.routineRunRecords,
+    ).filter((f) => f.routineId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineRunRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$RoutineRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRecordsTable> {
+  $$RoutineRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconKey => $composableBuilder(
+    column: $table.iconKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorKey => $composableBuilder(
+    column: $table.colorKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pausedUntilLocalDate => $composableBuilder(
+    column: $table.pausedUntilLocalDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> routineDayRecordsRefs(
+    Expression<bool> Function($$RoutineDayRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineDayRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.routineDayRecords,
+      getReferencedColumn: (t) => t.routineId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineDayRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineDayRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> routineItemRecordsRefs(
+    Expression<bool> Function($$RoutineItemRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineItemRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.routineItemRecords,
+      getReferencedColumn: (t) => t.routineId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineItemRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineItemRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> routineRunRecordsRefs(
+    Expression<bool> Function($$RoutineRunRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineRunRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.routineRunRecords,
+      getReferencedColumn: (t) => t.routineId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRunRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineRunRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$RoutineRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRecordsTable> {
+  $$RoutineRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconKey => $composableBuilder(
+    column: $table.iconKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorKey => $composableBuilder(
+    column: $table.colorKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pausedUntilLocalDate => $composableBuilder(
+    column: $table.pausedUntilLocalDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RoutineRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRecordsTable> {
+  $$RoutineRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconKey =>
+      $composableBuilder(column: $table.iconKey, builder: (column) => column);
+
+  GeneratedColumn<String> get colorKey =>
+      $composableBuilder(column: $table.colorKey, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get pausedUntilLocalDate => $composableBuilder(
+    column: $table.pausedUntilLocalDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> routineDayRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineDayRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineDayRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineDayRecords,
+          getReferencedColumn: (t) => t.routineId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineDayRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineDayRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> routineItemRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineItemRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineItemRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRecords,
+          getReferencedColumn: (t) => t.routineId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> routineRunRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineRunRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineRunRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineRunRecords,
+          getReferencedColumn: (t) => t.routineId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineRunRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RoutineRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $RoutineRecordsTable,
+          RoutineRecord,
+          $$RoutineRecordsTableFilterComposer,
+          $$RoutineRecordsTableOrderingComposer,
+          $$RoutineRecordsTableAnnotationComposer,
+          $$RoutineRecordsTableCreateCompanionBuilder,
+          $$RoutineRecordsTableUpdateCompanionBuilder,
+          (RoutineRecord, $$RoutineRecordsTableReferences),
+          RoutineRecord,
+          PrefetchHooks Function({
+            bool routineDayRecordsRefs,
+            bool routineItemRecordsRefs,
+            bool routineRunRecordsRefs,
+          })
+        > {
+  $$RoutineRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $RoutineRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoutineRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoutineRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> iconKey = const Value.absent(),
+                Value<String> colorKey = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> pausedUntilLocalDate = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineRecordsCompanion(
+                id: id,
+                name: name,
+                description: description,
+                iconKey: iconKey,
+                colorKey: colorKey,
+                status: status,
+                pausedUntilLocalDate: pausedUntilLocalDate,
+                archivedAt: archivedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                Value<String> iconKey = const Value.absent(),
+                Value<String> colorKey = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> pausedUntilLocalDate = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineRecordsCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                iconKey: iconKey,
+                colorKey: colorKey,
+                status: status,
+                pausedUntilLocalDate: pausedUntilLocalDate,
+                archivedAt: archivedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoutineRecordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                routineDayRecordsRefs = false,
+                routineItemRecordsRefs = false,
+                routineRunRecordsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (routineDayRecordsRefs) db.routineDayRecords,
+                    if (routineItemRecordsRefs) db.routineItemRecords,
+                    if (routineRunRecordsRefs) db.routineRunRecords,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (routineDayRecordsRefs)
+                        await $_getPrefetchedData<
+                          RoutineRecord,
+                          $RoutineRecordsTable,
+                          RoutineDayRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RoutineRecordsTableReferences
+                              ._routineDayRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RoutineRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineDayRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.routineId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (routineItemRecordsRefs)
+                        await $_getPrefetchedData<
+                          RoutineRecord,
+                          $RoutineRecordsTable,
+                          RoutineItemRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RoutineRecordsTableReferences
+                              ._routineItemRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RoutineRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineItemRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.routineId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (routineRunRecordsRefs)
+                        await $_getPrefetchedData<
+                          RoutineRecord,
+                          $RoutineRecordsTable,
+                          RoutineRunRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RoutineRecordsTableReferences
+                              ._routineRunRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RoutineRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineRunRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.routineId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$RoutineRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $RoutineRecordsTable,
+      RoutineRecord,
+      $$RoutineRecordsTableFilterComposer,
+      $$RoutineRecordsTableOrderingComposer,
+      $$RoutineRecordsTableAnnotationComposer,
+      $$RoutineRecordsTableCreateCompanionBuilder,
+      $$RoutineRecordsTableUpdateCompanionBuilder,
+      (RoutineRecord, $$RoutineRecordsTableReferences),
+      RoutineRecord,
+      PrefetchHooks Function({
+        bool routineDayRecordsRefs,
+        bool routineItemRecordsRefs,
+        bool routineRunRecordsRefs,
+      })
+    >;
+typedef $$RoutineDayRecordsTableCreateCompanionBuilder =
+    RoutineDayRecordsCompanion Function({
+      required String routineId,
+      required int weekday,
+      Value<int> rowid,
+    });
+typedef $$RoutineDayRecordsTableUpdateCompanionBuilder =
+    RoutineDayRecordsCompanion Function({
+      Value<String> routineId,
+      Value<int> weekday,
+      Value<int> rowid,
+    });
+
+final class $$RoutineDayRecordsTableReferences
+    extends
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $RoutineDayRecordsTable,
+          RoutineDayRecord
+        > {
+  $$RoutineDayRecordsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RoutineRecordsTable _routineIdTable(_$MichiFocusDatabase db) =>
+      db.routineRecords.createAlias(
+        $_aliasNameGenerator(
+          db.routineDayRecords.routineId,
+          db.routineRecords.id,
+        ),
+      );
+
+  $$RoutineRecordsTableProcessedTableManager get routineId {
+    final $_column = $_itemColumn<String>('routine_id')!;
+
+    final manager = $$RoutineRecordsTableTableManager(
+      $_db,
+      $_db.routineRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_routineIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$RoutineDayRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineDayRecordsTable> {
+  $$RoutineDayRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get weekday => $composableBuilder(
+    column: $table.weekday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RoutineRecordsTableFilterComposer get routineId {
+    final $$RoutineRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineDayRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineDayRecordsTable> {
+  $$RoutineDayRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get weekday => $composableBuilder(
+    column: $table.weekday,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RoutineRecordsTableOrderingComposer get routineId {
+    final $$RoutineRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineDayRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineDayRecordsTable> {
+  $$RoutineDayRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get weekday =>
+      $composableBuilder(column: $table.weekday, builder: (column) => column);
+
+  $$RoutineRecordsTableAnnotationComposer get routineId {
+    final $$RoutineRecordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineDayRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $RoutineDayRecordsTable,
+          RoutineDayRecord,
+          $$RoutineDayRecordsTableFilterComposer,
+          $$RoutineDayRecordsTableOrderingComposer,
+          $$RoutineDayRecordsTableAnnotationComposer,
+          $$RoutineDayRecordsTableCreateCompanionBuilder,
+          $$RoutineDayRecordsTableUpdateCompanionBuilder,
+          (RoutineDayRecord, $$RoutineDayRecordsTableReferences),
+          RoutineDayRecord,
+          PrefetchHooks Function({bool routineId})
+        > {
+  $$RoutineDayRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $RoutineDayRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineDayRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoutineDayRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoutineDayRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> routineId = const Value.absent(),
+                Value<int> weekday = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineDayRecordsCompanion(
+                routineId: routineId,
+                weekday: weekday,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String routineId,
+                required int weekday,
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineDayRecordsCompanion.insert(
+                routineId: routineId,
+                weekday: weekday,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoutineDayRecordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({routineId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (routineId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.routineId,
+                                referencedTable:
+                                    $$RoutineDayRecordsTableReferences
+                                        ._routineIdTable(db),
+                                referencedColumn:
+                                    $$RoutineDayRecordsTableReferences
+                                        ._routineIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$RoutineDayRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $RoutineDayRecordsTable,
+      RoutineDayRecord,
+      $$RoutineDayRecordsTableFilterComposer,
+      $$RoutineDayRecordsTableOrderingComposer,
+      $$RoutineDayRecordsTableAnnotationComposer,
+      $$RoutineDayRecordsTableCreateCompanionBuilder,
+      $$RoutineDayRecordsTableUpdateCompanionBuilder,
+      (RoutineDayRecord, $$RoutineDayRecordsTableReferences),
+      RoutineDayRecord,
+      PrefetchHooks Function({bool routineId})
+    >;
+typedef $$RoutineItemRecordsTableCreateCompanionBuilder =
+    RoutineItemRecordsCompanion Function({
+      required String id,
+      required String routineId,
+      required int position,
+      required String title,
+      required int scheduledMinute,
+      required int durationMinutes,
+      Value<String?> goalId,
+      Value<bool> isOptional,
+      Value<int?> reminderMinutesBefore,
+      Value<String> pomodoroMode,
+      Value<int?> customFocusMinutes,
+      Value<int?> customBreakMinutes,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RoutineItemRecordsTableUpdateCompanionBuilder =
+    RoutineItemRecordsCompanion Function({
+      Value<String> id,
+      Value<String> routineId,
+      Value<int> position,
+      Value<String> title,
+      Value<int> scheduledMinute,
+      Value<int> durationMinutes,
+      Value<String?> goalId,
+      Value<bool> isOptional,
+      Value<int?> reminderMinutesBefore,
+      Value<String> pomodoroMode,
+      Value<int?> customFocusMinutes,
+      Value<int?> customBreakMinutes,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$RoutineItemRecordsTableReferences
+    extends
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $RoutineItemRecordsTable,
+          RoutineItemRecord
+        > {
+  $$RoutineItemRecordsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RoutineRecordsTable _routineIdTable(_$MichiFocusDatabase db) =>
+      db.routineRecords.createAlias(
+        $_aliasNameGenerator(
+          db.routineItemRecords.routineId,
+          db.routineRecords.id,
+        ),
+      );
+
+  $$RoutineRecordsTableProcessedTableManager get routineId {
+    final $_column = $_itemColumn<String>('routine_id')!;
+
+    final manager = $$RoutineRecordsTableTableManager(
+      $_db,
+      $_db.routineRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_routineIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $GoalRecordsTable _goalIdTable(_$MichiFocusDatabase db) =>
+      db.goalRecords.createAlias(
+        $_aliasNameGenerator(db.routineItemRecords.goalId, db.goalRecords.id),
+      );
+
+  $$GoalRecordsTableProcessedTableManager? get goalId {
+    final $_column = $_itemColumn<String>('goal_id');
+    if ($_column == null) return null;
+    final manager = $$GoalRecordsTableTableManager(
+      $_db,
+      $_db.goalRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_goalIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $RoutineItemRunRecordsTable,
+    List<RoutineItemRunRecord>
+  >
+  _routineItemRunRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineItemRunRecords,
+        aliasName: $_aliasNameGenerator(
+          db.routineItemRecords.id,
+          db.routineItemRunRecords.routineItemId,
+        ),
+      );
+
+  $$RoutineItemRunRecordsTableProcessedTableManager
+  get routineItemRunRecordsRefs {
+    final manager = $$RoutineItemRunRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRunRecords,
+    ).filter((f) => f.routineItemId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineItemRunRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$RoutineItemRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRecordsTable> {
+  $$RoutineItemRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isOptional => $composableBuilder(
+    column: $table.isOptional,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pomodoroMode => $composableBuilder(
+    column: $table.pomodoroMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customFocusMinutes => $composableBuilder(
+    column: $table.customFocusMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customBreakMinutes => $composableBuilder(
+    column: $table.customBreakMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RoutineRecordsTableFilterComposer get routineId {
+    final $$RoutineRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GoalRecordsTableFilterComposer get goalId {
+    final $$GoalRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.goalId,
+      referencedTable: $db.goalRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GoalRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.goalRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> routineItemRunRecordsRefs(
+    Expression<bool> Function($$RoutineItemRunRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineItemRunRecordsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.routineItemId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableFilterComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RoutineItemRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRecordsTable> {
+  $$RoutineItemRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isOptional => $composableBuilder(
+    column: $table.isOptional,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pomodoroMode => $composableBuilder(
+    column: $table.pomodoroMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get customFocusMinutes => $composableBuilder(
+    column: $table.customFocusMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get customBreakMinutes => $composableBuilder(
+    column: $table.customBreakMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RoutineRecordsTableOrderingComposer get routineId {
+    final $$RoutineRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GoalRecordsTableOrderingComposer get goalId {
+    final $$GoalRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.goalId,
+      referencedTable: $db.goalRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GoalRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.goalRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineItemRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRecordsTable> {
+  $$RoutineItemRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get scheduledMinute => $composableBuilder(
+    column: $table.scheduledMinute,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isOptional => $composableBuilder(
+    column: $table.isOptional,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reminderMinutesBefore => $composableBuilder(
+    column: $table.reminderMinutesBefore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pomodoroMode => $composableBuilder(
+    column: $table.pomodoroMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get customFocusMinutes => $composableBuilder(
+    column: $table.customFocusMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get customBreakMinutes => $composableBuilder(
+    column: $table.customBreakMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$RoutineRecordsTableAnnotationComposer get routineId {
+    final $$RoutineRecordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GoalRecordsTableAnnotationComposer get goalId {
+    final $$GoalRecordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.goalId,
+      referencedTable: $db.goalRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GoalRecordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.goalRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> routineItemRunRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineItemRunRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineItemRunRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.routineItemId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RoutineItemRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $RoutineItemRecordsTable,
+          RoutineItemRecord,
+          $$RoutineItemRecordsTableFilterComposer,
+          $$RoutineItemRecordsTableOrderingComposer,
+          $$RoutineItemRecordsTableAnnotationComposer,
+          $$RoutineItemRecordsTableCreateCompanionBuilder,
+          $$RoutineItemRecordsTableUpdateCompanionBuilder,
+          (RoutineItemRecord, $$RoutineItemRecordsTableReferences),
+          RoutineItemRecord,
+          PrefetchHooks Function({
+            bool routineId,
+            bool goalId,
+            bool routineItemRunRecordsRefs,
+          })
+        > {
+  $$RoutineItemRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $RoutineItemRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineItemRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoutineItemRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoutineItemRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> routineId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> scheduledMinute = const Value.absent(),
+                Value<int> durationMinutes = const Value.absent(),
+                Value<String?> goalId = const Value.absent(),
+                Value<bool> isOptional = const Value.absent(),
+                Value<int?> reminderMinutesBefore = const Value.absent(),
+                Value<String> pomodoroMode = const Value.absent(),
+                Value<int?> customFocusMinutes = const Value.absent(),
+                Value<int?> customBreakMinutes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineItemRecordsCompanion(
+                id: id,
+                routineId: routineId,
+                position: position,
+                title: title,
+                scheduledMinute: scheduledMinute,
+                durationMinutes: durationMinutes,
+                goalId: goalId,
+                isOptional: isOptional,
+                reminderMinutesBefore: reminderMinutesBefore,
+                pomodoroMode: pomodoroMode,
+                customFocusMinutes: customFocusMinutes,
+                customBreakMinutes: customBreakMinutes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String routineId,
+                required int position,
+                required String title,
+                required int scheduledMinute,
+                required int durationMinutes,
+                Value<String?> goalId = const Value.absent(),
+                Value<bool> isOptional = const Value.absent(),
+                Value<int?> reminderMinutesBefore = const Value.absent(),
+                Value<String> pomodoroMode = const Value.absent(),
+                Value<int?> customFocusMinutes = const Value.absent(),
+                Value<int?> customBreakMinutes = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineItemRecordsCompanion.insert(
+                id: id,
+                routineId: routineId,
+                position: position,
+                title: title,
+                scheduledMinute: scheduledMinute,
+                durationMinutes: durationMinutes,
+                goalId: goalId,
+                isOptional: isOptional,
+                reminderMinutesBefore: reminderMinutesBefore,
+                pomodoroMode: pomodoroMode,
+                customFocusMinutes: customFocusMinutes,
+                customBreakMinutes: customBreakMinutes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoutineItemRecordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                routineId = false,
+                goalId = false,
+                routineItemRunRecordsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (routineItemRunRecordsRefs) db.routineItemRunRecords,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (routineId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.routineId,
+                                    referencedTable:
+                                        $$RoutineItemRecordsTableReferences
+                                            ._routineIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineItemRecordsTableReferences
+                                            ._routineIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (goalId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.goalId,
+                                    referencedTable:
+                                        $$RoutineItemRecordsTableReferences
+                                            ._goalIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineItemRecordsTableReferences
+                                            ._goalIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (routineItemRunRecordsRefs)
+                        await $_getPrefetchedData<
+                          RoutineItemRecord,
+                          $RoutineItemRecordsTable,
+                          RoutineItemRunRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RoutineItemRecordsTableReferences
+                              ._routineItemRunRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RoutineItemRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineItemRunRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.routineItemId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$RoutineItemRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $RoutineItemRecordsTable,
+      RoutineItemRecord,
+      $$RoutineItemRecordsTableFilterComposer,
+      $$RoutineItemRecordsTableOrderingComposer,
+      $$RoutineItemRecordsTableAnnotationComposer,
+      $$RoutineItemRecordsTableCreateCompanionBuilder,
+      $$RoutineItemRecordsTableUpdateCompanionBuilder,
+      (RoutineItemRecord, $$RoutineItemRecordsTableReferences),
+      RoutineItemRecord,
+      PrefetchHooks Function({
+        bool routineId,
+        bool goalId,
+        bool routineItemRunRecordsRefs,
+      })
+    >;
+typedef $$RoutineRunRecordsTableCreateCompanionBuilder =
+    RoutineRunRecordsCompanion Function({
+      required String id,
+      Value<String?> routineId,
+      required String sourceRoutineId,
+      required String localDate,
+      Value<String> status,
+      required String nameSnapshot,
+      required String iconKeySnapshot,
+      required String colorKeySnapshot,
+      required int scheduledStartMinuteSnapshot,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> completedAt,
+      Value<DateTime?> skippedAt,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RoutineRunRecordsTableUpdateCompanionBuilder =
+    RoutineRunRecordsCompanion Function({
+      Value<String> id,
+      Value<String?> routineId,
+      Value<String> sourceRoutineId,
+      Value<String> localDate,
+      Value<String> status,
+      Value<String> nameSnapshot,
+      Value<String> iconKeySnapshot,
+      Value<String> colorKeySnapshot,
+      Value<int> scheduledStartMinuteSnapshot,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> completedAt,
+      Value<DateTime?> skippedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$RoutineRunRecordsTableReferences
+    extends
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $RoutineRunRecordsTable,
+          RoutineRunRecord
+        > {
+  $$RoutineRunRecordsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RoutineRecordsTable _routineIdTable(_$MichiFocusDatabase db) =>
+      db.routineRecords.createAlias(
+        $_aliasNameGenerator(
+          db.routineRunRecords.routineId,
+          db.routineRecords.id,
+        ),
+      );
+
+  $$RoutineRecordsTableProcessedTableManager? get routineId {
+    final $_column = $_itemColumn<String>('routine_id');
+    if ($_column == null) return null;
+    final manager = $$RoutineRecordsTableTableManager(
+      $_db,
+      $_db.routineRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_routineIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $RoutineItemRunRecordsTable,
+    List<RoutineItemRunRecord>
+  >
+  _routineItemRunRecordsRefsTable(_$MichiFocusDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.routineItemRunRecords,
+        aliasName: $_aliasNameGenerator(
+          db.routineRunRecords.id,
+          db.routineItemRunRecords.routineRunId,
+        ),
+      );
+
+  $$RoutineItemRunRecordsTableProcessedTableManager
+  get routineItemRunRecordsRefs {
+    final manager = $$RoutineItemRunRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRunRecords,
+    ).filter((f) => f.routineRunId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _routineItemRunRecordsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$RoutineRunRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRunRecordsTable> {
+  $$RoutineRunRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceRoutineId => $composableBuilder(
+    column: $table.sourceRoutineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localDate => $composableBuilder(
+    column: $table.localDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameSnapshot => $composableBuilder(
+    column: $table.nameSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconKeySnapshot => $composableBuilder(
+    column: $table.iconKeySnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorKeySnapshot => $composableBuilder(
+    column: $table.colorKeySnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduledStartMinuteSnapshot => $composableBuilder(
+    column: $table.scheduledStartMinuteSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get skippedAt => $composableBuilder(
+    column: $table.skippedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RoutineRecordsTableFilterComposer get routineId {
+    final $$RoutineRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> routineItemRunRecordsRefs(
+    Expression<bool> Function($$RoutineItemRunRecordsTableFilterComposer f) f,
+  ) {
+    final $$RoutineItemRunRecordsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.routineRunId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableFilterComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RoutineRunRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRunRecordsTable> {
+  $$RoutineRunRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceRoutineId => $composableBuilder(
+    column: $table.sourceRoutineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localDate => $composableBuilder(
+    column: $table.localDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nameSnapshot => $composableBuilder(
+    column: $table.nameSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconKeySnapshot => $composableBuilder(
+    column: $table.iconKeySnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorKeySnapshot => $composableBuilder(
+    column: $table.colorKeySnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get scheduledStartMinuteSnapshot => $composableBuilder(
+    column: $table.scheduledStartMinuteSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get skippedAt => $composableBuilder(
+    column: $table.skippedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RoutineRecordsTableOrderingComposer get routineId {
+    final $$RoutineRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineRunRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineRunRecordsTable> {
+  $$RoutineRunRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceRoutineId => $composableBuilder(
+    column: $table.sourceRoutineId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get localDate =>
+      $composableBuilder(column: $table.localDate, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get nameSnapshot => $composableBuilder(
+    column: $table.nameSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconKeySnapshot => $composableBuilder(
+    column: $table.iconKeySnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get colorKeySnapshot => $composableBuilder(
+    column: $table.colorKeySnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get scheduledStartMinuteSnapshot => $composableBuilder(
+    column: $table.scheduledStartMinuteSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get skippedAt =>
+      $composableBuilder(column: $table.skippedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$RoutineRecordsTableAnnotationComposer get routineId {
+    final $$RoutineRecordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineId,
+      referencedTable: $db.routineRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRecordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.routineRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> routineItemRunRecordsRefs<T extends Object>(
+    Expression<T> Function($$RoutineItemRunRecordsTableAnnotationComposer a) f,
+  ) {
+    final $$RoutineItemRunRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.routineItemRunRecords,
+          getReferencedColumn: (t) => t.routineRunId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRunRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RoutineRunRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $RoutineRunRecordsTable,
+          RoutineRunRecord,
+          $$RoutineRunRecordsTableFilterComposer,
+          $$RoutineRunRecordsTableOrderingComposer,
+          $$RoutineRunRecordsTableAnnotationComposer,
+          $$RoutineRunRecordsTableCreateCompanionBuilder,
+          $$RoutineRunRecordsTableUpdateCompanionBuilder,
+          (RoutineRunRecord, $$RoutineRunRecordsTableReferences),
+          RoutineRunRecord,
+          PrefetchHooks Function({
+            bool routineId,
+            bool routineItemRunRecordsRefs,
+          })
+        > {
+  $$RoutineRunRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $RoutineRunRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineRunRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoutineRunRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoutineRunRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> routineId = const Value.absent(),
+                Value<String> sourceRoutineId = const Value.absent(),
+                Value<String> localDate = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> nameSnapshot = const Value.absent(),
+                Value<String> iconKeySnapshot = const Value.absent(),
+                Value<String> colorKeySnapshot = const Value.absent(),
+                Value<int> scheduledStartMinuteSnapshot = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> skippedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineRunRecordsCompanion(
+                id: id,
+                routineId: routineId,
+                sourceRoutineId: sourceRoutineId,
+                localDate: localDate,
+                status: status,
+                nameSnapshot: nameSnapshot,
+                iconKeySnapshot: iconKeySnapshot,
+                colorKeySnapshot: colorKeySnapshot,
+                scheduledStartMinuteSnapshot: scheduledStartMinuteSnapshot,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                skippedAt: skippedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> routineId = const Value.absent(),
+                required String sourceRoutineId,
+                required String localDate,
+                Value<String> status = const Value.absent(),
+                required String nameSnapshot,
+                required String iconKeySnapshot,
+                required String colorKeySnapshot,
+                required int scheduledStartMinuteSnapshot,
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> skippedAt = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineRunRecordsCompanion.insert(
+                id: id,
+                routineId: routineId,
+                sourceRoutineId: sourceRoutineId,
+                localDate: localDate,
+                status: status,
+                nameSnapshot: nameSnapshot,
+                iconKeySnapshot: iconKeySnapshot,
+                colorKeySnapshot: colorKeySnapshot,
+                scheduledStartMinuteSnapshot: scheduledStartMinuteSnapshot,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                skippedAt: skippedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoutineRunRecordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({routineId = false, routineItemRunRecordsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (routineItemRunRecordsRefs) db.routineItemRunRecords,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (routineId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.routineId,
+                                    referencedTable:
+                                        $$RoutineRunRecordsTableReferences
+                                            ._routineIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineRunRecordsTableReferences
+                                            ._routineIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (routineItemRunRecordsRefs)
+                        await $_getPrefetchedData<
+                          RoutineRunRecord,
+                          $RoutineRunRecordsTable,
+                          RoutineItemRunRecord
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RoutineRunRecordsTableReferences
+                              ._routineItemRunRecordsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RoutineRunRecordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).routineItemRunRecordsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.routineRunId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$RoutineRunRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $RoutineRunRecordsTable,
+      RoutineRunRecord,
+      $$RoutineRunRecordsTableFilterComposer,
+      $$RoutineRunRecordsTableOrderingComposer,
+      $$RoutineRunRecordsTableAnnotationComposer,
+      $$RoutineRunRecordsTableCreateCompanionBuilder,
+      $$RoutineRunRecordsTableUpdateCompanionBuilder,
+      (RoutineRunRecord, $$RoutineRunRecordsTableReferences),
+      RoutineRunRecord,
+      PrefetchHooks Function({bool routineId, bool routineItemRunRecordsRefs})
+    >;
+typedef $$RoutineItemRunRecordsTableCreateCompanionBuilder =
+    RoutineItemRunRecordsCompanion Function({
+      required String id,
+      required String routineRunId,
+      Value<String?> routineItemId,
+      required String sourceItemId,
+      Value<String?> taskId,
+      Value<String?> taskIdSnapshot,
+      required int positionSnapshot,
+      required String titleSnapshot,
+      required DateTime scheduledAtSnapshot,
+      required int durationMinutesSnapshot,
+      Value<String?> goalTitleSnapshot,
+      Value<bool> isOptionalSnapshot,
+      Value<int?> reminderMinutesSnapshot,
+      required String pomodoroModeSnapshot,
+      Value<int?> customFocusMinutesSnapshot,
+      Value<int?> customBreakMinutesSnapshot,
+      Value<String> status,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> completedAt,
+      Value<DateTime?> skippedAt,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RoutineItemRunRecordsTableUpdateCompanionBuilder =
+    RoutineItemRunRecordsCompanion Function({
+      Value<String> id,
+      Value<String> routineRunId,
+      Value<String?> routineItemId,
+      Value<String> sourceItemId,
+      Value<String?> taskId,
+      Value<String?> taskIdSnapshot,
+      Value<int> positionSnapshot,
+      Value<String> titleSnapshot,
+      Value<DateTime> scheduledAtSnapshot,
+      Value<int> durationMinutesSnapshot,
+      Value<String?> goalTitleSnapshot,
+      Value<bool> isOptionalSnapshot,
+      Value<int?> reminderMinutesSnapshot,
+      Value<String> pomodoroModeSnapshot,
+      Value<int?> customFocusMinutesSnapshot,
+      Value<int?> customBreakMinutesSnapshot,
+      Value<String> status,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> completedAt,
+      Value<DateTime?> skippedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$RoutineItemRunRecordsTableReferences
+    extends
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $RoutineItemRunRecordsTable,
+          RoutineItemRunRecord
+        > {
+  $$RoutineItemRunRecordsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RoutineRunRecordsTable _routineRunIdTable(_$MichiFocusDatabase db) =>
+      db.routineRunRecords.createAlias(
+        $_aliasNameGenerator(
+          db.routineItemRunRecords.routineRunId,
+          db.routineRunRecords.id,
+        ),
+      );
+
+  $$RoutineRunRecordsTableProcessedTableManager get routineRunId {
+    final $_column = $_itemColumn<String>('routine_run_id')!;
+
+    final manager = $$RoutineRunRecordsTableTableManager(
+      $_db,
+      $_db.routineRunRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_routineRunIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $RoutineItemRecordsTable _routineItemIdTable(
+    _$MichiFocusDatabase db,
+  ) => db.routineItemRecords.createAlias(
+    $_aliasNameGenerator(
+      db.routineItemRunRecords.routineItemId,
+      db.routineItemRecords.id,
+    ),
+  );
+
+  $$RoutineItemRecordsTableProcessedTableManager? get routineItemId {
+    final $_column = $_itemColumn<String>('routine_item_id');
+    if ($_column == null) return null;
+    final manager = $$RoutineItemRecordsTableTableManager(
+      $_db,
+      $_db.routineItemRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_routineItemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $TaskRecordsTable _taskIdTable(_$MichiFocusDatabase db) =>
+      db.taskRecords.createAlias(
+        $_aliasNameGenerator(
+          db.routineItemRunRecords.taskId,
+          db.taskRecords.id,
+        ),
+      );
+
+  $$TaskRecordsTableProcessedTableManager? get taskId {
+    final $_column = $_itemColumn<String>('task_id');
+    if ($_column == null) return null;
+    final manager = $$TaskRecordsTableTableManager(
+      $_db,
+      $_db.taskRecords,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_taskIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$RoutineItemRunRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRunRecordsTable> {
+  $$RoutineItemRunRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceItemId => $composableBuilder(
+    column: $table.sourceItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taskIdSnapshot => $composableBuilder(
+    column: $table.taskIdSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get positionSnapshot => $composableBuilder(
+    column: $table.positionSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get titleSnapshot => $composableBuilder(
+    column: $table.titleSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAtSnapshot => $composableBuilder(
+    column: $table.scheduledAtSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMinutesSnapshot => $composableBuilder(
+    column: $table.durationMinutesSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get goalTitleSnapshot => $composableBuilder(
+    column: $table.goalTitleSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isOptionalSnapshot => $composableBuilder(
+    column: $table.isOptionalSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutesSnapshot => $composableBuilder(
+    column: $table.reminderMinutesSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pomodoroModeSnapshot => $composableBuilder(
+    column: $table.pomodoroModeSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customFocusMinutesSnapshot => $composableBuilder(
+    column: $table.customFocusMinutesSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customBreakMinutesSnapshot => $composableBuilder(
+    column: $table.customBreakMinutesSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get skippedAt => $composableBuilder(
+    column: $table.skippedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RoutineRunRecordsTableFilterComposer get routineRunId {
+    final $$RoutineRunRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineRunId,
+      referencedTable: $db.routineRunRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRunRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineRunRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$RoutineItemRecordsTableFilterComposer get routineItemId {
+    final $$RoutineItemRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineItemId,
+      referencedTable: $db.routineItemRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineItemRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.routineItemRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TaskRecordsTableFilterComposer get taskId {
+    final $$TaskRecordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.taskId,
+      referencedTable: $db.taskRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TaskRecordsTableFilterComposer(
+            $db: $db,
+            $table: $db.taskRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineItemRunRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRunRecordsTable> {
+  $$RoutineItemRunRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceItemId => $composableBuilder(
+    column: $table.sourceItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taskIdSnapshot => $composableBuilder(
+    column: $table.taskIdSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get positionSnapshot => $composableBuilder(
+    column: $table.positionSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get titleSnapshot => $composableBuilder(
+    column: $table.titleSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledAtSnapshot => $composableBuilder(
+    column: $table.scheduledAtSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMinutesSnapshot => $composableBuilder(
+    column: $table.durationMinutesSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get goalTitleSnapshot => $composableBuilder(
+    column: $table.goalTitleSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isOptionalSnapshot => $composableBuilder(
+    column: $table.isOptionalSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reminderMinutesSnapshot => $composableBuilder(
+    column: $table.reminderMinutesSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pomodoroModeSnapshot => $composableBuilder(
+    column: $table.pomodoroModeSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get customFocusMinutesSnapshot => $composableBuilder(
+    column: $table.customFocusMinutesSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get customBreakMinutesSnapshot => $composableBuilder(
+    column: $table.customBreakMinutesSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get skippedAt => $composableBuilder(
+    column: $table.skippedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RoutineRunRecordsTableOrderingComposer get routineRunId {
+    final $$RoutineRunRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineRunId,
+      referencedTable: $db.routineRunRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineRunRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.routineRunRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$RoutineItemRecordsTableOrderingComposer get routineItemId {
+    final $$RoutineItemRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.routineItemId,
+      referencedTable: $db.routineItemRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RoutineItemRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.routineItemRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TaskRecordsTableOrderingComposer get taskId {
+    final $$TaskRecordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.taskId,
+      referencedTable: $db.taskRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TaskRecordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.taskRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineItemRunRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $RoutineItemRunRecordsTable> {
+  $$RoutineItemRunRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceItemId => $composableBuilder(
+    column: $table.sourceItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get taskIdSnapshot => $composableBuilder(
+    column: $table.taskIdSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get positionSnapshot => $composableBuilder(
+    column: $table.positionSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get titleSnapshot => $composableBuilder(
+    column: $table.titleSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get scheduledAtSnapshot => $composableBuilder(
+    column: $table.scheduledAtSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMinutesSnapshot => $composableBuilder(
+    column: $table.durationMinutesSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get goalTitleSnapshot => $composableBuilder(
+    column: $table.goalTitleSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isOptionalSnapshot => $composableBuilder(
+    column: $table.isOptionalSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get reminderMinutesSnapshot => $composableBuilder(
+    column: $table.reminderMinutesSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pomodoroModeSnapshot => $composableBuilder(
+    column: $table.pomodoroModeSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get customFocusMinutesSnapshot => $composableBuilder(
+    column: $table.customFocusMinutesSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get customBreakMinutesSnapshot => $composableBuilder(
+    column: $table.customBreakMinutesSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get skippedAt =>
+      $composableBuilder(column: $table.skippedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$RoutineRunRecordsTableAnnotationComposer get routineRunId {
+    final $$RoutineRunRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.routineRunId,
+          referencedTable: $db.routineRunRecords,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineRunRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineRunRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$RoutineItemRecordsTableAnnotationComposer get routineItemId {
+    final $$RoutineItemRecordsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.routineItemId,
+          referencedTable: $db.routineItemRecords,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RoutineItemRecordsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.routineItemRecords,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$TaskRecordsTableAnnotationComposer get taskId {
+    final $$TaskRecordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.taskId,
+      referencedTable: $db.taskRecords,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TaskRecordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.taskRecords,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RoutineItemRunRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $RoutineItemRunRecordsTable,
+          RoutineItemRunRecord,
+          $$RoutineItemRunRecordsTableFilterComposer,
+          $$RoutineItemRunRecordsTableOrderingComposer,
+          $$RoutineItemRunRecordsTableAnnotationComposer,
+          $$RoutineItemRunRecordsTableCreateCompanionBuilder,
+          $$RoutineItemRunRecordsTableUpdateCompanionBuilder,
+          (RoutineItemRunRecord, $$RoutineItemRunRecordsTableReferences),
+          RoutineItemRunRecord,
+          PrefetchHooks Function({
+            bool routineRunId,
+            bool routineItemId,
+            bool taskId,
+          })
+        > {
+  $$RoutineItemRunRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $RoutineItemRunRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineItemRunRecordsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RoutineItemRunRecordsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RoutineItemRunRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> routineRunId = const Value.absent(),
+                Value<String?> routineItemId = const Value.absent(),
+                Value<String> sourceItemId = const Value.absent(),
+                Value<String?> taskId = const Value.absent(),
+                Value<String?> taskIdSnapshot = const Value.absent(),
+                Value<int> positionSnapshot = const Value.absent(),
+                Value<String> titleSnapshot = const Value.absent(),
+                Value<DateTime> scheduledAtSnapshot = const Value.absent(),
+                Value<int> durationMinutesSnapshot = const Value.absent(),
+                Value<String?> goalTitleSnapshot = const Value.absent(),
+                Value<bool> isOptionalSnapshot = const Value.absent(),
+                Value<int?> reminderMinutesSnapshot = const Value.absent(),
+                Value<String> pomodoroModeSnapshot = const Value.absent(),
+                Value<int?> customFocusMinutesSnapshot = const Value.absent(),
+                Value<int?> customBreakMinutesSnapshot = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> skippedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineItemRunRecordsCompanion(
+                id: id,
+                routineRunId: routineRunId,
+                routineItemId: routineItemId,
+                sourceItemId: sourceItemId,
+                taskId: taskId,
+                taskIdSnapshot: taskIdSnapshot,
+                positionSnapshot: positionSnapshot,
+                titleSnapshot: titleSnapshot,
+                scheduledAtSnapshot: scheduledAtSnapshot,
+                durationMinutesSnapshot: durationMinutesSnapshot,
+                goalTitleSnapshot: goalTitleSnapshot,
+                isOptionalSnapshot: isOptionalSnapshot,
+                reminderMinutesSnapshot: reminderMinutesSnapshot,
+                pomodoroModeSnapshot: pomodoroModeSnapshot,
+                customFocusMinutesSnapshot: customFocusMinutesSnapshot,
+                customBreakMinutesSnapshot: customBreakMinutesSnapshot,
+                status: status,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                skippedAt: skippedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String routineRunId,
+                Value<String?> routineItemId = const Value.absent(),
+                required String sourceItemId,
+                Value<String?> taskId = const Value.absent(),
+                Value<String?> taskIdSnapshot = const Value.absent(),
+                required int positionSnapshot,
+                required String titleSnapshot,
+                required DateTime scheduledAtSnapshot,
+                required int durationMinutesSnapshot,
+                Value<String?> goalTitleSnapshot = const Value.absent(),
+                Value<bool> isOptionalSnapshot = const Value.absent(),
+                Value<int?> reminderMinutesSnapshot = const Value.absent(),
+                required String pomodoroModeSnapshot,
+                Value<int?> customFocusMinutesSnapshot = const Value.absent(),
+                Value<int?> customBreakMinutesSnapshot = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<DateTime?> skippedAt = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RoutineItemRunRecordsCompanion.insert(
+                id: id,
+                routineRunId: routineRunId,
+                routineItemId: routineItemId,
+                sourceItemId: sourceItemId,
+                taskId: taskId,
+                taskIdSnapshot: taskIdSnapshot,
+                positionSnapshot: positionSnapshot,
+                titleSnapshot: titleSnapshot,
+                scheduledAtSnapshot: scheduledAtSnapshot,
+                durationMinutesSnapshot: durationMinutesSnapshot,
+                goalTitleSnapshot: goalTitleSnapshot,
+                isOptionalSnapshot: isOptionalSnapshot,
+                reminderMinutesSnapshot: reminderMinutesSnapshot,
+                pomodoroModeSnapshot: pomodoroModeSnapshot,
+                customFocusMinutesSnapshot: customFocusMinutesSnapshot,
+                customBreakMinutesSnapshot: customBreakMinutesSnapshot,
+                status: status,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                skippedAt: skippedAt,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RoutineItemRunRecordsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({routineRunId = false, routineItemId = false, taskId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (routineRunId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.routineRunId,
+                                    referencedTable:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._routineRunIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._routineRunIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (routineItemId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.routineItemId,
+                                    referencedTable:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._routineItemIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._routineItemIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (taskId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.taskId,
+                                    referencedTable:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._taskIdTable(db),
+                                    referencedColumn:
+                                        $$RoutineItemRunRecordsTableReferences
+                                            ._taskIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$RoutineItemRunRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $RoutineItemRunRecordsTable,
+      RoutineItemRunRecord,
+      $$RoutineItemRunRecordsTableFilterComposer,
+      $$RoutineItemRunRecordsTableOrderingComposer,
+      $$RoutineItemRunRecordsTableAnnotationComposer,
+      $$RoutineItemRunRecordsTableCreateCompanionBuilder,
+      $$RoutineItemRunRecordsTableUpdateCompanionBuilder,
+      (RoutineItemRunRecord, $$RoutineItemRunRecordsTableReferences),
+      RoutineItemRunRecord,
+      PrefetchHooks Function({
+        bool routineRunId,
+        bool routineItemId,
+        bool taskId,
+      })
+    >;
 typedef $$CalendarEventRecordsTableCreateCompanionBuilder =
     CalendarEventRecordsCompanion Function({
       required String id,
@@ -8044,6 +15583,16 @@ class $MichiFocusDatabaseManager {
         _db,
         _db.pomodoroRuntimeRecords,
       );
+  $$RoutineRecordsTableTableManager get routineRecords =>
+      $$RoutineRecordsTableTableManager(_db, _db.routineRecords);
+  $$RoutineDayRecordsTableTableManager get routineDayRecords =>
+      $$RoutineDayRecordsTableTableManager(_db, _db.routineDayRecords);
+  $$RoutineItemRecordsTableTableManager get routineItemRecords =>
+      $$RoutineItemRecordsTableTableManager(_db, _db.routineItemRecords);
+  $$RoutineRunRecordsTableTableManager get routineRunRecords =>
+      $$RoutineRunRecordsTableTableManager(_db, _db.routineRunRecords);
+  $$RoutineItemRunRecordsTableTableManager get routineItemRunRecords =>
+      $$RoutineItemRunRecordsTableTableManager(_db, _db.routineItemRunRecords);
   $$CalendarEventRecordsTableTableManager get calendarEventRecords =>
       $$CalendarEventRecordsTableTableManager(_db, _db.calendarEventRecords);
 }

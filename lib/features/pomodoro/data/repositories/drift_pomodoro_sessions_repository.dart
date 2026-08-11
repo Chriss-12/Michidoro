@@ -40,6 +40,7 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
         goalId: Value(goalId),
         taskId: Value(taskId),
         startMoodScore: Value(startMoodScore),
+        moodPromptPending: Value(status == PomodoroSessionStatus.completed),
         status: status.name,
         createdAt: now,
       ),
@@ -87,6 +88,7 @@ class DriftPomodoroSessionsRepository implements PomodoroSessionsRepository {
       taskId: record.taskId,
       startMoodScore: record.startMoodScore,
       endMoodScore: record.endMoodScore,
+      moodPromptPending: record.moodPromptPending,
       wasDistracted: record.wasDistracted,
       distractionMinutes: record.distractionMinutes,
     );

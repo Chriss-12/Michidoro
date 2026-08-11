@@ -17,6 +17,9 @@ import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomod
 import 'package:pomodoro_app_v1/features/reports/data/repositories/drift_statistics_report_repository.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_repository.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/features/routines/data/repositories/drift_routines_repository.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/settings/data/repositories/file_settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/data/repositories/drift_tasks_repository.dart';
@@ -112,6 +115,24 @@ Future<void> configureDependencies() async {
       ..registerLazySingleton<TasksRepository>(
         () => DriftTasksRepository(serviceLocator<TasksDao>()),
       );
+  }
+
+  if (!serviceLocator.isRegistered<RoutinesDao>()) {
+    serviceLocator.registerLazySingleton<RoutinesDao>(
+      () => RoutinesDao(serviceLocator<MichiFocusDatabase>()),
+    );
+  }
+  if (!serviceLocator.isRegistered<RoutinesRepository>()) {
+    serviceLocator.registerLazySingleton<RoutinesRepository>(
+      () => DriftRoutinesRepository(serviceLocator<RoutinesDao>()),
+    );
+  }
+  if (!serviceLocator.isRegistered<RoutinesController>()) {
+    final routinesController = RoutinesController(
+      repository: serviceLocator<RoutinesRepository>(),
+    );
+    serviceLocator.registerSingleton<RoutinesController>(routinesController);
+    _loadInBackground(routinesController.load());
   }
 
   if (!serviceLocator.isRegistered<GenerateStatisticsReport>()) {

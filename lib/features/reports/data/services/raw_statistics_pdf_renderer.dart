@@ -38,7 +38,7 @@ class RawStatisticsPdfRenderer implements StatisticsReportDocumentRenderer {
         'Pomodoros: ${data.completedPomodoros} | '
         '${t('Minutos enfocados', 'Focused minutes')}: ${data.focusedMinutes}';
     final moodLine =
-        '${t('Ánimo final/promedio', 'Final/average mood')}: $mood | '
+        '${t('Ánimo promedio en tareas', 'Average mood during tasks')}: $mood | '
         '${t('Distracciones', 'Distractions')}: '
         '${data.distractionMinutes} min';
 
@@ -140,6 +140,95 @@ class RawStatisticsPdfRenderer implements StatisticsReportDocumentRenderer {
           totalTasks: bucket.totalTasks,
           value: bucket.completionRatio,
         );
+      }
+    }
+
+    final routines = data.routines;
+    if (routines != null) {
+      final consistency = routines.consistency;
+      final delay = routines.averageStartDelayMinutes;
+      final routineMood = routines.moodAverage;
+      final abandonment = routines.typicalAbandonmentItem;
+
+      writer.addSection(t('Constancia de rutinas', 'Routine consistency'));
+      if (consistency == null) {
+        writer.addText(
+          t(
+            'Sin datos: el período no contiene actividades obligatorias.',
+            'No data: this period contains no required activities.',
+          ),
+          color: _muted,
+        );
+      } else {
+        final consistencyPercent = (consistency * 100).round();
+        writer.addBar(
+          label: t(
+            '$consistencyPercent% · ${routines.completedRequiredItems} de ${routines.requiredItems} actividades obligatorias',
+            '$consistencyPercent% · ${routines.completedRequiredItems} of ${routines.requiredItems} required activities',
+          ),
+          value: consistency,
+          color: _green,
+        );
+      }
+      writer.addPanel([
+        t(
+          'Rutinas: ${routines.completedRuns} completadas | ${routines.inProgressRuns} en progreso | ${routines.skippedRuns} omitidas | ${routines.missedRuns} perdidas',
+          'Routines: ${routines.completedRuns} completed | ${routines.inProgressRuns} in progress | ${routines.skippedRuns} skipped | ${routines.missedRuns} missed',
+        ),
+        t(
+          'Actividades: ${routines.scheduledItems} programadas | ${routines.inProgressItems} en progreso | ${routines.completedItems} completadas',
+          'Activities: ${routines.scheduledItems} scheduled | ${routines.inProgressItems} in progress | ${routines.completedItems} completed',
+        ),
+        t(
+          'Actividades omitidas / perdidas: ${routines.skippedItems} / ${routines.missedItems}',
+          'Skipped / missed activities: ${routines.skippedItems} / ${routines.missedItems}',
+        ),
+        t(
+          'Foco planificado / real: ${routines.plannedFocusMinutes} / ${routines.focusedMinutes} min',
+          'Planned / actual focus: ${routines.plannedFocusMinutes} / ${routines.focusedMinutes} min',
+        ),
+        t(
+          'Retraso promedio: ${delay == null ? 'Sin datos' : '${delay.toStringAsFixed(1)} min'} (${routines.startDelaySampleCount} muestras)',
+          'Average delay: ${delay == null ? 'No data' : '${delay.toStringAsFixed(1)} min'} (${routines.startDelaySampleCount} samples)',
+        ),
+        t(
+          'Ánimo promedio: ${routineMood == null ? 'Sin datos' : '${routineMood.toStringAsFixed(1)}/5'} (${routines.moodSampleCount} muestras)',
+          'Average mood: ${routineMood == null ? 'No data' : '${routineMood.toStringAsFixed(1)}/5'} (${routines.moodSampleCount} samples)',
+        ),
+        t(
+          'Mejor racha por rutina: ${routines.longestCompletedStreak} días',
+          'Best streak by routine: ${routines.longestCompletedStreak} days',
+        ),
+        if (abandonment != null)
+          t(
+            'Abandono más frecuente: $abandonment (${routines.typicalAbandonmentCount})',
+            'Most frequent abandonment: $abandonment (${routines.typicalAbandonmentCount})',
+          ),
+      ]);
+
+      if (routines.byRoutine.isNotEmpty) {
+        writer.addSection(t('Detalle por rutina', 'Breakdown by routine'));
+        for (final routine in routines.byRoutine) {
+          final routineConsistency = routine.consistency;
+          if (routineConsistency == null) {
+            writer.addText(
+              t(
+                '${routine.name}: sin actividades obligatorias',
+                '${routine.name}: no required activities',
+              ),
+              color: _muted,
+            );
+          } else {
+            writer.addBar(
+              label: t(
+                '${routine.name}: ${routine.completedRequiredItems}/${routine.requiredItems} obligatorias',
+                '${routine.name}: ${routine.completedRequiredItems}/${routine.requiredItems} required',
+              ),
+              value: routineConsistency,
+              color: _ink,
+            );
+          }
+        }
       }
     }
 

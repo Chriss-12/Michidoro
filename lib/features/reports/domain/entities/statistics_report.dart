@@ -170,6 +170,85 @@ class StatisticsCalendarDay {
   final int focusedSeconds;
 }
 
+class StatisticsRoutineBreakdown {
+  const StatisticsRoutineBreakdown({
+    required this.sourceRoutineId,
+    required this.name,
+    required this.scheduledRuns,
+    required this.completedRuns,
+    required this.requiredItems,
+    required this.completedRequiredItems,
+  });
+
+  final String sourceRoutineId;
+  final String name;
+  final int scheduledRuns;
+  final int completedRuns;
+  final int requiredItems;
+  final int completedRequiredItems;
+
+  double? get consistency =>
+      requiredItems == 0 ? null : completedRequiredItems / requiredItems;
+}
+
+class StatisticsRoutineMetrics {
+  const StatisticsRoutineMetrics({
+    required this.scheduledRuns,
+    required this.inProgressRuns,
+    required this.completedRuns,
+    required this.skippedRuns,
+    required this.missedRuns,
+    required this.scheduledItems,
+    required this.inProgressItems,
+    required this.completedItems,
+    required this.skippedItems,
+    required this.missedItems,
+    required this.requiredItems,
+    required this.completedRequiredItems,
+    required this.skippedOptionalItems,
+    required this.missedRequiredItems,
+    required this.plannedFocusMinutes,
+    required this.focusedSeconds,
+    required this.longestCompletedStreak,
+    required this.byRoutine,
+    this.averageStartDelayMinutes,
+    this.startDelaySampleCount = 0,
+    this.moodAverage,
+    this.moodSampleCount = 0,
+    this.typicalAbandonmentItem,
+    this.typicalAbandonmentCount = 0,
+  });
+
+  final int scheduledRuns;
+  final int inProgressRuns;
+  final int completedRuns;
+  final int skippedRuns;
+  final int missedRuns;
+  final int scheduledItems;
+  final int inProgressItems;
+  final int completedItems;
+  final int skippedItems;
+  final int missedItems;
+  final int requiredItems;
+  final int completedRequiredItems;
+  final int skippedOptionalItems;
+  final int missedRequiredItems;
+  final int plannedFocusMinutes;
+  final int focusedSeconds;
+  final double? averageStartDelayMinutes;
+  final int startDelaySampleCount;
+  final double? moodAverage;
+  final int moodSampleCount;
+  final String? typicalAbandonmentItem;
+  final int typicalAbandonmentCount;
+  final int longestCompletedStreak;
+  final List<StatisticsRoutineBreakdown> byRoutine;
+
+  double? get consistency =>
+      requiredItems == 0 ? null : completedRequiredItems / requiredItems;
+  int get focusedMinutes => focusedSeconds ~/ 60;
+}
+
 class StatisticsReportData {
   const StatisticsReportData({
     required this.range,
@@ -187,6 +266,7 @@ class StatisticsReportData {
     this.moodAverage,
     this.moodSampleCount = 0,
     this.distractionMinutes = 0,
+    this.routines,
   });
 
   final ResolvedStatisticsReportRange range;
@@ -204,6 +284,7 @@ class StatisticsReportData {
   final double? moodAverage;
   final int moodSampleCount;
   final int distractionMinutes;
+  final StatisticsRoutineMetrics? routines;
 
   DateTime get generatedAt => range.generatedAt;
   int get focusedMinutes => focusedSeconds ~/ 60;

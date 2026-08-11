@@ -10,6 +10,13 @@ V6-M0 connects planned task duration with an explicit, recoverable Pomodoro
 execution plan. Task duration remains net focus time. Breaks add elapsed clock
 time but never task progress.
 
+The approved V6-M0.5 extension makes timed recovery and per-block wellbeing
+explicit without creating a second source of truth. Every completed non-final
+focus block transitions to its configured break countdown. The final focus
+block completes the task without forcing a trailing break. Mood remains stored
+on the completed Pomodoro session and is aggregated from SQLite for Home
+statistics and PDF reports.
+
 ### REQ-V6-001 - Editable task duration and automatic task states
 
 Status: Implemented
@@ -173,6 +180,40 @@ Acceptance criteria:
 - [x] Controls and dialog actions remain responsive under supported font scales.
 - [ ] Android visual inspection covers light/dark themes, at least two
       typography presets, small-screen layout, and active/paused/break states.
+
+### REQ-V6-006 - Timed block recovery and daily wellbeing
+
+Status: Implemented
+
+Objective:
+Make recovery time and post-block wellbeing part of the visible continuous task
+plan while preserving focus-minute, task-state, and report consistency.
+
+Checklist:
+- [x] Requirement approved
+- [x] UI, state, persistence, and report impact reviewed
+- [x] Existing session mood fields and report aggregation selected for reuse
+- [x] Implementation completed
+- [x] Checks passed
+- [ ] Android visual inspection completed
+- [x] Documentation and traceability updated
+
+Acceptance criteria:
+- [x] Every completed non-final task focus block starts the configured break
+      countdown, including continuous and explicit single-block execution.
+- [x] Break seconds never increase task focus progress or complete a task.
+- [x] The final focus block completes the planned task without forcing a
+      trailing break.
+- [x] Focus asks how the user feels after each completed block on a scale from
+      1 to 5 using face icons rather than emoji or plain numbers.
+- [x] Every unanswered completed-block reflection survives background phase
+      transitions and Android process recreation until it is answered.
+- [x] The selected score is persisted on that block's Pomodoro session.
+- [x] Home statistics expose the average final mood for completed task blocks
+      in the selected range, with a specific daily label when Day is selected.
+- [x] PDF reports include the same average mood, scale, and sample count for
+      their exported range, including day reports.
+- [x] Unified database export/import preserves and validates reflection data.
 
 ## Non-goals
 

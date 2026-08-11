@@ -16,6 +16,7 @@ class StatisticsReportSource {
       inProgress: 0,
       completed: 0,
     ),
+    this.routines,
   });
 
   final StatisticsTaskTotals tasks;
@@ -28,4 +29,5 @@ class StatisticsReportSource {
   final double? moodAverage;
   final int moodSampleCount;
   final int distractionMinutes;
+  final StatisticsRoutineMetrics? routines;
 }

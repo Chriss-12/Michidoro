@@ -24,7 +24,10 @@ class FileSettingsRepository implements SettingsRepository {
     try {
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map<String, dynamic>) {
-        return const TimerPreferences.defaults();
+        return const TimerPreferences.defaults(
+          completedOnboardingVersion:
+              AppSettingsController.currentOnboardingVersion,
+        );
       }
 
       return TimerPreferences(
@@ -56,11 +59,20 @@ class FileSettingsRepository implements SettingsRepository {
           decoded['enabledStatisticsCharts'],
         ),
         language: AppLanguage.fromCode(decoded['languageCode']),
+        completedOnboardingVersion: _readOnboardingVersion(
+          decoded['completedOnboardingVersion'],
+        ),
       ).normalized();
     } on FormatException {
-      return const TimerPreferences.defaults();
+      return const TimerPreferences.defaults(
+        completedOnboardingVersion:
+            AppSettingsController.currentOnboardingVersion,
+      );
     } on FileSystemException {
-      return const TimerPreferences.defaults();
+      return const TimerPreferences.defaults(
+        completedOnboardingVersion:
+            AppSettingsController.currentOnboardingVersion,
+      );
     }
   }
 
@@ -93,6 +105,7 @@ class FileSettingsRepository implements SettingsRepository {
           for (final chart in normalized.enabledStatisticsCharts) chart.name,
         ],
         'languageCode': normalized.language.code,
+        'completedOnboardingVersion': normalized.completedOnboardingVersion,
       }),
       flush: true,
     );
@@ -159,6 +172,14 @@ class FileSettingsRepository implements SettingsRepository {
       (pattern) => pattern.name == value,
       orElse: () => PomodoroVibrationPattern.normal,
     );
+  }
+
+  static int _readOnboardingVersion(Object? value) {
+    if (value is int && value >= 0) {
+      return value;
+    }
+
+    return AppSettingsController.currentOnboardingVersion;
   }
 
   static AppTypographyPreset _readTypographyPreset(Object? value) {

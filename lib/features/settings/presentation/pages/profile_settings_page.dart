@@ -22,6 +22,7 @@ class ProfileSettingsPage extends StatelessWidget {
 
     return AppShell(
       selectedIndex: 4,
+      showHeader: false,
       child: ListView(
         padding: AppCardPaddings.detailPage,
         children: [

@@ -41,7 +41,7 @@ equivalent immutable task-completion event before implementation.
 | Legacy unknown completions | Completed legacy tasks for which no trustworthy completion time exists. They are shown as unavailable/unknown and never silently assigned to a period. |
 | Completed Pomodoros | Count completed sessions whose `endedAt` falls inside the resolved interval. |
 | Focused time | Sum `focusedSeconds` for those completed sessions. Display rounding occurs only after summing seconds. |
-| Mood average | Arithmetic mean of final mood, falling back to start mood only when final mood is absent, for sessions ending inside the interval. The sample count is always shown. |
+| Mood average | Arithmetic mean of valid final mood scores from completed task-linked focus blocks ending inside the interval. Start mood, partial sessions, free Pomodoros, null/invalid scores, and unanswered prompts are excluded. The sample count is always shown. |
 | Distraction time | Sum persisted `distractionMinutes` only for sessions marked distracted and ending inside the interval. |
 
 Historical integrity rules:
@@ -235,3 +235,22 @@ Remaining before `Verified`:
 - Render the extreme long-profile fixture at 144 DPI and inspect every page.
 - Repeat the Android viewer smoke for month, year, and custom reports.
 - Record one warm-up plus ten measured Android runs for the three p95 budgets.
+
+## Routine analytics verification - 2026-08-09
+
+- `ReportsDao` now aggregates complete routine/run item states, required-item
+  consistency, abandonment, start delay, planned focus, completed-session focus,
+  mood, and per-routine streaks from bounded SQLite ranges.
+- Completed routine focus and mood are attributed by session `ended_at`; planned
+  occurrences remain attributed by run `local_date`.
+- A zero required-item denominator is represented as unavailable and rendered as
+  `Sin datos` / `No data`, never as a fabricated zero percent.
+- The indexed high-volume test covers 20,000 routine runs, 20,000 routine item
+  runs, 20,000 tasks, and 50,000 sessions. One warm-up plus ten measured complete
+  snapshots stayed within the 1,000 ms p95 budget.
+- Three-page Spanish and English PDFs rendered at 144 DPI without clipping,
+  overlap, blank pages, or broken accents.
+- Per-routine streaks count consecutive scheduled occurrences rather than
+  consecutive calendar dates, avoiding penalties for weekends or weekly gaps.
+- `flutter analyze`, 202 automated tests, debug APK build, data-preserving install,
+  launch, and portrait Home inspection passed on RMX3301 / Android 15.

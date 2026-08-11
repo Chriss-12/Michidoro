@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
+import 'package:pomodoro_app_v1/app/router/app_router.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/calendar/domain/entities/calendar_event.dart';
@@ -15,6 +16,8 @@ import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomod
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_source.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_repository.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/pages/notification_settings_page.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/pages/settings_page.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
@@ -43,9 +46,14 @@ void main() {
         CalendarController(repository: _MemoryCalendarEventsRepository()),
       );
     }
+    if (!serviceLocator.isRegistered<TasksRepository>()) {
+      serviceLocator.registerSingleton<TasksRepository>(
+        _MemoryTasksRepository(),
+      );
+    }
     if (!serviceLocator.isRegistered<TasksController>()) {
       serviceLocator.registerSingleton<TasksController>(
-        TasksController(repository: _MemoryTasksRepository()),
+        TasksController(repository: serviceLocator<TasksRepository>()),
       );
     }
     if (!serviceLocator.isRegistered<GenerateStatisticsReport>()) {
@@ -57,6 +65,8 @@ void main() {
     }
     final tasksController = serviceLocator<TasksController>();
     final pomodoroController = serviceLocator<PomodoroController>();
+    appSettingsController.completedOnboardingVersion.value =
+        AppSettingsController.currentOnboardingVersion;
     await tasksController.createTask('Tarea rapida V2');
     await tasksController.updateTaskPlanning(
       id: tasksController.tasks.value.single.id,
@@ -344,6 +354,20 @@ void main() {
     );
     await tester.tapAt(const Offset(12, 12));
     await tester.pumpAndSettle();
+    pomodoroController.pendingReflectionSessionId.value = 'test-reflection';
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cierre de enfoque'));
+    expect(
+      find.byIcon(Icons.sentiment_very_dissatisfied_rounded),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.sentiment_dissatisfied_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.sentiment_neutral_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.sentiment_satisfied_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.sentiment_very_satisfied_rounded), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+    pomodoroController.pendingReflectionSessionId.value = null;
+    await tester.pumpAndSettle();
     await tester.binding.setSurfaceSize(const Size(480, 1800));
     await tester.pumpAndSettle();
 
@@ -425,7 +449,7 @@ void main() {
       PomodoroVibrationPattern.double,
     );
     expect(
-      find.text('Dos toques cortos para distinguir el final.'),
+      find.text('Dos vibraciones separadas para distinguir el final.'),
       findsOneWidget,
     );
     await tester.tap(vibrationSwitch);
@@ -433,6 +457,14 @@ void main() {
     expect(pomodoroController.isRunning.value, isFalse);
     expect(appSettingsController.completionVibrationEnabled.value, isFalse);
     await tester.tap(vibrationSwitch);
+    await tester.pumpAndSettle();
+
+    AppRouter.router.go(NotificationSettingsPage.routePath);
+    await tester.pumpAndSettle();
+    expect(find.text('Notificaciones'), findsWidgets);
+    expect(find.text('Chriss'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    AppRouter.router.go(SettingsPage.routePath);
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -449,6 +481,29 @@ void main() {
     );
     await tester.ensureVisible(find.text('English'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Ver onboarding'),
+      500,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.tap(find.text('Ver onboarding'));
+    await tester.pumpAndSettle();
+    expect(find.text('Organiza tu día'), findsOneWidget);
+    await tester.tap(find.text('Omitir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajustes'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('English'),
+      500,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
     expect(find.text('Language'), findsOneWidget);
@@ -489,9 +544,12 @@ void main() {
     expect(find.byTooltip('Test vibration'), findsOneWidget);
     expect(find.text('Vibration pattern'), findsOneWidget);
     expect(find.text('Double'), findsOneWidget);
-    await tester.tap(
-      find.byType(DropdownButtonFormField<PomodoroVibrationPattern>),
+    final englishVibrationPatternSelector = find.byType(
+      DropdownButtonFormField<PomodoroVibrationPattern>,
     );
+    await tester.ensureVisible(englishVibrationPatternSelector);
+    await tester.pumpAndSettle();
+    await tester.tap(englishVibrationPatternSelector);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Normal').last);
     await tester.pumpAndSettle();

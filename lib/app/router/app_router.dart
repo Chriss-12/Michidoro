@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/pages/goals_page.dart';
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
+import 'package:pomodoro_app_v1/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/pages/pomodoro_page.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/directory_picker_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/local_image_picker_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/notification_settings_page.dart';
@@ -26,6 +28,11 @@ class AppRouter {
         pageBuilder: (context, state) =>
             _buildTransitionPage(state: state, child: const SplashPage()),
       ),
+      GoRoute(
+        path: OnboardingPage.routePath,
+        pageBuilder: (context, state) =>
+            _buildTransitionPage(state: state, child: const OnboardingPage()),
+      ),
       ShellRoute(
         pageBuilder: (context, state, child) => _buildTransitionPage(
           state: state,
@@ -42,8 +49,12 @@ class AppRouter {
           ),
           GoRoute(
             path: TasksPage.routePath,
-            pageBuilder: (context, state) =>
-                _buildTransitionPage(state: state, child: const TasksPage()),
+            pageBuilder: (context, state) => _buildTransitionPage(
+              state: state,
+              child: TasksPage(
+                showRoutines: state.uri.queryParameters['view'] == 'routines',
+              ),
+            ),
           ),
           GoRoute(
             path: PomodoroPage.routePath,
@@ -80,6 +91,15 @@ class AppRouter {
         pageBuilder: (context, state) => _buildTransitionPage(
           state: state,
           child: const PomodoroFullscreenPage(),
+        ),
+      ),
+      GoRoute(
+        path: RoutineEditorPage.routePath,
+        pageBuilder: (context, state) => NoTransitionPage<bool>(
+          key: state.pageKey,
+          child: RoutineEditorPage(
+            routineId: state.uri.queryParameters['id'],
+          ),
         ),
       ),
 

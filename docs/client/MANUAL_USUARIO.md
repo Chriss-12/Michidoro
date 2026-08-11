@@ -2,6 +2,16 @@
 
 MichiFocus es una app Pomodoro offline-first para planificar objetivos, organizar tareas, trabajar con foco y revisar el avance sin depender de internet.
 
+## Primera apertura
+
+Después de la pantalla de carga, una instalación nueva presenta cuatro pantallas
+breves sobre organización, enfoque, progreso y personalización. Podés avanzar,
+volver o tocar **Omitir** en cualquier momento. Al terminar u omitir, la app abre
+Inicio y no vuelve a mostrar esta introducción en los siguientes arranques.
+
+Las instalaciones que ya tenían datos entran directamente a Inicio después de
+actualizar, sin alterar tareas, sesiones ni preferencias.
+
 ## Inicio
 
 La pantalla **Home** resume el estado del día y del mes:
@@ -39,6 +49,29 @@ La sección **Tasks** permite crear tareas rápidas sin fecha. También podés:
 
 No se pueden guardar tareas sin título.
 
+### Rutinas
+
+Dentro de **Tareas**, el selector **Tareas | Rutinas** permite configurar grupos
+de actividades que se repiten. Podés crear una rutina en cuatro pasos:
+
+1. nombre, descripción, icono y color;
+2. días de la semana;
+3. actividades con hora, duración, objetivo opcional, recordatorio y preferencia
+   Pomodoro;
+4. revisión de tiempo de enfoque, descansos, final estimado y cruces de horario.
+
+Al pulsar **Crear rutina**, el editor se abre en una ventana sobre la lista y
+el fondo queda desenfocado. La ventana se adapta al teclado y mantiene visibles
+las acciones. Si intentás salir con cambios sin guardar, podés seguir editando o
+descartar el borrador. La edición de una rutina existente usa la pantalla
+completa para conservar más espacio de trabajo.
+
+Las actividades se pueden editar, quitar y reordenar. Un cruce de horario se
+muestra como advertencia, pero la aplicación no cambia las horas sin permiso.
+Desde el menú de cada rutina se puede editar, duplicar, pausar, reactivar,
+archivar o restaurar. La generación de tareas diarias corresponde al flujo de
+ejecución de rutinas; configurar una rutina no modifica las tareas existentes.
+
 ## Focus
 
 Cada tarea puede iniciar un Pomodoro con **Empezar Pomodoro**. La acción
@@ -65,6 +98,12 @@ Durante la sesión podés:
 - terminar antes y guardar solo el tiempo realmente enfocado;
 - completar la tarea activa;
 - pasar por descansos cortos o largos.
+
+Al terminar cada bloque de enfoque que todavía tenga trabajo pendiente, el aro
+muestra la cuenta regresiva del descanso configurado. Ese tiempo de recuperación
+no se suma al avance de la tarea. La app también pregunta cómo te sentís del 1
+al 5 mediante cinco iconos de rostro. Si quedan varias respuestas pendientes,
+se conservan en orden incluso después de cerrar y volver a abrir la app.
 
 ## Objetivos
 
@@ -97,7 +136,9 @@ En **Home > Descargar estadísticas** podés exportar reportes por:
 - año;
 - rango personalizado.
 
-El PDF incluye nombre de usuario, correo electrónico, calendario, tareas por estado, Pomodoros completados, minutos enfocados y una frase de avance.
+El PDF incluye nombre de usuario, correo electrónico, calendario, tareas por
+estado, Pomodoros completados, minutos enfocados, promedio de ánimo registrado
+en las tareas y una frase de avance.
 
 Los gráficos que se oculten en **Home > Rendimiento** también se excluyen del reporte. Esto permite preparar un PDF más limpio, mostrando solo los indicadores que se quieren compartir.
 
@@ -121,6 +162,8 @@ En **Settings** podés ajustar:
 - tema visual;
 - tamaño de texto;
 - carpeta de reportes;
+- vibración física al finalizar, con patrones **Suave**, **Normal**, **Doble** e
+  **Intensa** y un botón para probarlos;
 - alertas y preferencias locales disponibles.
 
 Cuando la app está abierta, las tareas planificadas para el día pueden generar un recordatorio local con el tono seleccionado. Las notificaciones se acumulan en la parte superior derecha y, al abrirlas, llevan al calendario para revisar la planificación.

@@ -35,6 +35,20 @@ class DriftStatisticsReportRepository implements StatisticsReportRepository {
       start: range.start,
       end: range.end,
     );
+    final routineTotals = await _dao.loadRoutineTotals(
+      start: range.start,
+      end: range.end,
+    );
+    final hasRoutineData =
+        routineTotals.scheduledRuns > 0 ||
+        routineTotals.focusedSeconds > 0 ||
+        routineTotals.moodSampleCount > 0;
+    final routineBreakdown = routineTotals.scheduledRuns == 0
+        ? const <ReportRoutineBreakdownRecord>[]
+        : await _dao.loadRoutineBreakdown(
+            start: range.start,
+            end: range.end,
+          );
     final plannedTasks = taskTotals[0];
     final createdTasks = taskTotals[1];
 
@@ -70,6 +84,44 @@ class DriftStatisticsReportRepository implements StatisticsReportRepository {
       moodAverage: sessionTotals.moodAverage,
       moodSampleCount: sessionTotals.moodSampleCount,
       distractionMinutes: sessionTotals.distractionMinutes,
+      routines: !hasRoutineData
+          ? null
+          : StatisticsRoutineMetrics(
+              scheduledRuns: routineTotals.scheduledRuns,
+              inProgressRuns: routineTotals.inProgressRuns,
+              completedRuns: routineTotals.completedRuns,
+              skippedRuns: routineTotals.skippedRuns,
+              missedRuns: routineTotals.missedRuns,
+              scheduledItems: routineTotals.scheduledItems,
+              inProgressItems: routineTotals.inProgressItems,
+              completedItems: routineTotals.completedItems,
+              skippedItems: routineTotals.skippedItems,
+              missedItems: routineTotals.missedItems,
+              requiredItems: routineTotals.requiredItems,
+              completedRequiredItems: routineTotals.completedRequiredItems,
+              skippedOptionalItems: routineTotals.skippedOptionalItems,
+              missedRequiredItems: routineTotals.missedRequiredItems,
+              plannedFocusMinutes: routineTotals.plannedFocusMinutes,
+              focusedSeconds: routineTotals.focusedSeconds,
+              averageStartDelayMinutes: routineTotals.averageStartDelayMinutes,
+              startDelaySampleCount: routineTotals.startDelaySampleCount,
+              moodAverage: routineTotals.moodAverage,
+              moodSampleCount: routineTotals.moodSampleCount,
+              typicalAbandonmentItem: routineTotals.typicalAbandonmentItem,
+              typicalAbandonmentCount: routineTotals.typicalAbandonmentCount,
+              longestCompletedStreak: routineTotals.longestCompletedStreak,
+              byRoutine: [
+                for (final routine in routineBreakdown)
+                  StatisticsRoutineBreakdown(
+                    sourceRoutineId: routine.sourceRoutineId,
+                    name: routine.name,
+                    scheduledRuns: routine.scheduledRuns,
+                    completedRuns: routine.completedRuns,
+                    requiredItems: routine.requiredItems,
+                    completedRequiredItems: routine.completedRequiredItems,
+                  ),
+              ],
+            ),
     );
   }
 

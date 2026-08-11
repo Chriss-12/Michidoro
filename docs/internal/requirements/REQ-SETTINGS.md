@@ -57,6 +57,8 @@ Notes:
 - M6 verified: existing settings controls now persist timer preferences locally and restore them at app startup.
 - V7-M2 relocated completion vibration from Focus to Settings while retaining
   the existing `completionVibrationEnabled` JSON value.
+- V7-M2.1 stores the selected pattern and drives real Android vibration with
+  distinct timing and amplitude; `Normal` remains the legacy fallback.
 - Theme and notification preference persistence remain out of scope for this slice.
 
 ### REQ-SET-003 - Theme preferences

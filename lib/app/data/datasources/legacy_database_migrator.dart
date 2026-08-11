@@ -33,6 +33,7 @@ class LegacyDatabaseMigrator {
         .where((file) => file.existsSync())
         .toList(growable: false);
     if (legacyFiles.isEmpty) return;
+    await _validateLegacySources(directory, legacyFiles);
 
     final backupDirectory = Directory(
       '${directory.path}/michifocus-legacy-backup',
@@ -155,6 +156,85 @@ class LegacyDatabaseMigrator {
     final database = legacy_goals.GoalsDatabase(NativeDatabase(file));
     try {
       return await legacy_goals.GoalsDao(database).getAllGoals();
+    } finally {
+      await database.close();
+    }
+  }
+
+  static Future<void> _validateLegacySources(
+    Directory directory,
+    List<File> files,
+  ) async {
+    final names = files.map(_nameOf).toSet();
+    if (names.contains('michifocus_goals.sqlite')) {
+      await _validateLegacySource(
+        File('${directory.path}/michifocus_goals.sqlite'),
+        expectedTable: 'goals',
+        openDatabase: legacy_goals.GoalsDatabase.new,
+      );
+    }
+    if (names.contains('michifocus_tasks.sqlite')) {
+      await _validateLegacySource(
+        File('${directory.path}/michifocus_tasks.sqlite'),
+        expectedTable: 'tasks',
+        openDatabase: legacy_tasks.TasksDatabase.new,
+      );
+    }
+    if (names.contains('michifocus_pomodoro_sessions.sqlite')) {
+      await _validateLegacySource(
+        File('${directory.path}/michifocus_pomodoro_sessions.sqlite'),
+        expectedTable: 'pomodoro_sessions',
+        openDatabase: legacy_pomodoro.PomodoroSessionsDatabase.new,
+      );
+    }
+    if (names.contains('michifocus_calendar_events.sqlite')) {
+      await _validateLegacySource(
+        File('${directory.path}/michifocus_calendar_events.sqlite'),
+        expectedTable: 'calendar_events',
+        openDatabase: legacy_calendar.CalendarEventsDatabase.new,
+      );
+    }
+  }
+
+  static Future<void> _validateLegacySource(
+    File file, {
+    required String expectedTable,
+    required GeneratedDatabase Function(QueryExecutor executor) openDatabase,
+  }) async {
+    final executor = NativeDatabase(
+      file,
+      setup: (database) {
+        final version = database
+            .select(
+              'PRAGMA user_version',
+            )
+            .single
+            .values
+            .single;
+        if (version is! int || version < 1) {
+          throw FormatException(
+            'Backup legacy sin version valida: ${_nameOf(file)}.',
+          );
+        }
+        final tables = database.select(
+          "SELECT name FROM sqlite_master WHERE type = 'table'",
+        );
+        if (!tables.any((row) => row['name'] == expectedTable)) {
+          throw FormatException(
+            'Backup legacy sin tabla $expectedTable: ${_nameOf(file)}.',
+          );
+        }
+        final quickCheck = database.select('PRAGMA quick_check');
+        if (quickCheck.length != 1 || quickCheck.single.values.single != 'ok') {
+          throw FormatException(
+            'Backup legacy danado: ${_nameOf(file)}.',
+          );
+        }
+      },
+    );
+    final database = openDatabase(executor);
+    try {
+      await database.customSelect('SELECT 1').getSingle();
     } finally {
       await database.close();
     }

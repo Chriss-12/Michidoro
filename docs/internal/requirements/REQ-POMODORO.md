@@ -211,9 +211,13 @@ Acceptance criteria:
 
 Notes:
 - Approved and implemented on 2026-07-04 as `M4.1`.
-- Implemented with local Flutter `SystemSound` and `HapticFeedback` to avoid adding audio packages.
+- Completion sound uses local Flutter/native playback. Android completion
+  vibration uses the physical motor through `Vibrator`/`VibrationEffect`; other
+  platforms retain Flutter haptics as a fallback.
 - Available options: `Campana suave`, `Toque breve`, and `Silencio`.
 - Completion vibration is enabled by default and can be disabled from Settings.
 - V7-M2 moved vibration ownership out of Focus without changing the existing
   state, feedback behavior, or local JSON key.
+- V7-M2.1 added four native Android timing/amplitude patterns and the normal
+  `VIBRATE` permission without adding a dependency or changing SQLite.
 - Verification evidence: targeted settings/controller tests passed; full `flutter test` passed.

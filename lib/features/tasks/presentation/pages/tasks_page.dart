@@ -3,6 +3,9 @@ import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/widgets/routines_view.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
@@ -11,9 +14,10 @@ import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key});
+  const TasksPage({super.key, this.showRoutines = false});
 
   static const routePath = '/tasks';
+  final bool showRoutines;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -22,6 +26,26 @@ class TasksPage extends StatefulWidget {
 class _TasksPageState extends State<TasksPage> {
   final TextEditingController _titleController = TextEditingController();
   final TasksController _tasksController = serviceLocator<TasksController>();
+  RoutinesRepository? _routinesRepository;
+  RoutinesController? _routinesController;
+  late _PlanningView _selectedView;
+
+  RoutinesController get _routineController =>
+      _routinesController ??= serviceLocator<RoutinesController>();
+
+  RoutinesRepository get _routineRepository =>
+      _routinesRepository ??= serviceLocator<RoutinesRepository>();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedView = widget.showRoutines
+        ? _PlanningView.routines
+        : _PlanningView.tasks;
+    if (widget.showRoutines) {
+      _routineController.load();
+    }
+  }
 
   @override
   void dispose() {
@@ -57,7 +81,9 @@ class _TasksPageState extends State<TasksPage> {
           children: [
             const SizedBox(height: 24),
             Text(
-              context.tr('Mis tareas', 'My tasks'),
+              _selectedView == _PlanningView.tasks
+                  ? context.tr('Mis tareas', 'My tasks')
+                  : context.tr('Mis rutinas', 'My routines'),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontSize: AppDesignTokens.mainTitleFontSize,
                 fontWeight: FontWeight.w700,
@@ -66,80 +92,125 @@ class _TasksPageState extends State<TasksPage> {
             const SizedBox(height: 4),
             Text(
               context.tr(
-                'Organiza lo importante de hoy',
-                'Organize what matters today',
+                _selectedView == _PlanningView.tasks
+                    ? 'Organiza lo importante de hoy'
+                    : 'Programa actividades que repites con frecuencia',
+                _selectedView == _PlanningView.tasks
+                    ? 'Organize what matters today'
+                    : 'Schedule activities you repeat frequently',
               ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: palette.textSecondary,
               ),
             ),
-            const SizedBox(height: 18),
-            GlassCard(
-              padding: AppCardPaddings.compact,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _titleController,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: context.tr('Nueva tarea', 'New task'),
-                      hintText: context.tr(
-                        'Ej. Revisar avance del proyecto',
-                        'E.g. Review project progress',
-                      ),
-                      errorText: _localizedValidationMessage(
-                        context,
-                        validationMessage,
-                      ),
-                      prefixIcon: const Icon(Icons.add_task_rounded),
-                    ),
-                    onChanged: (_) => _tasksController.clearValidationMessage(),
-                    onSubmitted: (_) => _createTask(),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<_PlanningView>(
+                key: const ValueKey('tasks-routines-selector'),
+                segments: [
+                  ButtonSegment(
+                    value: _PlanningView.tasks,
+                    icon: const Icon(Icons.checklist_rounded),
+                    label: Text(context.tr('Tareas', 'Tasks')),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _createTask,
-                      icon: const Icon(Icons.add_rounded),
-                      label: Text(context.tr('Agregar tarea', 'Add task')),
-                    ),
+                  ButtonSegment(
+                    value: _PlanningView.routines,
+                    icon: const Icon(Icons.event_repeat_rounded),
+                    label: Text(context.tr('Rutinas', 'Routines')),
                   ),
                 ],
+                selected: {_selectedView},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) {
+                  final selected = selection.first;
+                  setState(() => _selectedView = selected);
+                  if (selected == _PlanningView.routines &&
+                      _routineController.routines.value.isEmpty) {
+                    _routineController.load();
+                  } else if (selected == _PlanningView.tasks) {
+                    _tasksController.loadTasks();
+                  }
+                },
               ),
             ),
             const SizedBox(height: 18),
-            if (tasks.isNotEmpty) ...[
-              _TaskFilterBar(
-                selectedFilter: filter,
-                tasks: tasks,
-                onFilterChanged: (value) =>
-                    _tasksController.selectedFilter = value,
+            if (_selectedView == _PlanningView.tasks) ...[
+              GlassCard(
+                padding: AppCardPaddings.compact,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      textInputAction: TextInputAction.done,
+                      decoration: InputDecoration(
+                        labelText: context.tr('Nueva tarea', 'New task'),
+                        hintText: context.tr(
+                          'Ej. Revisar avance del proyecto',
+                          'E.g. Review project progress',
+                        ),
+                        errorText: _localizedValidationMessage(
+                          context,
+                          validationMessage,
+                        ),
+                        prefixIcon: const Icon(Icons.add_task_rounded),
+                      ),
+                      onChanged: (_) =>
+                          _tasksController.clearValidationMessage(),
+                      onSubmitted: (_) => _createTask(),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _createTask,
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text(context.tr('Agregar tarea', 'Add task')),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
-            ],
-            GlassCard(
-              child: tasks.isEmpty
-                  ? const _EmptyTasksState()
-                  : _TaskList(
-                      filter: filter,
-                      tasks: visibleTasks,
-                      onToggleCompleted: _tasksController.toggleTaskCompletion,
-                      onStartFocus: (task) => startTaskFocusFlow(
-                        context: context,
-                        task: task,
+              if (tasks.isNotEmpty) ...[
+                _TaskFilterBar(
+                  selectedFilter: filter,
+                  tasks: tasks,
+                  onFilterChanged: (value) =>
+                      _tasksController.selectedFilter = value,
+                ),
+                const SizedBox(height: 18),
+              ],
+              GlassCard(
+                child: tasks.isEmpty
+                    ? const _EmptyTasksState()
+                    : _TaskList(
+                        filter: filter,
+                        tasks: visibleTasks,
+                        onToggleCompleted:
+                            _tasksController.toggleTaskCompletion,
+                        onStartFocus: (task) => startTaskFocusFlow(
+                          context: context,
+                          task: task,
+                        ),
+                        onEdit: _showEditTaskDialog,
+                        onDelete: _confirmDeleteTask,
                       ),
-                      onEdit: _showEditTaskDialog,
-                      onDelete: _confirmDeleteTask,
-                    ),
-            ),
+              ),
+            ] else
+              RoutinesView(
+                controller: _routineController,
+                tasksController: _tasksController,
+              ),
           ],
         );
       },
     );
   }
 }
+
+enum _PlanningView { tasks, routines }
 
 class _TaskFilterBar extends StatelessWidget {
   const _TaskFilterBar({
@@ -413,7 +484,55 @@ extension on _TasksPageState {
       return;
     }
 
-    await _tasksController.updateTaskTitle(task.id, title);
+    final isRoutineTask = await _routineRepository.isGeneratedTask(task.id);
+    if (!mounted) return;
+    var updateFutureTemplate = false;
+    if (isRoutineTask) {
+      final scope = await showDialog<_RoutineTaskEditScope>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            dialogContext.tr('Actualizar rutina', 'Update routine'),
+          ),
+          content: Text(
+            dialogContext.tr(
+              '¿Este cambio aplica solo a la tarea de hoy o también a las futuras?',
+              "Apply this change only to today's task or to future ones too?",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(dialogContext.tr('Cancelar', 'Cancel')),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.of(
+                dialogContext,
+              ).pop(_RoutineTaskEditScope.currentOnly),
+              child: Text(dialogContext.tr('Solo hoy', 'Today only')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(
+                dialogContext,
+              ).pop(_RoutineTaskEditScope.currentAndFuture),
+              child: Text(
+                dialogContext.tr('Hoy y futuras', 'Today and future'),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (scope == null) return;
+      updateFutureTemplate = scope == _RoutineTaskEditScope.currentAndFuture;
+    }
+
+    final updated = await _tasksController.updateTaskTitle(task.id, title);
+    if (updated && updateFutureTemplate) {
+      await _routineRepository.updateFutureTemplateTitleForTask(
+        taskId: task.id,
+        title: title,
+      );
+    }
   }
 
   Future<void> _confirmDeleteTask(Task task) async {
@@ -448,6 +567,8 @@ extension on _TasksPageState {
     }
   }
 }
+
+enum _RoutineTaskEditScope { currentOnly, currentAndFuture }
 
 class _EditTaskDialog extends StatefulWidget {
   const _EditTaskDialog({required this.initialTitle});

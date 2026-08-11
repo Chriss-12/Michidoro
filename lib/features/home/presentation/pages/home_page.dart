@@ -13,6 +13,12 @@ import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_pa
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/models/routine_schedule_projection.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
+import 'package:pomodoro_app_v1/features/routines/presentation/start_routine_focus_flow.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
@@ -48,6 +54,7 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 36),
         const _CalendarPlanningCard(),
         const SizedBox(height: 18),
+        const _RoutineTodayCard(),
         const _TaskStatusOverviewCard(),
         const SizedBox(height: 18),
         const _PerformanceDashboardCard(),
@@ -63,6 +70,213 @@ class HomePage extends StatelessWidget {
     );
   }
 }
+
+class _RoutineTodayCard extends StatelessWidget {
+  const _RoutineTodayCard();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!serviceLocator.isRegistered<RoutinesController>()) {
+      return const SizedBox.shrink();
+    }
+    final routinesController = serviceLocator<RoutinesController>();
+    final tasksController = serviceLocator<TasksController>();
+    return SignalBuilder(
+      builder: (context) {
+        final summary = projectRoutineTodayFocus(
+          routines: routinesController.routines.value,
+          runs: routinesController.todayRuns.value,
+          itemRuns: routinesController.todayItemRuns.value,
+          tasks: tasksController.tasks.value,
+        );
+        if (summary == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: _RoutineTodayContent(summary: summary),
+        );
+      },
+    );
+  }
+}
+
+class _RoutineTodayContent extends StatelessWidget {
+  const _RoutineTodayContent({required this.summary});
+
+  final RoutineTodayFocus summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final nextItem = summary.nextItem;
+    final completed =
+        summary.run.status == RoutineRunStatus.completed ||
+        summary.completedRequiredItems >= summary.totalRequiredItems;
+    final inProgress = nextItem?.status == RoutineRunStatus.inProgress;
+    final progress = summary.totalRequiredItems == 0
+        ? 0.0
+        : (summary.completedRequiredItems / summary.totalRequiredItems).clamp(
+            0.0,
+            1.0,
+          );
+    return GlassCard(
+      key: const ValueKey('home-routine-today'),
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _SoftIcon(
+                icon: Icons.event_repeat_rounded,
+                color: palette.secondary,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('Rutina de hoy', "Today's routine"),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      summary.routine.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: context.tr('Ver rutina', 'View routine'),
+                onPressed: () => context.push(
+                  '${RoutineEditorPage.routePath}?id=${summary.routine.id}',
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  completed
+                      ? context.tr('Completada', 'Completed')
+                      : inProgress
+                      ? context.tr('En progreso', 'In progress')
+                      : context.tr('Pendiente', 'Pending'),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: completed ? palette.primary : palette.secondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '${summary.completedRequiredItems}/${summary.totalRequiredItems}',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: palette.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              color: palette.primary,
+              backgroundColor: palette.neutralSoft.withValues(alpha: 0.5),
+            ),
+          ),
+          if (nextItem != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              nextItem.titleSnapshot,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '${_homeClock(context, nextItem.scheduledAtSnapshot)} · '
+              '${nextItem.durationMinutesSnapshot} min',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ],
+          if (inProgress && summary.followingItem != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: palette.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    context.tr(
+                      'Después: ${summary.followingItem!.titleSnapshot} · '
+                          '${_homeClock(context, summary.followingItem!.scheduledAtSnapshot)}',
+                      'Next: ${summary.followingItem!.titleSnapshot} · '
+                          '${_homeClock(context, summary.followingItem!.scheduledAtSnapshot)}',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (summary.canStart) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('home-routine-start'),
+                onPressed: () => startRoutineTaskFocusFlow(
+                  context: context,
+                  task: summary.task!,
+                  run: summary.run,
+                  item: summary.nextItem!,
+                  controller: serviceLocator<RoutinesController>(),
+                ),
+                icon: Icon(
+                  inProgress ? Icons.play_arrow_rounded : Icons.timer_outlined,
+                ),
+                label: Text(
+                  inProgress
+                      ? context.tr('Continuar actividad', 'Continue activity')
+                      : context.tr('Iniciar actividad', 'Start activity'),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _homeClock(BuildContext context, DateTime value) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay(hour: value.hour, minute: value.minute),
+    );
 
 class _CalendarPlanningCard extends StatelessWidget {
   const _CalendarPlanningCard();
@@ -489,6 +703,143 @@ class _PerformanceLinePainter extends CustomPainter {
   }
 }
 
+class _CartesianCurvePainter extends CustomPainter {
+  const _CartesianCurvePainter({
+    required this.palette,
+    required this.fontFamily,
+    required this.values,
+    required this.labels,
+  });
+
+  final AppPalette palette;
+  final String? fontFamily;
+  final List<double> values;
+  final List<String> labels;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 34.0;
+    const right = 14.0;
+    const top = 12.0;
+    const bottom = 34.0;
+    final chartHeight = size.height - top - bottom;
+    final chartWidth = size.width - left - right;
+    final origin = Offset(left, top + chartHeight);
+    final xEnd = Offset(left + chartWidth, origin.dy);
+    const yEnd = Offset(left, top);
+    final gridPaint = Paint()
+      ..color = palette.neutralSoft
+      ..strokeWidth = 1;
+    final axisPaint = Paint()
+      ..color = palette.textSecondary
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+
+    for (var line = 0; line <= 4; line++) {
+      final y = top + chartHeight * line / 4;
+      canvas.drawLine(Offset(left, y), Offset(xEnd.dx, y), gridPaint);
+    }
+    for (var line = 1; line <= 4; line++) {
+      final x = left + chartWidth * line / 4;
+      canvas.drawLine(Offset(x, top), Offset(x, origin.dy), gridPaint);
+    }
+
+    canvas
+      ..drawLine(origin, xEnd, axisPaint)
+      ..drawLine(origin, yEnd, axisPaint)
+      ..drawLine(xEnd, Offset(xEnd.dx - 7, xEnd.dy - 4), axisPaint)
+      ..drawLine(xEnd, Offset(xEnd.dx - 7, xEnd.dy + 4), axisPaint)
+      ..drawLine(yEnd, Offset(yEnd.dx - 4, yEnd.dy + 7), axisPaint)
+      ..drawLine(yEnd, Offset(yEnd.dx + 4, yEnd.dy + 7), axisPaint);
+
+    final points = <Offset>[];
+    for (var index = 0; index < values.length; index += 1) {
+      final x = values.length == 1
+          ? left + chartWidth / 2
+          : left + chartWidth * index / (values.length - 1);
+      final value = values[index].clamp(0, 1).toDouble();
+      final y = top + chartHeight * (1 - value);
+      points.add(Offset(x, y));
+    }
+
+    if (points.isNotEmpty) {
+      final curve = Path()..moveTo(points.first.dx, points.first.dy);
+      for (var index = 0; index < points.length - 1; index += 1) {
+        final current = points[index];
+        final next = points[index + 1];
+        final midX = (current.dx + next.dx) / 2;
+        curve.cubicTo(midX, current.dy, midX, next.dy, next.dx, next.dy);
+      }
+      canvas.drawPath(
+        curve,
+        Paint()
+          ..color = palette.primary
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke,
+      );
+
+      final pointPaint = Paint()..color = palette.secondary;
+      for (final point in points) {
+        canvas
+          ..drawCircle(point, 4.5, Paint()..color = palette.surface)
+          ..drawCircle(point, 3.2, pointPaint);
+      }
+    }
+
+    final textPainter = TextPainter(
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
+    void paintLabel(String text, Offset offset, {double fontSize = 10}) {
+      textPainter
+        ..text = TextSpan(
+          text: text,
+          style: TextStyle(
+            color: palette.textSecondary,
+            fontFamily: fontFamily,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        )
+        ..layout()
+        ..paint(canvas, offset);
+    }
+
+    paintLabel('Y', Offset(8, yEnd.dy - 3), fontSize: 11);
+    paintLabel('X', Offset(xEnd.dx - 2, origin.dy + 12), fontSize: 11);
+
+    final maximumLabels = values.length < 2
+        ? 1
+        : (chartWidth / 44).floor().clamp(2, values.length);
+    final labelStride = values.length <= maximumLabels
+        ? 1
+        : (values.length / maximumLabels).ceil();
+    for (
+      var index = 0;
+      index < labels.length && index < points.length;
+      index += 1
+    ) {
+      if (index % labelStride != 0 && index != labels.length - 1) {
+        continue;
+      }
+      paintLabel(
+        labels[index],
+        Offset(points[index].dx - 14, size.height - 18),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CartesianCurvePainter oldDelegate) {
+    return oldDelegate.palette != palette ||
+        oldDelegate.fontFamily != fontFamily ||
+        !listEquals(oldDelegate.values, values) ||
+        !listEquals(oldDelegate.labels, labels);
+  }
+}
+
 class _PerformanceDashboardCard extends StatefulWidget {
   const _PerformanceDashboardCard();
 
@@ -499,8 +850,12 @@ class _PerformanceDashboardCard extends StatefulWidget {
 
 class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
   _PerformanceRange _range = _PerformanceRange.month;
+  StatisticsChartType _selectedChart = StatisticsChartType.circular;
   Object? _tasksRevision;
   Object? _sessionsRevision;
+  Object? _routineTemplatesRevision;
+  Object? _routineRunsRevision;
+  Object? _routineItemsRevision;
   _PerformanceRange? _loadedRange;
   Future<StatisticsReportData>? _reportFuture;
   Timer? _rangeRefreshTimer;
@@ -522,14 +877,19 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
     final settings = AppSettingsScope.of(context);
     final tasksController = serviceLocator<TasksController>();
     final pomodoroController = serviceLocator<PomodoroController>();
+    final routinesController = serviceLocator.isRegistered<RoutinesController>()
+        ? serviceLocator<RoutinesController>()
+        : null;
 
     return SignalBuilder(
       builder: (context) {
         final reportFuture = _reportFor(
           tasksRevision: tasksController.tasks.value,
           sessionsRevision: pomodoroController.sessions.value,
+          routineTemplatesRevision: routinesController?.routines.value,
+          routineRunsRevision: routinesController?.todayRuns.value,
+          routineItemsRevision: routinesController?.todayItemRuns.value,
         );
-        final visibleCharts = settings.enabledStatisticsCharts;
 
         return GlassCard(
           child: Column(
@@ -575,9 +935,9 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
                 onChanged: (range) => setState(() => _range = range),
               ),
               const SizedBox(height: 14),
-              _ChartVisibilitySelector(
-                visibleCharts: visibleCharts,
-                onToggle: settings.onStatisticsChartVisibilityChanged,
+              _ChartTypeSelector(
+                selectedChart: _selectedChart,
+                onChanged: (chart) => setState(() => _selectedChart = chart),
               ),
               const SizedBox(height: 18),
               FutureBuilder<StatisticsReportData>(
@@ -602,7 +962,7 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
                       focusMinutes: settings.focusMinutes,
                       report: report,
                     ),
-                    visibleCharts: visibleCharts,
+                    selectedChart: _selectedChart,
                   );
                 },
               ),
@@ -616,13 +976,22 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
   Future<StatisticsReportData> _reportFor({
     required Object tasksRevision,
     required Object sessionsRevision,
+    required Object? routineTemplatesRevision,
+    required Object? routineRunsRevision,
+    required Object? routineItemsRevision,
   }) {
     if (_reportFuture == null ||
         _loadedRange != _range ||
         !identical(_tasksRevision, tasksRevision) ||
-        !identical(_sessionsRevision, sessionsRevision)) {
+        !identical(_sessionsRevision, sessionsRevision) ||
+        !identical(_routineTemplatesRevision, routineTemplatesRevision) ||
+        !identical(_routineRunsRevision, routineRunsRevision) ||
+        !identical(_routineItemsRevision, routineItemsRevision)) {
       _tasksRevision = tasksRevision;
       _sessionsRevision = sessionsRevision;
+      _routineTemplatesRevision = routineTemplatesRevision;
+      _routineRunsRevision = routineRunsRevision;
+      _routineItemsRevision = routineItemsRevision;
       _loadedRange = _range;
       _reportFuture = serviceLocator<GenerateStatisticsReport>()(
         StatisticsReportRequest(period: _range.reportPeriod),
@@ -655,53 +1024,59 @@ class _PerformanceDashboardCardState extends State<_PerformanceDashboardCard> {
 class _PerformanceDashboardContent extends StatelessWidget {
   const _PerformanceDashboardContent({
     required this.snapshot,
-    required this.visibleCharts,
+    required this.selectedChart,
   });
 
   final _PerformanceSnapshot snapshot;
-  final Set<StatisticsChartType> visibleCharts;
+  final StatisticsChartType selectedChart;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (visibleCharts.contains(StatisticsChartType.circular)) ...[
+        _MoodAverageSummary(snapshot: snapshot),
+        if (snapshot.routines case final routines?) ...[
+          const SizedBox(height: 18),
+          _RoutineAnalyticsSummary(metrics: routines),
+        ],
+        const SizedBox(height: 18),
+        if (selectedChart == StatisticsChartType.circular) ...[
           _DashboardSection(
             title: context.tr('Circular', 'Circular'),
             child: _OverallProgressChart(progress: snapshot.overallProgress),
           ),
           const SizedBox(height: 16),
         ],
-        if (visibleCharts.contains(StatisticsChartType.stackedBars)) ...[
+        if (selectedChart == StatisticsChartType.stackedBars) ...[
           _DashboardSection(
             title: context.tr('Barras apiladas', 'Stacked bars'),
             child: _StackedTaskStatusChart(snapshot: snapshot),
           ),
           const SizedBox(height: 16),
         ],
-        if (visibleCharts.contains(StatisticsChartType.groupedBars)) ...[
+        if (selectedChart == StatisticsChartType.groupedBars) ...[
           _DashboardSection(
             title: context.tr('Barras agrupadas', 'Grouped bars'),
             child: _GroupedFocusChart(snapshot: snapshot),
           ),
           const SizedBox(height: 16),
         ],
-        if (visibleCharts.contains(StatisticsChartType.horizontalBars)) ...[
+        if (selectedChart == StatisticsChartType.horizontalBars) ...[
           _DashboardSection(
             title: context.tr('Gráfico horizontal', 'Horizontal chart'),
             child: _HorizontalStatusChart(snapshot: snapshot),
           ),
           const SizedBox(height: 16),
         ],
-        if (visibleCharts.contains(StatisticsChartType.standardBars)) ...[
+        if (selectedChart == StatisticsChartType.standardBars) ...[
           _DashboardSection(
             title: context.tr('Gráfico de barras', 'Bar chart'),
             child: _BasicBarsChart(snapshot: snapshot),
           ),
           const SizedBox(height: 16),
         ],
-        if (visibleCharts.contains(StatisticsChartType.xy))
+        if (selectedChart == StatisticsChartType.xy)
           _DashboardSection(
             title: context.tr('Gráfico básico x/y', 'Basic x/y chart'),
             child: _BasicTrendChart(snapshot: snapshot),
@@ -709,6 +1084,272 @@ class _PerformanceDashboardContent extends StatelessWidget {
       ],
     );
   }
+}
+
+class _RoutineAnalyticsSummary extends StatelessWidget {
+  const _RoutineAnalyticsSummary({required this.metrics});
+
+  final StatisticsRoutineMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final consistency = metrics.consistency;
+    final percent = consistency == null ? null : (consistency * 100).round();
+    final delay = metrics.averageStartDelayMinutes;
+    final mood = metrics.moodAverage;
+    final abandonment = metrics.typicalAbandonmentItem;
+
+    return Semantics(
+      label: context.tr(
+        percent == null
+            ? 'Constancia de rutinas sin datos'
+            : 'Constancia de rutinas $percent por ciento',
+        percent == null
+            ? 'Routine consistency unavailable'
+            : 'Routine consistency $percent percent',
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.tr('Constancia de rutinas', 'Routine consistency'),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                percent == null
+                    ? context.tr('Sin datos', 'No data')
+                    : '$percent%',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: context.palette.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (consistency != null) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: consistency.clamp(0, 1),
+                minHeight: 8,
+                backgroundColor: context.palette.neutralSoft,
+                color: context.palette.primary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            context.tr(
+              '${metrics.completedRequiredItems} de ${metrics.requiredItems} actividades obligatorias',
+              '${metrics.completedRequiredItems} of ${metrics.requiredItems} required activities',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 20,
+            runSpacing: 12,
+            children: [
+              _RoutineMetric(
+                label: context.tr('Rutinas completadas', 'Completed routines'),
+                value: '${metrics.completedRuns}/${metrics.scheduledRuns}',
+              ),
+              _RoutineMetric(
+                label: context.tr('Omitidas / perdidas', 'Skipped / missed'),
+                value: '${metrics.skippedRuns} / ${metrics.missedRuns}',
+              ),
+              _RoutineMetric(
+                label: context.tr(
+                  'Actividades programadas',
+                  'Scheduled activities',
+                ),
+                value: '${metrics.scheduledItems}',
+              ),
+              _RoutineMetric(
+                label: context.tr(
+                  'Actividades en progreso',
+                  'Activities in progress',
+                ),
+                value: '${metrics.inProgressItems}',
+              ),
+              _RoutineMetric(
+                label: context.tr(
+                  'Actividades completadas',
+                  'Completed activities',
+                ),
+                value: '${metrics.completedItems}',
+              ),
+              _RoutineMetric(
+                label: context.tr(
+                  'Actividades omitidas / perdidas',
+                  'Skipped / missed activities',
+                ),
+                value: '${metrics.skippedItems} / ${metrics.missedItems}',
+              ),
+              _RoutineMetric(
+                label: context.tr('Foco plan / real', 'Planned / actual focus'),
+                value:
+                    '${metrics.plannedFocusMinutes} / ${metrics.focusedMinutes} min',
+              ),
+              _RoutineMetric(
+                label: context.tr('Retraso promedio', 'Average delay'),
+                value: delay == null
+                    ? context.tr('Sin datos', 'No data')
+                    : '${delay.round()} min',
+              ),
+              _RoutineMetric(
+                label: context.tr('Ánimo en rutinas', 'Mood in routines'),
+                value: mood == null
+                    ? context.tr('Sin datos', 'No data')
+                    : '${mood.toStringAsFixed(1)}/5',
+              ),
+              _RoutineMetric(
+                label: context.tr(
+                  'Mejor racha por rutina',
+                  'Best streak by routine',
+                ),
+                value: context.tr(
+                  '${metrics.longestCompletedStreak} días',
+                  '${metrics.longestCompletedStreak} days',
+                ),
+              ),
+            ],
+          ),
+          if (abandonment != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              context.tr(
+                'Abandono más frecuente: $abandonment (${metrics.typicalAbandonmentCount})',
+                'Most frequent abandonment: $abandonment (${metrics.typicalAbandonmentCount})',
+              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.palette.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RoutineMetric extends StatelessWidget {
+  const _RoutineMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 132,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoodAverageSummary extends StatelessWidget {
+  const _MoodAverageSummary({required this.snapshot});
+
+  final _PerformanceSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final average = snapshot.moodAverage;
+    final isDay = snapshot.range == _PerformanceRange.day;
+    final title = isDay
+        ? context.tr('Ánimo promedio del día', 'Average mood today')
+        : context.tr('Ánimo promedio del período', 'Average mood this period');
+    final sampleLabel = context.tr(
+      '${snapshot.moodSampleCount} bloques valorados',
+      '${snapshot.moodSampleCount} rated blocks',
+    );
+
+    return Semantics(
+      label: average == null
+          ? '$title. ${context.tr('Sin respuestas', 'No responses')}'
+          : '$title. ${average.toStringAsFixed(1)} de 5. $sampleLabel',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.palette.primaryMuted.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: context.palette.neutralSoft),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                _homeMoodIcon(average),
+                color: context.palette.primary,
+                size: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      average == null
+                          ? context.tr(
+                              'Sin respuestas de ánimo',
+                              'No mood responses',
+                            )
+                          : '${average.toStringAsFixed(1)}/5 · $sampleLabel',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.palette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _homeMoodIcon(double? average) {
+  if (average == null) {
+    return Icons.sentiment_neutral_rounded;
+  }
+  return switch (average.round().clamp(1, 5)) {
+    1 => Icons.sentiment_very_dissatisfied_rounded,
+    2 => Icons.sentiment_dissatisfied_rounded,
+    3 => Icons.sentiment_neutral_rounded,
+    4 => Icons.sentiment_satisfied_rounded,
+    _ => Icons.sentiment_very_satisfied_rounded,
+  };
 }
 
 class _PerformanceLoadingState extends StatelessWidget {
@@ -803,6 +1444,7 @@ class _PerformanceRangeSelector extends StatelessWidget {
         segments: [
           ButtonSegment(
             value: _PerformanceRange.day,
+            tooltip: 'performance-range-day',
             label: Text(context.tr('Día', 'Day')),
           ),
           ButtonSegment(
@@ -832,15 +1474,14 @@ const _compactSegmentStyle = ButtonStyle(
   ),
 );
 
-class _ChartVisibilitySelector extends StatelessWidget {
-  const _ChartVisibilitySelector({
-    required this.visibleCharts,
-    required this.onToggle,
+class _ChartTypeSelector extends StatelessWidget {
+  const _ChartTypeSelector({
+    required this.selectedChart,
+    required this.onChanged,
   });
 
-  final Set<StatisticsChartType> visibleCharts;
-  final void Function(StatisticsChartType chart, {required bool enabled})
-  onToggle;
+  final StatisticsChartType selectedChart;
+  final ValueChanged<StatisticsChartType> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -849,10 +1490,10 @@ class _ChartVisibilitySelector extends StatelessWidget {
       runSpacing: 8,
       children: [
         for (final chart in StatisticsChartType.values)
-          FilterChip(
+          ChoiceChip(
             label: Text(_chartTypeLabel(context, chart)),
-            selected: visibleCharts.contains(chart),
-            onSelected: (selected) => onToggle(chart, enabled: selected),
+            selected: selectedChart == chart,
+            onSelected: (_) => onChanged(chart),
           ),
       ],
     );
@@ -1187,7 +1828,7 @@ class _BasicTrendChart extends StatelessWidget {
       height: 190,
       child: RepaintBoundary(
         child: CustomPaint(
-          painter: _PerformanceLinePainter(
+          painter: _CartesianCurvePainter(
             palette: context.palette,
             fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
             values: snapshot.bucketValues,
@@ -1240,6 +1881,9 @@ class _PerformanceSnapshot {
     required this.bucketValues,
     required this.focusBucketValues,
     required this.bucketLabels,
+    required this.moodAverage,
+    required this.moodSampleCount,
+    required this.routines,
   });
 
   factory _PerformanceSnapshot.fromReportData({
@@ -1287,6 +1931,9 @@ class _PerformanceSnapshot {
         for (final bucket in buckets)
           _reportBucketLabel(context, range, bucket.day),
       ],
+      moodAverage: report.moodAverage,
+      moodSampleCount: report.moodSampleCount,
+      routines: report.routines,
     );
   }
 
@@ -1298,6 +1945,9 @@ class _PerformanceSnapshot {
   final List<double> bucketValues;
   final List<double> focusBucketValues;
   final List<String> bucketLabels;
+  final double? moodAverage;
+  final int moodSampleCount;
+  final StatisticsRoutineMetrics? routines;
 
   int get focusedMinutes => focusedSeconds ~/ 60;
   double get taskProgress => taskSummary.completionRatio;
@@ -1421,8 +2071,17 @@ class _PerformanceInsightsCard extends StatelessWidget {
   }
 }
 
-class _TaskStatusOverviewCard extends StatelessWidget {
+class _TaskStatusOverviewCard extends StatefulWidget {
   const _TaskStatusOverviewCard();
+
+  @override
+  State<_TaskStatusOverviewCard> createState() =>
+      _TaskStatusOverviewCardState();
+}
+
+class _TaskStatusOverviewCardState extends State<_TaskStatusOverviewCard> {
+  Object? _tasksRevision;
+  Future<TaskStatusSummary>? _summaryFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -1430,34 +2089,78 @@ class _TaskStatusOverviewCard extends StatelessWidget {
 
     return SignalBuilder(
       builder: (context) {
-        final summary = tasksController.allTaskSummary.value;
+        final summaryFuture = _summaryFor(tasksController.tasks.value);
 
         return GlassCard(
           padding: AppCardPaddings.compact,
-          child: Column(
-            children: [
-              _TaskStatusMetric(
-                label: context.tr('Pendientes', 'Pending'),
-                value: summary.listed,
-                icon: Icons.playlist_add_check_rounded,
-              ),
-              const SizedBox(height: 10),
-              _TaskStatusMetric(
-                label: context.tr('En progreso', 'In progress'),
-                value: summary.inProgress,
-                icon: Icons.pending_actions_rounded,
-              ),
-              const SizedBox(height: 10),
-              _TaskStatusMetric(
-                label: context.tr('Completadas', 'Completed'),
-                value: summary.completed,
-                icon: Icons.task_alt_rounded,
-              ),
-            ],
+          child: FutureBuilder<TaskStatusSummary>(
+            future: summaryFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  key: const ValueKey('task-status-error'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child: TextButton.icon(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(context.tr('Reintentar', 'Retry')),
+                    ),
+                  ),
+                );
+              }
+
+              final summary =
+                  snapshot.data ??
+                  const TaskStatusSummary(
+                    listed: 0,
+                    inProgress: 0,
+                    completed: 0,
+                  );
+
+              return Column(
+                children: [
+                  _TaskStatusMetric(
+                    label: context.tr('Pendientes', 'Pending'),
+                    value: summary.listed,
+                    icon: Icons.playlist_add_check_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  _TaskStatusMetric(
+                    label: context.tr('En progreso', 'In progress'),
+                    value: summary.inProgress,
+                    icon: Icons.pending_actions_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  _TaskStatusMetric(
+                    label: context.tr('Completadas', 'Completed'),
+                    value: summary.completed,
+                    icon: Icons.task_alt_rounded,
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
     );
+  }
+
+  Future<TaskStatusSummary> _summaryFor(Object tasksRevision) {
+    if (_summaryFuture == null || !identical(_tasksRevision, tasksRevision)) {
+      _tasksRevision = tasksRevision;
+      _summaryFuture = serviceLocator<TasksRepository>().loadTasks().then(
+        TaskStatusSummary.fromTasks,
+      );
+    }
+
+    return _summaryFuture!;
+  }
+
+  void _retry() {
+    setState(() {
+      _summaryFuture = null;
+    });
   }
 }
 
@@ -2368,5 +3071,6 @@ bool _isEmptyReport(StatisticsReportData report) {
       report.completionEvents == 0 &&
       report.legacyUnknownCompletions == 0 &&
       report.moodSampleCount == 0 &&
-      report.distractionMinutes == 0;
+      report.distractionMinutes == 0 &&
+      report.routines == null;
 }

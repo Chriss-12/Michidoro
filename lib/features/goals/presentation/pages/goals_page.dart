@@ -997,15 +997,26 @@ class _GoalTile extends StatelessWidget {
                     _GoalTaskRows(summary: taskSummary),
                     if (goal.targetDate != null) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        context.tr(
-                          'Fecha objetivo: '
-                              '${_formatGoalDate(context, goal.targetDate!)}',
-                          'Target date: '
-                              '${_formatGoalDate(context, goal.targetDate!)}',
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: palette.textPrimary.withValues(alpha: 0.1),
                         ),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        child: Text(
+                          context.tr(
+                            'Fecha objetivo: '
+                                '${_formatGoalDate(context, goal.targetDate!)}',
+                            'Target date: '
+                                '${_formatGoalDate(context, goal.targetDate!)}',
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: palette.textSecondary,
+                              ),
                         ),
                       ),
                     ],
@@ -1117,7 +1128,7 @@ class _GoalTaskRow extends StatelessWidget {
     final palette = context.palette;
 
     final row = Container(
-      width: fullWidth ? double.infinity : null,
+      width: double.infinity,
       constraints: fullWidth ? null : const BoxConstraints(maxWidth: 210),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
@@ -1126,7 +1137,7 @@ class _GoalTaskRow extends StatelessWidget {
         border: Border.all(color: palette.neutralSoft),
       ),
       child: Row(
-        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Flexible(
             fit: fullWidth ? FlexFit.tight : FlexFit.loose,

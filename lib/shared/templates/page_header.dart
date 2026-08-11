@@ -725,7 +725,7 @@ class _ProfileStatsSnapshot {
   String moodLabel(BuildContext context) {
     final mood = averageMood;
     if (mood == null) {
-      return context.tr('Sin datos', 'No data');
+      return context.tr('', 'No data');
     }
 
     return '${mood.toStringAsFixed(1)}/5';

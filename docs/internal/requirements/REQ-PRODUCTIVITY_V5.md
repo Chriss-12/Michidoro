@@ -270,3 +270,8 @@ Notes:
   approve a schema migration before its design is reviewed.
 - This requirement does not change the SQLite backup contract or move settings
   preferences into the database.
+- On 2026-07-31, the Home task-status statistics card was corrected to read
+  task totals from the registered repository instead of trusting controller
+  memory. The card still refreshes when task state changes, while the visible
+  totals come from the persistence boundary. `flutter analyze` and the full
+  157-test suite passed.

@@ -39,6 +39,7 @@ class AppFontSizes {
   static const double button = AppDesignTokens.bodyFontSize;
   static const double stat = AppDesignTokens.mainTitleFontSize;
   static const double navigationLabel = AppDesignTokens.navigationLabelFontSize;
+  static const double constrainedNavigationLabel = 6.5;
 }
 
 class AppTypography {

@@ -146,4 +146,11 @@ class NativeFileManager {
       {'sound': soundName},
     );
   }
+
+  static Future<void> playCompletionVibration(String patternName) {
+    return _channel.invokeMethod<void>(
+      'playCompletionVibration',
+      {'pattern': patternName},
+    );
+  }
 }

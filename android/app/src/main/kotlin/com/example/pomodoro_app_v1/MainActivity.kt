@@ -1,18 +1,28 @@
 package com.example.pomodoro_app_v1
 
 import android.app.Activity
+import android.app.AlarmManager
+import android.Manifest
+import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.media.ToneGenerator
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,6 +32,7 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val channelName = "michifocus/native_files"
+    private val routineReminderChannelName = "michifocus/routine_reminders"
     private val pickProfileImageRequest = 4101
     private val pickFolderRequest = 4102
     private val pickBackupImportFolderRequest = 4103
@@ -42,6 +53,60 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result -> handleNativeFileCall(call, result) }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, routineReminderChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "replaceRoutineReminders" -> replaceRoutineReminders(call, result)
+                    "getRoutineReminderStatus" -> result.success(routineReminderStatus())
+                    "openRoutineReminderSettings" -> openRoutineReminderSettings(result)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun replaceRoutineReminders(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val preferences = getSharedPreferences("routine_reminders", Context.MODE_PRIVATE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                !preferences.getBoolean("notification_permission_requested", false)) {
+                preferences.edit().putBoolean("notification_permission_requested", true).apply()
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4104)
+            }
+            val reminders = call.argument<List<Map<String, Any>>>("reminders") ?: emptyList()
+            RoutineReminderSchedulerNative.replace(this, reminders)
+            result.success(routineReminderStatus())
+        } catch (error: Exception) {
+            result.error("routine_reminder_failed", error.message, null)
+        }
+    }
+
+    private fun routineReminderStatus(): Map<String, Boolean> {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationPermissionGranted =
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
+                (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || notificationManager.areNotificationsEnabled())
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val exactSchedulingAvailable =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        return mapOf(
+            "notificationPermissionGranted" to notificationPermissionGranted,
+            "exactSchedulingAvailable" to exactSchedulingAvailable,
+        )
+    }
+
+    private fun openRoutineReminderSettings(result: MethodChannel.Result) {
+        try {
+            startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                },
+            )
+            result.success(null)
+        } catch (error: Exception) {
+            result.error("routine_reminder_settings_failed", error.message, null)
+        }
     }
 
     private fun handleNativeFileCall(call: MethodCall, result: MethodChannel.Result) {
@@ -82,6 +147,7 @@ class MainActivity : FlutterActivity() {
             "exportBackupToExternalFolder" -> exportBackupToExternalFolder(call, result)
             "openFile" -> openFile(call, result)
             "playCompletionSound" -> playCompletionSound(call, result)
+            "playCompletionVibration" -> playCompletionVibration(call, result)
             else -> result.notImplemented()
         }
     }
@@ -294,6 +360,49 @@ class MainActivity : FlutterActivity() {
             result.success(null)
         } catch (error: Exception) {
             result.error("sound_failed", error.message ?: "No se pudo reproducir el tono.", null)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun playCompletionVibration(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val pattern = call.argument<String>("pattern") ?: "normal"
+            val (timings, amplitudes) = when (pattern) {
+                "light" -> longArrayOf(0L, 90L) to intArrayOf(0, 90)
+                "double" -> longArrayOf(0L, 150L, 110L, 190L) to
+                    intArrayOf(0, 170, 0, 220)
+                "intense" -> longArrayOf(0L, 450L, 120L, 320L) to
+                    intArrayOf(0, 255, 0, 255)
+                else -> longArrayOf(0L, 240L) to intArrayOf(0, 190)
+            }
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(VibratorManager::class.java).defaultVibrator
+            } else {
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
+            }
+
+            if (!vibrator.hasVibrator()) {
+                result.success(false)
+                return
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val effect = if (vibrator.hasAmplitudeControl()) {
+                    VibrationEffect.createWaveform(timings, amplitudes, -1)
+                } else {
+                    VibrationEffect.createWaveform(timings, -1)
+                }
+                vibrator.vibrate(effect)
+            } else {
+                vibrator.vibrate(timings, -1)
+            }
+            result.success(true)
+        } catch (error: Exception) {
+            result.error(
+                "vibration_failed",
+                error.message ?: "No se pudo activar la vibracion.",
+                null,
+            )
         }
     }
 

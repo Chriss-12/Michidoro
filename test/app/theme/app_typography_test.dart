@@ -33,6 +33,21 @@ void main() {
         );
       });
     }
+
+    test('caps navigation labels while preserving the selected font', () {
+      final theme = AppTheme.fromPreset(
+        AppThemePreset.graphiteNight,
+        isDark: true,
+        fontScale: AppTypography.maxFontScale,
+        typographyPreset: AppTypographyPreset.serio,
+      );
+      final style = theme.navigationBarTheme.labelTextStyle?.resolve(
+        <WidgetState>{WidgetState.selected},
+      );
+
+      expect(style?.fontFamily, AppTypographyPreset.serio.fontFamily);
+      expect(style?.fontSize, AppFontSizes.constrainedNavigationLabel);
+    });
   });
 
   test('dark presets use light system status bar icons', () {

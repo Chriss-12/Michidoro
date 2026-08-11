@@ -77,6 +77,7 @@ enum _ConflictAction { returnToTimer, stopAndSwitch }
 Future<void> startTaskFocusFlow({
   required BuildContext context,
   required Task task,
+  PomodoroCadence? preferredCadence,
 }) async {
   final controller = serviceLocator<PomodoroController>();
 
@@ -138,11 +139,16 @@ Future<void> startTaskFocusFlow({
     presets: standardPresets.map((preset) => preset.cadence),
   );
   final recommendedCadence = ranking.first.cadence;
-  final recommendedPreset = standardPresets.firstWhere(
-    (preset) =>
-        preset.focusMinutes == recommendedCadence.focusMinutes &&
-        preset.breakMinutes == recommendedCadence.breakMinutes,
-  );
+  final recommendedPreset = preferredCadence == null
+      ? standardPresets.firstWhere(
+          (preset) =>
+              preset.focusMinutes == recommendedCadence.focusMinutes &&
+              preset.breakMinutes == recommendedCadence.breakMinutes,
+        )
+      : TaskFocusPreset.minutes(
+          focusMinutes: preferredCadence.focusMinutes,
+          breakMinutes: preferredCadence.breakMinutes,
+        );
 
   final selection = await _showFocusOptions(
     context: context,

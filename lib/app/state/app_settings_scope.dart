@@ -16,6 +16,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.avatarIndex,
     required this.typographyPreset,
     required this.language,
+    required this.completedOnboardingVersion,
     required this.focusMinutes,
     required this.shortBreakMinutes,
     required this.longBreakMinutes,
@@ -43,6 +44,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.onAvatarChanged,
     required this.onTypographyPresetChanged,
     required this.onLanguageChanged,
+    required this.onCompleteOnboarding,
     required this.onFocusMinutesChanged,
     required this.onShortBreakMinutesChanged,
     required this.onLongBreakMinutesChanged,
@@ -80,6 +82,7 @@ class AppSettingsScope extends InheritedWidget {
   final int avatarIndex;
   final AppTypographyPreset typographyPreset;
   final AppLanguage language;
+  final int completedOnboardingVersion;
   final int focusMinutes;
   final int shortBreakMinutes;
   final int longBreakMinutes;
@@ -107,6 +110,7 @@ class AppSettingsScope extends InheritedWidget {
   final ValueChanged<int> onAvatarChanged;
   final ValueChanged<AppTypographyPreset> onTypographyPresetChanged;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final Future<void> Function() onCompleteOnboarding;
   final ValueChanged<int> onFocusMinutesChanged;
   final ValueChanged<int> onShortBreakMinutesChanged;
   final ValueChanged<int> onLongBreakMinutesChanged;
@@ -154,6 +158,7 @@ class AppSettingsScope extends InheritedWidget {
         avatarIndex != oldWidget.avatarIndex ||
         typographyPreset != oldWidget.typographyPreset ||
         language != oldWidget.language ||
+        completedOnboardingVersion != oldWidget.completedOnboardingVersion ||
         focusMinutes != oldWidget.focusMinutes ||
         shortBreakMinutes != oldWidget.shortBreakMinutes ||
         longBreakMinutes != oldWidget.longBreakMinutes ||

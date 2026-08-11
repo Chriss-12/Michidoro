@@ -2,13 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
+import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/widgets/routine_reminder_capability_tile.dart';
 import 'package:pomodoro_app_v1/l10n/app_language.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
@@ -29,6 +33,8 @@ class SettingsPage extends StatelessWidget {
         _AppearanceCard(),
         SizedBox(height: 26),
         _LanguageCard(),
+        SizedBox(height: 26),
+        _OnboardingPreviewCard(),
         SizedBox(height: 26),
         _FocusTimesCard(),
         SizedBox(height: 26),
@@ -449,6 +455,47 @@ class _LanguageCard extends StatelessWidget {
   }
 }
 
+class _OnboardingPreviewCard extends StatelessWidget {
+  const _OnboardingPreviewCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return GlassCard(
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle(
+            icon: Icons.auto_stories_outlined,
+            title: context.tr('Onboarding', 'Onboarding'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            context.tr(
+              'Abre la introducción para probarla otra vez.',
+              'Open the introduction to test it again.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.go(OnboardingPage.routePath),
+              icon: const Icon(Icons.play_circle_outline_rounded),
+              label: Text(context.tr('Ver onboarding', 'View onboarding')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FocusTimesCard extends StatelessWidget {
   const _FocusTimesCard();
 
@@ -760,8 +807,37 @@ class _ReportsCard extends StatelessWidget {
   }
 }
 
-class _NotificationsCard extends StatelessWidget {
+class _NotificationsCard extends StatefulWidget {
   const _NotificationsCard();
+
+  @override
+  State<_NotificationsCard> createState() => _NotificationsCardState();
+}
+
+class _NotificationsCardState extends State<_NotificationsCard>
+    with WidgetsBindingObserver {
+  late Future<RoutineReminderCapability?> _capability;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _capability = RoutineReminderPlatform.getCapability();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    setState(() {
+      _capability = RoutineReminderPlatform.getCapability();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -776,6 +852,19 @@ class _NotificationsCard extends StatelessWidget {
           _SectionTitle(
             icon: Icons.notifications_active_outlined,
             title: context.tr('Notificaciones', 'Notifications'),
+          ),
+          FutureBuilder<RoutineReminderCapability?>(
+            future: _capability,
+            builder: (context, snapshot) {
+              final capability = snapshot.data;
+              if (capability == null) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 18),
+                child: RoutineReminderCapabilityTile(
+                  capability: capability,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 18),
           DropdownButtonFormField<PomodoroCompletionSound>(
@@ -1433,8 +1522,8 @@ class _CompletionVibrationTile extends StatelessWidget {
                     ),
                     Text(
                       context.tr(
-                        'Aviso háptico al terminar enfoque o descanso',
-                        'Haptic alert when focus or a break finishes',
+                        'Vibración real al terminar enfoque o descanso',
+                        'Physical vibration when focus or a break finishes',
                       ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
@@ -1514,20 +1603,20 @@ class _CompletionVibrationTile extends StatelessWidget {
   ) {
     return switch (value) {
       PomodoroVibrationPattern.light => context.tr(
-        'Un toque ligero y discreto.',
-        'One light and subtle tap.',
+        'Vibración corta de intensidad baja.',
+        'A short, low-intensity vibration.',
       ),
       PomodoroVibrationPattern.normal => context.tr(
-        'Un toque medio, igual al aviso original.',
-        'One medium tap, matching the original alert.',
+        'Vibración clara de intensidad media.',
+        'A clear, medium-intensity vibration.',
       ),
       PomodoroVibrationPattern.double => context.tr(
-        'Dos toques cortos para distinguir el final.',
-        'Two short taps to make completion distinct.',
+        'Dos vibraciones separadas para distinguir el final.',
+        'Two separated vibrations to make completion distinct.',
       ),
       PomodoroVibrationPattern.intense => context.tr(
-        'Un toque fuerte para que sea más perceptible.',
-        'One strong tap for a more noticeable alert.',
+        'Dos pulsos largos a intensidad máxima.',
+        'Two long pulses at maximum intensity.',
       ),
     };
   }

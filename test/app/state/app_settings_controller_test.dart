@@ -1,19 +1,32 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
+import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/calendar/data/datasources/calendar_events_database.dart'
+    as legacy_calendar;
+import 'package:pomodoro_app_v1/features/goals/data/datasources/goals_database.dart'
+    as legacy_goals;
+import 'package:pomodoro_app_v1/features/pomodoro/data/datasources/pomodoro_sessions_database.dart'
+    as legacy_pomodoro;
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_file_writer.dart';
 import 'package:pomodoro_app_v1/features/settings/data/repositories/file_settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/entities/timer_preferences.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/features/tasks/data/datasources/tasks_database.dart'
+    as legacy_tasks;
 import 'package:pomodoro_app_v1/l10n/app_language.dart';
+// NativeDatabase exposes sqlite3 through a transitive package in production.
+// ignore: depend_on_referenced_packages
+import 'package:sqlite3/sqlite3.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -204,6 +217,43 @@ void main() {
         calls.clear();
       }
     });
+
+    test(
+      'forwards physical vibration patterns to the Android bridge',
+      () async {
+        const channel = MethodChannel('michifocus/native_files');
+        final calls = <MethodCall>[];
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              ..setMockMethodCallHandler(channel, (call) async {
+                calls.add(call);
+                return true;
+              });
+        addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+        for (final pattern in PomodoroVibrationPattern.values) {
+          await NativeFileManager.playCompletionVibration(pattern.name);
+        }
+
+        expect(
+          calls,
+          [
+            for (final pattern in PomodoroVibrationPattern.values)
+              isA<MethodCall>()
+                  .having(
+                    (call) => call.method,
+                    'method',
+                    'playCompletionVibration',
+                  )
+                  .having(
+                    (call) => call.arguments,
+                    'arguments',
+                    {'pattern': pattern.name},
+                  ),
+          ],
+        );
+      },
+    );
 
     test('silent completion still honors the vibration preference', () async {
       final calls = <MethodCall>[];
@@ -476,7 +526,13 @@ void main() {
         '${appDirectory.path}/michifocus_tasks.sqlite',
       ).writeAsString('legacy-task-db');
 
-      final exportedPath = await controller.exportDatabaseBackup();
+      final sourceDatabase = MichiFocusDatabase(
+        NativeDatabase(File('${appDirectory.path}/michifocus.sqlite')),
+      );
+      final exportedPath = await controller.exportDatabaseBackup(
+        createDatabaseSnapshot: sourceDatabase.createBackupSnapshot,
+      );
+      await sourceDatabase.close();
       final backupDirectory = Directory(exportedPath);
 
       expect(
@@ -491,6 +547,353 @@ void main() {
         File('${backupDirectory.path}/michifocus_tasks.sqlite').existsSync(),
         isFalse,
       );
+    });
+
+    test(
+      'round trips routines, snapshots, mood, and paused runtime context',
+      () async {
+        final appDirectory = await Directory.systemTemp.createTemp(
+          'michifocus-round-trip-app-',
+        );
+        final reportsDirectory = await Directory.systemTemp.createTemp(
+          'michifocus-round-trip-reports-',
+        );
+        final liveFile = File('${appDirectory.path}/michifocus.sqlite');
+        final controller = AppSettingsController(
+          documentsDirectory: appDirectory,
+        )..setReportsDirectoryPath(reportsDirectory.path);
+
+        addTearDown(() async {
+          if (appDirectory.existsSync()) {
+            await appDirectory.delete(recursive: true);
+          }
+          if (reportsDirectory.existsSync()) {
+            await reportsDirectory.delete(recursive: true);
+          }
+        });
+
+        await _createCompleteUnifiedDatabase(liveFile);
+        final sourceDatabase = MichiFocusDatabase(NativeDatabase(liveFile));
+        final exportedPath = await controller.exportDatabaseBackup(
+          createDatabaseSnapshot: sourceDatabase.createBackupSnapshot,
+        );
+        await sourceDatabase.close();
+
+        await liveFile.delete();
+        await _createUnifiedDatabase(liveFile, goalTitle: 'Replaced goal');
+        await controller.stageDatabaseBackupImport(exportedPath);
+        expect(await controller.applyPendingDatabaseImport(), isTrue);
+
+        final imported = MichiFocusDatabase(NativeDatabase(liveFile));
+        try {
+          final routines = await imported.select(imported.routineRecords).get();
+          final days = await imported.select(imported.routineDayRecords).get();
+          final items = await imported.select(imported.routineItemRecords).get()
+            ..sort((left, right) => left.position.compareTo(right.position));
+          final runs = await imported.select(imported.routineRunRecords).get();
+          final itemRuns =
+              await imported.select(imported.routineItemRunRecords).get()
+                ..sort(
+                  (left, right) => left.positionSnapshot.compareTo(
+                    right.positionSnapshot,
+                  ),
+                );
+          final task = await TasksDao(imported).findById('routine-task');
+          final session = await PomodoroSessionsDao(
+            imported,
+          ).findById('routine-session');
+          final runtime = await PomodoroRuntimeDao(imported).loadActive();
+          final completionEvents = await imported
+              .select(imported.taskCompletionEventRecords)
+              .get();
+          final reportingMetadata = await imported
+              .select(imported.reportingMetadataRecords)
+              .get();
+          final calendarEvents = await imported
+              .select(imported.calendarEventRecords)
+              .get();
+
+          expect(
+            routines.map((routine) => [routine.id, routine.status]),
+            containsAll([
+              ['routine-active', 'active'],
+              ['routine-archived', 'archived'],
+            ]),
+          );
+          expect(
+            routines
+                .singleWhere((routine) => routine.id == 'routine-archived')
+                .archivedAt,
+            DateTime(2026, 8, 8, 20),
+          );
+          expect(days.map((day) => day.weekday).toSet(), {1, 3, 5});
+          expect(
+            items.map(
+              (item) => [
+                item.position,
+                item.title,
+                item.scheduledMinute,
+                item.reminderMinutesBefore,
+              ],
+            ),
+            [
+              [0, 'Deep work', 540, 15],
+              [1, 'Review', 600, 5],
+            ],
+          );
+          expect(runs.single.nameSnapshot, 'Morning snapshot');
+          expect(runs.single.scheduledStartMinuteSnapshot, 540);
+          expect(
+            itemRuns.map(
+              (item) => [
+                item.sourceItemId,
+                item.positionSnapshot,
+                item.titleSnapshot,
+                item.reminderMinutesSnapshot,
+                item.pomodoroModeSnapshot,
+              ],
+            ),
+            [
+              ['routine-item-1', 0, 'Deep work snapshot', 15, 'custom'],
+              ['routine-item-2', 1, 'Review snapshot', 5, 'recommended'],
+            ],
+          );
+          expect(itemRuns.first.taskId, 'routine-task');
+          expect(itemRuns.first.taskIdSnapshot, 'routine-task');
+          expect(task?.status, 'inProgress');
+          expect(task?.durationMinutes, 90);
+          expect(session?.taskId, 'routine-task');
+          expect(session?.startMoodScore, 2);
+          expect(session?.endMoodScore, 4);
+          expect(session?.moodPromptPending, isTrue);
+          expect(runtime?.isRunning, isFalse);
+          expect(runtime?.taskId, 'routine-task');
+          expect(runtime?.taskTitle, 'Deep work');
+          expect(runtime?.remainingSeconds, 901);
+          expect(runtime?.blockIndex, 2);
+          expect(runtime?.blockCount, 4);
+          expect(runtime?.taskFocusedSecondsAtStart, 1500);
+          expect(runtime?.focusStartedAt, DateTime(2026, 8, 9, 9, 5));
+          expect(runtime?.lastTickAt, isNull);
+          expect(completionEvents.single.taskIdSnapshot, 'routine-task');
+          expect(reportingMetadata.single.id, 'completion-history');
+          expect(calendarEvents.single.title, 'Routine review');
+        } finally {
+          await imported.close();
+        }
+      },
+    );
+
+    test(
+      'stages four legacy databases into one database without routines',
+      () async {
+        final appDirectory = await Directory.systemTemp.createTemp(
+          'michifocus-legacy-import-app-',
+        );
+        final backupDirectory = await Directory.systemTemp.createTemp(
+          'michifocus-four-file-backup-',
+        );
+        final controller = AppSettingsController(
+          documentsDirectory: appDirectory,
+        );
+
+        addTearDown(() async {
+          if (appDirectory.existsSync()) {
+            await appDirectory.delete(recursive: true);
+          }
+          if (backupDirectory.existsSync()) {
+            await backupDirectory.delete(recursive: true);
+          }
+        });
+
+        await _createLegacyFourFileBackup(backupDirectory);
+        await controller.stageDatabaseBackupImport(backupDirectory.path);
+        expect(await controller.applyPendingDatabaseImport(), isTrue);
+
+        final imported = MichiFocusDatabase(
+          NativeDatabase(File('${appDirectory.path}/michifocus.sqlite')),
+        );
+        try {
+          expect(
+            (await GoalsDao(imported).getAllGoals()).single.title,
+            'Legacy goal',
+          );
+          expect(
+            (await TasksDao(imported).getAllTasks()).single.title,
+            'Legacy task',
+          );
+          expect(
+            (await PomodoroSessionsDao(
+              imported,
+            ).getAllSessions()).single.endMoodScore,
+            5,
+          );
+          expect(
+            (await CalendarEventsDao(imported).getAllEvents()).single.title,
+            'Legacy event',
+          );
+          expect(await imported.select(imported.routineRecords).get(), isEmpty);
+          expect(
+            await imported.select(imported.routineDayRecords).get(),
+            isEmpty,
+          );
+          expect(
+            await imported.select(imported.routineItemRecords).get(),
+            isEmpty,
+          );
+          expect(
+            await imported.select(imported.routineRunRecords).get(),
+            isEmpty,
+          );
+          expect(
+            await imported.select(imported.routineItemRunRecords).get(),
+            isEmpty,
+          );
+        } finally {
+          await imported.close();
+        }
+      },
+    );
+
+    test('rejects an incomplete legacy backup before staging', () async {
+      final appDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-incomplete-legacy-app-',
+      );
+      final backupDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-incomplete-legacy-backup-',
+      );
+      final controller = AppSettingsController(
+        documentsDirectory: appDirectory,
+      );
+      addTearDown(() async {
+        if (appDirectory.existsSync()) {
+          await appDirectory.delete(recursive: true);
+        }
+        if (backupDirectory.existsSync()) {
+          await backupDirectory.delete(recursive: true);
+        }
+      });
+      await File(
+        '${backupDirectory.path}/michifocus_tasks.sqlite',
+      ).writeAsString('partial');
+
+      await expectLater(
+        controller.stageDatabaseBackupImport(backupDirectory.path),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(
+        Directory(
+          '${appDirectory.path}/michifocus-pending-import',
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('rejects four empty legacy SQLite files', () async {
+      final appDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-empty-legacy-app-',
+      );
+      final backupDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-empty-legacy-backup-',
+      );
+      final controller = AppSettingsController(
+        documentsDirectory: appDirectory,
+      );
+      addTearDown(() async {
+        if (appDirectory.existsSync()) {
+          await appDirectory.delete(recursive: true);
+        }
+        if (backupDirectory.existsSync()) {
+          await backupDirectory.delete(recursive: true);
+        }
+      });
+      for (final name in const [
+        'michifocus_goals.sqlite',
+        'michifocus_tasks.sqlite',
+        'michifocus_pomodoro_sessions.sqlite',
+        'michifocus_calendar_events.sqlite',
+      ]) {
+        sqlite3.open('${backupDirectory.path}/$name').dispose();
+      }
+
+      await expectLater(
+        controller.stageDatabaseBackupImport(backupDirectory.path),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(
+        Directory(
+          '${appDirectory.path}/michifocus-pending-import',
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
+    test(
+      'restores the previous database after interrupted replacement',
+      () async {
+        final appDirectory = await Directory.systemTemp.createTemp(
+          'michifocus-interrupted-import-',
+        );
+        final controller = AppSettingsController(
+          documentsDirectory: appDirectory,
+        );
+        final previousFile = File(
+          '${appDirectory.path}/.michifocus-before-import.sqlite',
+        );
+
+        addTearDown(() async {
+          if (appDirectory.existsSync()) {
+            await appDirectory.delete(recursive: true);
+          }
+        });
+
+        await _createUnifiedDatabase(
+          previousFile,
+          goalTitle: 'Recovered goal',
+        );
+        await File(
+          '${appDirectory.path}/.michifocus-import.sqlite',
+        ).writeAsString('interrupted candidate');
+
+        expect(await controller.applyPendingDatabaseImport(), isFalse);
+        expect(
+          await _loadGoalTitles(
+            File('${appDirectory.path}/michifocus.sqlite'),
+          ),
+          ['Recovered goal'],
+        );
+        expect(previousFile.existsSync(), isFalse);
+        expect(
+          File('${appDirectory.path}/.michifocus-import.sqlite').existsSync(),
+          isFalse,
+        );
+      },
+    );
+
+    test('discards interrupted staging and keeps the live database', () async {
+      final appDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-interrupted-staging-',
+      );
+      final controller = AppSettingsController(
+        documentsDirectory: appDirectory,
+      );
+      final liveFile = File('${appDirectory.path}/michifocus.sqlite');
+      final stagingDirectory = Directory(
+        '${appDirectory.path}/michifocus-staging-import',
+      )..createSync();
+      await _createUnifiedDatabase(liveFile, goalTitle: 'Live goal');
+      await File(
+        '${stagingDirectory.path}/michifocus.sqlite',
+      ).writeAsString('partial staging copy');
+      addTearDown(() async {
+        if (appDirectory.existsSync()) {
+          await appDirectory.delete(recursive: true);
+        }
+      });
+
+      expect(await controller.applyPendingDatabaseImport(), isFalse);
+      expect(await _loadGoalTitles(liveFile), ['Live goal']);
+      expect(stagingDirectory.existsSync(), isFalse);
     });
 
     test('stages and applies unified database backup import', () async {
@@ -809,7 +1212,10 @@ MethodChannel _mockPathProviderDocumentsDirectory(String path) {
   return channel;
 }
 
-Future<void> _createUnifiedDatabase(File file) async {
+Future<void> _createUnifiedDatabase(
+  File file, {
+  String goalTitle = 'Backup goal',
+}) async {
   final database = MichiFocusDatabase(NativeDatabase(file));
   try {
     final now = DateTime(2026, 7, 22, 9);
@@ -818,7 +1224,7 @@ Future<void> _createUnifiedDatabase(File file) async {
         .insert(
           GoalRecordsCompanion.insert(
             id: 'goal-backup',
-            title: 'Backup goal',
+            title: goalTitle,
             targetSessions: 1,
             createdAt: now,
             updatedAt: now,
@@ -826,6 +1232,338 @@ Future<void> _createUnifiedDatabase(File file) async {
         );
   } finally {
     await database.close();
+  }
+}
+
+Future<void> _createCompleteUnifiedDatabase(File file) async {
+  final database = MichiFocusDatabase(NativeDatabase(file));
+  final now = DateTime(2026, 8, 9, 9);
+  try {
+    await database.transaction(() async {
+      await database
+          .into(database.goalRecords)
+          .insert(
+            GoalRecordsCompanion.insert(
+              id: 'routine-goal',
+              title: 'Routine goal',
+              targetSessions: 8,
+              completedSessions: const Value(3),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.taskRecords)
+          .insert(
+            TaskRecordsCompanion.insert(
+              id: 'routine-task',
+              title: 'Deep work',
+              status: const Value('inProgress'),
+              scheduledDate: Value(DateTime(2026, 8, 9, 9)),
+              goalId: const Value('routine-goal'),
+              durationMinutes: const Value(90),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.taskCompletionEventRecords)
+          .insert(
+            TaskCompletionEventRecordsCompanion.insert(
+              id: 'routine-completion',
+              taskId: const Value('routine-task'),
+              taskIdSnapshot: 'routine-task',
+              completedAt: DateTime(2026, 8, 8, 18),
+              scheduledDateSnapshot: Value(DateTime(2026, 8, 8)),
+            ),
+          );
+      await database
+          .into(database.reportingMetadataRecords)
+          .insert(
+            ReportingMetadataRecordsCompanion.insert(
+              id: 'completion-history',
+              completionTrackingStartedAt: DateTime(2026, 7),
+            ),
+          );
+      await database
+          .into(database.calendarEventRecords)
+          .insert(
+            CalendarEventRecordsCompanion.insert(
+              id: 'routine-calendar-event',
+              title: 'Routine review',
+              scheduledAt: DateTime(2026, 8, 9, 11),
+              durationMinutes: 30,
+              createdAt: now,
+            ),
+          );
+      await database
+          .into(database.routineRecords)
+          .insert(
+            RoutineRecordsCompanion.insert(
+              id: 'routine-active',
+              name: 'Morning routine',
+              description: const Value('Preserve every routine field'),
+              iconKey: const Value('sunrise'),
+              colorKey: const Value('amber'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.routineRecords)
+          .insert(
+            RoutineRecordsCompanion.insert(
+              id: 'routine-archived',
+              name: 'Archived routine',
+              status: const Value('archived'),
+              archivedAt: Value(DateTime(2026, 8, 8, 20)),
+              createdAt: DateTime(2026, 8),
+              updatedAt: DateTime(2026, 8, 8, 20),
+            ),
+          );
+      for (final weekday in const [1, 3, 5]) {
+        await database
+            .into(database.routineDayRecords)
+            .insert(
+              RoutineDayRecordsCompanion.insert(
+                routineId: 'routine-active',
+                weekday: weekday,
+              ),
+            );
+      }
+      await database
+          .into(database.routineItemRecords)
+          .insert(
+            RoutineItemRecordsCompanion.insert(
+              id: 'routine-item-2',
+              routineId: 'routine-active',
+              position: 1,
+              title: 'Review',
+              scheduledMinute: 600,
+              durationMinutes: 30,
+              isOptional: const Value(true),
+              reminderMinutesBefore: const Value(5),
+              pomodoroMode: const Value('recommended'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.routineItemRecords)
+          .insert(
+            RoutineItemRecordsCompanion.insert(
+              id: 'routine-item-1',
+              routineId: 'routine-active',
+              position: 0,
+              title: 'Deep work',
+              scheduledMinute: 540,
+              durationMinutes: 90,
+              goalId: const Value('routine-goal'),
+              reminderMinutesBefore: const Value(15),
+              pomodoroMode: const Value('custom'),
+              customFocusMinutes: const Value(30),
+              customBreakMinutes: const Value(5),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.routineRunRecords)
+          .insert(
+            RoutineRunRecordsCompanion.insert(
+              id: 'routine-run',
+              routineId: const Value('routine-active'),
+              sourceRoutineId: 'routine-active',
+              localDate: '2026-08-09',
+              status: const Value('inProgress'),
+              nameSnapshot: 'Morning snapshot',
+              iconKeySnapshot: 'sunrise',
+              colorKeySnapshot: 'amber',
+              scheduledStartMinuteSnapshot: 540,
+              startedAt: Value(DateTime(2026, 8, 9, 9, 5)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.routineItemRunRecords)
+          .insert(
+            RoutineItemRunRecordsCompanion.insert(
+              id: 'routine-item-run-1',
+              routineRunId: 'routine-run',
+              routineItemId: const Value('routine-item-1'),
+              sourceItemId: 'routine-item-1',
+              taskId: const Value('routine-task'),
+              taskIdSnapshot: const Value('routine-task'),
+              positionSnapshot: 0,
+              titleSnapshot: 'Deep work snapshot',
+              scheduledAtSnapshot: DateTime(2026, 8, 9, 9),
+              durationMinutesSnapshot: 90,
+              goalTitleSnapshot: const Value('Routine goal'),
+              reminderMinutesSnapshot: const Value(15),
+              pomodoroModeSnapshot: 'custom',
+              customFocusMinutesSnapshot: const Value(30),
+              customBreakMinutesSnapshot: const Value(5),
+              status: const Value('inProgress'),
+              startedAt: Value(DateTime(2026, 8, 9, 9, 5)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.routineItemRunRecords)
+          .insert(
+            RoutineItemRunRecordsCompanion.insert(
+              id: 'routine-item-run-2',
+              routineRunId: 'routine-run',
+              routineItemId: const Value('routine-item-2'),
+              sourceItemId: 'routine-item-2',
+              positionSnapshot: 1,
+              titleSnapshot: 'Review snapshot',
+              scheduledAtSnapshot: DateTime(2026, 8, 9, 10),
+              durationMinutesSnapshot: 30,
+              isOptionalSnapshot: const Value(true),
+              reminderMinutesSnapshot: const Value(5),
+              pomodoroModeSnapshot: 'recommended',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.pomodoroSessionRecords)
+          .insert(
+            PomodoroSessionRecordsCompanion.insert(
+              id: 'routine-session',
+              startedAt: DateTime(2026, 8, 9, 9, 5),
+              endedAt: DateTime(2026, 8, 9, 9, 30),
+              plannedSeconds: 1800,
+              focusedSeconds: 1500,
+              goalId: const Value('routine-goal'),
+              taskId: const Value('routine-task'),
+              startMoodScore: const Value(2),
+              endMoodScore: const Value(4),
+              moodPromptPending: const Value(true),
+              wasDistracted: const Value(true),
+              distractionMinutes: const Value(3),
+              status: 'completed',
+              createdAt: now,
+            ),
+          );
+      await database
+          .into(database.pomodoroRuntimeRecords)
+          .insert(
+            PomodoroRuntimeRecordsCompanion.insert(
+              id: 'active-runtime',
+              taskId: const Value('routine-task'),
+              taskTitle: const Value('Deep work'),
+              goalId: const Value('routine-goal'),
+              taskEstimatedMinutes: const Value(90),
+              phase: 'focus',
+              isRunning: true,
+              remainingSeconds: 901,
+              phaseTotalSeconds: 1800,
+              cadenceFocusMinutes: 30,
+              cadenceBreakMinutes: 5,
+              longBreakMinutes: 15,
+              longBreakFrequency: 4,
+              autoStartBreak: true,
+              autoStartFocus: true,
+              planMode: 'continuous',
+              blockIndex: 2,
+              blockCount: 4,
+              taskFocusedSecondsAtStart: 1500,
+              focusStartedAt: Value(DateTime(2026, 8, 9, 9, 5)),
+              lastTickAt: Value(DateTime(2026, 8, 9, 9, 30)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+    });
+  } finally {
+    await database.close();
+  }
+}
+
+Future<void> _createLegacyFourFileBackup(Directory directory) async {
+  final now = DateTime(2026, 8, 1, 8);
+  final goals = legacy_goals.GoalsDatabase(
+    NativeDatabase(File('${directory.path}/michifocus_goals.sqlite')),
+  );
+  try {
+    await legacy_goals.GoalsDao(goals).insertGoal(
+      legacy_goals.GoalRecordsCompanion.insert(
+        id: 'legacy-goal',
+        title: 'Legacy goal',
+        targetSessions: 4,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  } finally {
+    await goals.close();
+  }
+
+  final tasks = legacy_tasks.TasksDatabase(
+    NativeDatabase(File('${directory.path}/michifocus_tasks.sqlite')),
+  );
+  try {
+    await legacy_tasks.TasksDao(tasks).insertTask(
+      legacy_tasks.TaskRecordsCompanion.insert(
+        id: 'legacy-task',
+        title: 'Legacy task',
+        status: const Value('inProgress'),
+        goalId: const Value('legacy-goal'),
+        durationMinutes: const Value(45),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  } finally {
+    await tasks.close();
+  }
+
+  final sessions = legacy_pomodoro.PomodoroSessionsDatabase(
+    NativeDatabase(
+      File('${directory.path}/michifocus_pomodoro_sessions.sqlite'),
+    ),
+  );
+  try {
+    await legacy_pomodoro.PomodoroSessionsDao(sessions).insertSession(
+      legacy_pomodoro.PomodoroSessionRecordsCompanion.insert(
+        id: 'legacy-session',
+        startedAt: now,
+        endedAt: now.add(const Duration(minutes: 25)),
+        plannedSeconds: 1500,
+        focusedSeconds: 1400,
+        goalId: const Value('legacy-goal'),
+        taskId: const Value('legacy-task'),
+        startMoodScore: const Value(3),
+        endMoodScore: const Value(5),
+        status: 'completed',
+        createdAt: now,
+      ),
+    );
+  } finally {
+    await sessions.close();
+  }
+
+  final events = legacy_calendar.CalendarEventsDatabase(
+    NativeDatabase(
+      File('${directory.path}/michifocus_calendar_events.sqlite'),
+    ),
+  );
+  try {
+    await legacy_calendar.CalendarEventsDao(events).insertEvent(
+      legacy_calendar.CalendarEventRecordsCompanion.insert(
+        id: 'legacy-event',
+        title: 'Legacy event',
+        scheduledAt: now.add(const Duration(hours: 2)),
+        durationMinutes: 30,
+        createdAt: now,
+      ),
+    );
+  } finally {
+    await events.close();
   }
 }
 

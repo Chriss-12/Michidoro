@@ -1,0 +1,176 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [5 0 R 7 0 R 9 0 R] /Count 3 >> endobj
+3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> endobj
+5 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >> endobj
+6 0 obj << /Length 3421 >> stream
+0.96 0.97 0.94 rg 0 0 612.0 792.0 re f
+0.1 0.18 0.16 rg 0 713.0 612 79 re f
+0.1 0.56 0.33 rg 0 705.0 612 8 re f
+BT /F2 19.0 Tf 1.0 1.0 1.0 rg 44.0 756.0 Td (MichiDoro Performance Report) Tj ET
+BT /F1 10.0 Tf 1.0 1.0 1.0 rg 44.0 733.0 Td (Chris | test@michidoro.local) Tj ET
+BT /F2 11.0 Tf 0.18 0.13 0.09 rg 44.0 689.0 Td (Period: Month | Range: 2026-08) Tj ET
+BT /F1 9.0 Tf 0.38 0.4 0.37 rg 44.0 672.0 Td (Generated: 2026-08-09 18:30) Tj ET
+1.0 1.0 1.0 rg 38 545.0 536 110 re f
+0.75 0.78 0.73 RG 38 545.0 536 110 re S
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 637.0 Td (Tasks planned in period: 30) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 622.0 Td (Pending: 8 | In progress: 3 | Completed: 19) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 607.0 Td (Tasks created in period: 0) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 592.0 Td (Recorded completions: 19 | Undated legacy history: 0) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 577.0 Td (Pomodoros: 24 | Focused minutes: 600) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 562.0 Td (Average mood during tasks: 4.2/5 \(12 sessions\) | Distractions: 0 min) Tj ET
+BT /F1 9.0 Tf 0.38 0.4 0.37 rg 44.0 537.0 Td (Included charts: Circular, Grouped bars) Tj ET
+BT /F2 14.0 Tf 0.18 0.13 0.09 rg 44.0 512.0 Td (Current task progress) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 488.0 Td (63% completed) Tj ET
+0.88 0.88 0.84 rg 260 484.0 280 10 re f
+0.1 0.56 0.33 rg 260 484.0 177.3 10 re f
+BT /F2 14.0 Tf 0.18 0.13 0.09 rg 44.0 450.0 Td (Focus and completion) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 426.0 Td (600 focus minutes) Tj ET
+0.88 0.88 0.84 rg 260 422.0 280 10 re f
+0.18 0.13 0.09 rg 260 422.0 280.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 398.0 Td (24 Pomodoros) Tj ET
+0.88 0.88 0.84 rg 260 394.0 280 10 re f
+0.1 0.56 0.33 rg 260 394.0 11.2 10 re f
+BT /F2 14.0 Tf 0.18 0.13 0.09 rg 44.0 360.0 Td (Routine consistency) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 336.0 Td (85% · 61 of 72 required activities) Tj ET
+0.88 0.88 0.84 rg 260 332.0 280 10 re f
+0.1 0.56 0.33 rg 260 332.0 237.2 10 re f
+1.0 1.0 1.0 rg 38 176.0 536 140 re f
+0.75 0.78 0.73 RG 38 176.0 536 140 re S
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 298.0 Td (Routines: 22 completed | 1 in progress | 3 skipped | 5 missed) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 283.0 Td (Activities: 4 scheduled | 2 in progress | 68 completed) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 268.0 Td (Skipped / missed activities: 7 / 9) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 253.0 Td (Planned / actual focus: 2140 / 1800 min) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 238.0 Td (Average delay: 8.4 min \(64 samples\)) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 223.0 Td (Average mood: 4.3/5 \(44 samples\)) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 208.0 Td (Best streak by routine: 9 days) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 52.0 193.0 Td (Most frequent abandonment: Lectura técnica \(4\)) Tj ET
+BT /F2 14.0 Tf 0.18 0.13 0.09 rg 44.0 158.0 Td (Breakdown by routine) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 134.0 Td (Rutina 1: 12/20 required) Tj ET
+0.88 0.88 0.84 rg 260 130.0 280 10 re f
+0.18 0.13 0.09 rg 260 130.0 168.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 106.0 Td (Rutina 2: 13/20 required) Tj ET
+0.88 0.88 0.84 rg 260 102.0 280 10 re f
+0.18 0.13 0.09 rg 260 102.0 182.0 10 re f
+0.75 0.78 0.73 RG 44 46 524 0 re S
+BT /F1 8 Tf 0.38 0.4 0.37 rg 44 32 Td (MichiFocus | Page 1 of 3) Tj ET
+
+endstream endobj
+7 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 8 0 R >> endobj
+8 0 obj << /Length 3887 >> stream
+0.96 0.97 0.94 rg 0 0 612.0 792.0 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 730.0 Td (Rutina 3: 14/20 required) Tj ET
+0.88 0.88 0.84 rg 260 726.0 280 10 re f
+0.18 0.13 0.09 rg 260 726.0 196.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 702.0 Td (Rutina 4: 15/20 required) Tj ET
+0.88 0.88 0.84 rg 260 698.0 280 10 re f
+0.18 0.13 0.09 rg 260 698.0 210.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 674.0 Td (Rutina 5: 16/20 required) Tj ET
+0.88 0.88 0.84 rg 260 670.0 280 10 re f
+0.18 0.13 0.09 rg 260 670.0 224.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 646.0 Td (Rutina 6: 17/20 required) Tj ET
+0.88 0.88 0.84 rg 260 642.0 280 10 re f
+0.18 0.13 0.09 rg 260 642.0 238.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 618.0 Td (Rutina 7: 18/20 required) Tj ET
+0.88 0.88 0.84 rg 260 614.0 280 10 re f
+0.18 0.13 0.09 rg 260 614.0 252.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 590.0 Td (Rutina 8: 19/20 required) Tj ET
+0.88 0.88 0.84 rg 260 586.0 280 10 re f
+0.18 0.13 0.09 rg 260 586.0 266.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 562.0 Td (Rutina 9: 20/20 required) Tj ET
+0.88 0.88 0.84 rg 260 558.0 280 10 re f
+0.18 0.13 0.09 rg 260 558.0 280.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 534.0 Td (Rutina 10: 12/20 required) Tj ET
+0.88 0.88 0.84 rg 260 530.0 280 10 re f
+0.18 0.13 0.09 rg 260 530.0 168.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 506.0 Td (Rutina 11: 13/20 required) Tj ET
+0.88 0.88 0.84 rg 260 502.0 280 10 re f
+0.18 0.13 0.09 rg 260 502.0 182.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 478.0 Td (Rutina 12: 14/20 required) Tj ET
+0.88 0.88 0.84 rg 260 474.0 280 10 re f
+0.18 0.13 0.09 rg 260 474.0 196.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 450.0 Td (Rutina 13: 15/20 required) Tj ET
+0.88 0.88 0.84 rg 260 446.0 280 10 re f
+0.18 0.13 0.09 rg 260 446.0 210.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 422.0 Td (Rutina 14: 16/20 required) Tj ET
+0.88 0.88 0.84 rg 260 418.0 280 10 re f
+0.18 0.13 0.09 rg 260 418.0 224.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 394.0 Td (Rutina 15: 17/20 required) Tj ET
+0.88 0.88 0.84 rg 260 390.0 280 10 re f
+0.18 0.13 0.09 rg 260 390.0 238.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 366.0 Td (Rutina 16: 18/20 required) Tj ET
+0.88 0.88 0.84 rg 260 362.0 280 10 re f
+0.18 0.13 0.09 rg 260 362.0 252.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 338.0 Td (Rutina 17: 19/20 required) Tj ET
+0.88 0.88 0.84 rg 260 334.0 280 10 re f
+0.18 0.13 0.09 rg 260 334.0 266.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 310.0 Td (Rutina 18: 20/20 required) Tj ET
+0.88 0.88 0.84 rg 260 306.0 280 10 re f
+0.18 0.13 0.09 rg 260 306.0 280.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 282.0 Td (Rutina 19: 12/20 required) Tj ET
+0.88 0.88 0.84 rg 260 278.0 280 10 re f
+0.18 0.13 0.09 rg 260 278.0 168.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 254.0 Td (Rutina 20: 13/20 required) Tj ET
+0.88 0.88 0.84 rg 260 250.0 280 10 re f
+0.18 0.13 0.09 rg 260 250.0 182.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 226.0 Td (Rutina 21: 14/20 required) Tj ET
+0.88 0.88 0.84 rg 260 222.0 280 10 re f
+0.18 0.13 0.09 rg 260 222.0 196.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 198.0 Td (Rutina 22: 15/20 required) Tj ET
+0.88 0.88 0.84 rg 260 194.0 280 10 re f
+0.18 0.13 0.09 rg 260 194.0 210.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 170.0 Td (Rutina 23: 16/20 required) Tj ET
+0.88 0.88 0.84 rg 260 166.0 280 10 re f
+0.18 0.13 0.09 rg 260 166.0 224.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 142.0 Td (Rutina 24: 17/20 required) Tj ET
+0.88 0.88 0.84 rg 260 138.0 280 10 re f
+0.18 0.13 0.09 rg 260 138.0 238.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 114.0 Td (Rutina 25: 18/20 required) Tj ET
+0.88 0.88 0.84 rg 260 110.0 280 10 re f
+0.18 0.13 0.09 rg 260 110.0 252.0 10 re f
+0.75 0.78 0.73 RG 44 46 524 0 re S
+BT /F1 8 Tf 0.38 0.4 0.37 rg 44 32 Td (MichiFocus | Page 2 of 3) Tj ET
+
+endstream endobj
+9 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 10 0 R >> endobj
+10 0 obj << /Length 1153 >> stream
+0.96 0.97 0.94 rg 0 0 612.0 792.0 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 730.0 Td (Rutina 26: 19/20 required) Tj ET
+0.88 0.88 0.84 rg 260 726.0 280 10 re f
+0.18 0.13 0.09 rg 260 726.0 266.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 702.0 Td (Rutina 27: 20/20 required) Tj ET
+0.88 0.88 0.84 rg 260 698.0 280 10 re f
+0.18 0.13 0.09 rg 260 698.0 280.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 674.0 Td (Rutina 28: 12/20 required) Tj ET
+0.88 0.88 0.84 rg 260 670.0 280 10 re f
+0.18 0.13 0.09 rg 260 670.0 168.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 646.0 Td (Rutina 29: 13/20 required) Tj ET
+0.88 0.88 0.84 rg 260 642.0 280 10 re f
+0.18 0.13 0.09 rg 260 642.0 182.0 10 re f
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 618.0 Td (Rutina 30: 14/20 required) Tj ET
+0.88 0.88 0.84 rg 260 614.0 280 10 re f
+0.18 0.13 0.09 rg 260 614.0 196.0 10 re f
+BT /F2 14.0 Tf 0.18 0.13 0.09 rg 44.0 580.0 Td (Recommendation) Tj ET
+BT /F1 10.0 Tf 0.18 0.13 0.09 rg 44.0 556.0 Td (Solid progress: your plan works; now finish the highest-value task.) Tj ET
+0.75 0.78 0.73 RG 44 46 524 0 re S
+BT /F1 8 Tf 0.38 0.4 0.37 rg 44 32 Td (MichiFocus | Page 3 of 3) Tj ET
+
+endstream endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000000326 00000 n 
+0000000462 00000 n 
+0000003935 00000 n 
+0000004071 00000 n 
+0000008010 00000 n 
+0000008147 00000 n 
+trailer << /Size 11 /Root 1 0 R >>
+startxref
+9353
+%%EOF

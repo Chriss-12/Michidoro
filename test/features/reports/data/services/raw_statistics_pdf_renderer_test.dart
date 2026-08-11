@@ -36,6 +36,41 @@ void main() {
       focusedSeconds: 36000,
       completionEvents: 21,
       legacyUnknownCompletions: 2,
+      routines: const StatisticsRoutineMetrics(
+        scheduledRuns: 3,
+        inProgressRuns: 0,
+        completedRuns: 1,
+        skippedRuns: 1,
+        missedRuns: 1,
+        scheduledItems: 0,
+        inProgressItems: 0,
+        completedItems: 1,
+        skippedItems: 1,
+        missedItems: 1,
+        requiredItems: 3,
+        completedRequiredItems: 1,
+        skippedOptionalItems: 1,
+        missedRequiredItems: 1,
+        plannedFocusMinutes: 85,
+        focusedSeconds: 1200,
+        averageStartDelayMinutes: 10,
+        startDelaySampleCount: 1,
+        moodAverage: 4,
+        moodSampleCount: 1,
+        typicalAbandonmentItem: 'Lectura',
+        typicalAbandonmentCount: 1,
+        longestCompletedStreak: 2,
+        byRoutine: [
+          StatisticsRoutineBreakdown(
+            sourceRoutineId: 'routine-1',
+            name: 'Mañana',
+            scheduledRuns: 3,
+            completedRuns: 1,
+            requiredItems: 3,
+            completedRequiredItems: 1,
+          ),
+        ],
+      ),
     );
     final profileName = 'María ${List.filled(114, 'Á').join()}';
     final profileEmail = '${List.filled(242, 'a').join()}@example.com';
@@ -62,6 +97,10 @@ void main() {
     expect(profileEmail.length, 254);
     expect(pdf, contains('María'));
     expect(pdf, isNot(contains('Ã')));
+    expect(pdf, contains('Constancia de rutinas'));
+    expect(pdf, contains('Foco planificado / real: 85 / 20 min'));
+    expect(pdf, contains('Lectura'));
+    expect(pdf, contains('Detalle por rutina'));
   });
 
   test('renders report copy in English', () {
@@ -101,5 +140,62 @@ void main() {
     expect(pdf, contains('Recommendation'));
     expect(pdf, contains('Page 1 of 1'));
     expect(pdf, isNot(contains('Recomendaci')));
+    expect(pdf, isNot(contains('Routine consistency')));
+  });
+
+  test('does not fabricate zero consistency without required items', () {
+    final generatedAt = DateTime(2026, 8, 9, 9);
+    final data = StatisticsReportData(
+      range: ResolvedStatisticsReportRange(
+        period: StatisticsReportPeriod.day,
+        start: DateTime(2026, 8, 9),
+        end: DateTime(2026, 8, 10),
+        generatedAt: generatedAt,
+      ),
+      tasks: const StatisticsTaskTotals(
+        listed: 0,
+        inProgress: 0,
+        completed: 0,
+      ),
+      calendarDays: const [],
+      completedPomodoros: 0,
+      focusedSeconds: 0,
+      routines: const StatisticsRoutineMetrics(
+        scheduledRuns: 1,
+        inProgressRuns: 0,
+        completedRuns: 0,
+        skippedRuns: 0,
+        missedRuns: 0,
+        scheduledItems: 1,
+        inProgressItems: 0,
+        completedItems: 0,
+        skippedItems: 0,
+        missedItems: 0,
+        requiredItems: 0,
+        completedRequiredItems: 0,
+        skippedOptionalItems: 0,
+        missedRequiredItems: 0,
+        plannedFocusMinutes: 20,
+        focusedSeconds: 0,
+        longestCompletedStreak: 0,
+        byRoutine: [],
+      ),
+    );
+
+    final pdf = latin1.decode(
+      const RawStatisticsPdfRenderer().render(
+        StatisticsReportDocument(
+          title: 'Reporte',
+          profileName: 'Chris',
+          profileEmail: '',
+          periodLabel: 'Día',
+          enabledCharts: const {},
+          data: data,
+        ),
+      ),
+    );
+
+    expect(pdf, contains('Sin datos: el período no contiene'));
+    expect(pdf, isNot(contains('0% · 0 de 0')));
   });
 }

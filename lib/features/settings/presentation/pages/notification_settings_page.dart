@@ -1,17 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
+import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/settings/presentation/widgets/routine_reminder_capability_tile.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:pomodoro_app_v1/shared/templates/app_shell.dart';
 import 'package:pomodoro_app_v1/shared/templates/page_header.dart';
 
-class NotificationSettingsPage extends StatelessWidget {
+class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
 
   static const routePath = '/settings/notifications';
+
+  @override
+  State<NotificationSettingsPage> createState() =>
+      _NotificationSettingsPageState();
+}
+
+class _NotificationSettingsPageState extends State<NotificationSettingsPage>
+    with WidgetsBindingObserver {
+  late Future<RoutineReminderCapability?> _capability;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _capability = RoutineReminderPlatform.getCapability();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    setState(() {
+      _capability = RoutineReminderPlatform.getCapability();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +52,7 @@ class NotificationSettingsPage extends StatelessWidget {
 
     return AppShell(
       selectedIndex: 4,
+      showHeader: false,
       child: ListView(
         padding: AppCardPaddings.detailPage,
         children: [
@@ -30,6 +63,22 @@ class NotificationSettingsPage extends StatelessWidget {
               'Configure alerts, sounds, and tests.',
             ),
             showBack: true,
+          ),
+          FutureBuilder<RoutineReminderCapability?>(
+            future: _capability,
+            builder: (context, snapshot) {
+              final capability = snapshot.data;
+              if (capability == null) return const SizedBox.shrink();
+              return Padding(
+                padding: AppCardPaddings.standard,
+                child: GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: RoutineReminderCapabilityTile(
+                    capability: capability,
+                  ),
+                ),
+              );
+            },
           ),
           Padding(
             padding: AppCardPaddings.standard,
@@ -87,6 +136,7 @@ class NotificationSettingsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<PomodoroCompletionSound>(
+                    isExpanded: true,
                     value: settings.completionSound,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.volume_up_outlined),
@@ -148,6 +198,7 @@ class NotificationSettingsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<PomodoroVibrationPattern>(
+                    isExpanded: true,
                     value: settings.completionVibrationPattern,
                     decoration: InputDecoration(
                       labelText: context.tr(
@@ -290,20 +341,20 @@ class NotificationSettingsPage extends StatelessWidget {
   ) {
     return switch (value) {
       PomodoroVibrationPattern.light => context.tr(
-        'Un toque ligero y discreto.',
-        'One light and subtle tap.',
+        'Vibración corta de intensidad baja.',
+        'A short, low-intensity vibration.',
       ),
       PomodoroVibrationPattern.normal => context.tr(
-        'Un toque medio, igual al aviso original.',
-        'One medium tap, matching the original alert.',
+        'Vibración clara de intensidad media.',
+        'A clear, medium-intensity vibration.',
       ),
       PomodoroVibrationPattern.double => context.tr(
-        'Dos toques cortos para distinguir el final.',
-        'Two short taps to make completion distinct.',
+        'Dos vibraciones separadas para distinguir el final.',
+        'Two separated vibrations to make completion distinct.',
       ),
       PomodoroVibrationPattern.intense => context.tr(
-        'Un toque fuerte para que sea más perceptible.',
-        'One strong tap for a more noticeable alert.',
+        'Dos pulsos largos a intensidad máxima.',
+        'Two long pulses at maximum intensity.',
       ),
     };
   }

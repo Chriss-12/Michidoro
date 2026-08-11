@@ -12,6 +12,7 @@ class PomodoroSession {
     this.taskId,
     this.startMoodScore,
     this.endMoodScore,
+    this.moodPromptPending = false,
     this.wasDistracted,
     this.distractionMinutes,
   });
@@ -26,12 +27,14 @@ class PomodoroSession {
   final String? taskId;
   final int? startMoodScore;
   final int? endMoodScore;
+  final bool moodPromptPending;
   final bool? wasDistracted;
   final int? distractionMinutes;
 
   PomodoroSession copyWith({
     int? startMoodScore,
     int? endMoodScore,
+    bool? moodPromptPending,
     bool? wasDistracted,
     int? distractionMinutes,
   }) {
@@ -46,6 +49,7 @@ class PomodoroSession {
       taskId: taskId,
       startMoodScore: startMoodScore ?? this.startMoodScore,
       endMoodScore: endMoodScore ?? this.endMoodScore,
+      moodPromptPending: moodPromptPending ?? this.moodPromptPending,
       wasDistracted: wasDistracted ?? this.wasDistracted,
       distractionMinutes: distractionMinutes ?? this.distractionMinutes,
     );

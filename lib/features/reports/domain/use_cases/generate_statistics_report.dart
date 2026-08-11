@@ -27,6 +27,7 @@ class GenerateStatisticsReport {
       moodAverage: source.moodAverage,
       moodSampleCount: source.moodSampleCount,
       distractionMinutes: source.distractionMinutes,
+      routines: source.routines,
     );
   }
 }
