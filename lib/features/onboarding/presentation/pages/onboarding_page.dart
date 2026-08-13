@@ -86,21 +86,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   padding: const EdgeInsets.fromLTRB(20, 10, 12, 4),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        child: Text(
-                          'MichiDoro',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: palette.background,
-                                fontWeight: FontWeight.w900,
-                              ),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            'MichiDoro',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: palette.background,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       TextButton(
                         onPressed: _isCompleting ? null : _finish,
                         child: Container(

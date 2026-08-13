@@ -11,6 +11,7 @@ import 'package:pomodoro_app_v1/app/state/pomodoro_runtime_scope.dart';
 import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/state/scheduled_task_reminder_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
@@ -225,6 +226,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (!serviceLocator.isRegistered<RoutinesController>()) return;
     await serviceLocator<RoutinesController>().reconcileToday();
     await serviceLocator<TasksController>().loadTasks();
+    await _routineReminders?.synchronize();
+  }
+
+  Future<void> _deleteAllDatabaseData() async {
+    final pomodoroController = serviceLocator<PomodoroController>()
+      ..stopForDatabaseReset();
+
+    try {
+      await serviceLocator<MichiFocusDatabase>().clearAllUserData();
+    } on Object {
+      await pomodoroController.initialize();
+      rethrow;
+    }
+
+    pomodoroController.resetAfterDatabaseClear();
+    await Future.wait([
+      serviceLocator<GoalsController>().loadGoals(),
+      serviceLocator<TasksController>().loadTasks(),
+      serviceLocator<CalendarController>().loadEvents(),
+      if (serviceLocator.isRegistered<RoutinesController>())
+        serviceLocator<RoutinesController>().load(),
+    ]);
     await _routineReminders?.synchronize();
   }
 
@@ -463,6 +486,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       },
                       onImportDatabaseBackup:
                           controller.stageDatabaseBackupImport,
+                      onDeleteAllDatabaseData: _deleteAllDatabaseData,
                       onTestNotification: controller.sendTestNotification,
                       onClearNotifications: controller.clearNotifications,
                       child: routeChild,

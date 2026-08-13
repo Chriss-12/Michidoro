@@ -62,6 +62,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Rutinas'),
+        320,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Rutinas'), findsOneWidget);
       _expectOccurrence(
         routinesRepository,
@@ -109,6 +114,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Routines'),
+        320,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Routines'), findsOneWidget);
       _expectOccurrence(
         routinesRepository,

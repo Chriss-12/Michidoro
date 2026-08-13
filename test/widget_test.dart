@@ -82,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hola, Chriss'), findsOneWidget);
-    expect(find.text('Planificación'), findsOneWidget);
+    expect(find.text('Planificación'), findsNothing);
     expect(find.text('Pendientes'), findsOneWidget);
     expect(find.text('Completadas'), findsWidgets);
 
@@ -100,18 +100,41 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Abrir calendario'));
+    AppRouter.router.go('/calendar');
     await tester.pumpAndSettle();
-    expect(find.text('Calendario'), findsOneWidget);
-    expect(find.byTooltip('Mes siguiente'), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.text('Hola, Chriss'), findsOneWidget);
+    expect(
+      AppRouter.router.routeInformationProvider.value.uri.path,
+      '/goals',
+    );
     expect(find.text('Planificación'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Abrir calendario'));
+    AppRouter.router.go('/home');
     await tester.pumpAndSettle();
-    expect(find.text('Calendario'), findsOneWidget);
+
+    await tester.tap(find.text('Objetivos').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Planificación'), findsOneWidget);
+    expect(find.byKey(const ValueKey('goal-period-card')), findsOneWidget);
+    expect(find.text('Todos'), findsOneWidget);
+    expect(find.text('Semana'), findsOneWidget);
+    expect(find.text('Rango'), findsOneWidget);
+    await tester.ensureVisible(find.text('Rango'));
+    await tester.tap(find.text('Rango'));
+    await tester.pumpAndSettle();
+    final rangeDialog = find.byKey(
+      const ValueKey('goal-date-range-dialog'),
+    );
+    expect(rangeDialog, findsOneWidget);
+    expect(
+      find.descendant(of: rangeDialog, matching: find.text('Inicio')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: rangeDialog, matching: find.text('Fin')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byTooltip('Cerrar'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Mes siguiente'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Más acciones'));
     await tester.pumpAndSettle();
@@ -215,12 +238,38 @@ void main() {
     );
     await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     await tester.binding.setSurfaceSize(const Size(480, 1800));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('25 min enfoque / 5 min descanso'));
+
+    await tester.ensureVisible(find.byTooltip('Opciones de tarea').first);
+    await tester.tap(find.byTooltip('Opciones de tarea').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Empezar Pomodoro'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.text('25 min enfoque / 5 min descanso'),
+    );
+    await tester.pumpAndSettle();
+    final presetTile = tester.widget<ListTile>(
+      find
+          .ancestor(
+            of: find.text('25 min enfoque / 5 min descanso'),
+            matching: find.byType(ListTile),
+          )
+          .first,
+    );
+    presetTile.onTap!();
     await tester.pumpAndSettle();
 
     await tester.pumpAndSettle();
+    expect(find.text('Empezar Pomodoro'), findsNothing);
+    expect(pomodoroController.hasActiveRuntime.value, isTrue);
+    expect(
+      AppRouter.router.routeInformationProvider.value.uri.path,
+      '/pomodoro',
+    );
     expect(find.text('25:00'), findsOneWidget);
     expect(find.text('MODO ENFOQUE'), findsOneWidget);
     expect(find.text('Enfoque actual'), findsOneWidget);
@@ -373,9 +422,15 @@ void main() {
 
     await tester.tap(find.text('Objetivos'));
     await tester.pumpAndSettle();
-    expect(find.text('Mis metas'), findsOneWidget);
-    expect(find.text('Progreso general'), findsOneWidget);
-    expect(find.text('Tareas sin objetivo'), findsOneWidget);
+    expect(find.text('Planificación'), findsOneWidget);
+    expect(find.byKey(const ValueKey('goal-period-card')), findsOneWidget);
+    expect(find.text('Todos los objetivos'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Nueva tarea'),
+      320,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Agenda local de planificación'), findsOneWidget);
 
     await tester.tap(find.text('Ajustes'));
     await tester.pumpAndSettle();
@@ -467,13 +522,46 @@ void main() {
     AppRouter.router.go(SettingsPage.routePath);
     await tester.pumpAndSettle();
 
+    final settingsScrollable = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Borrar todos los datos'),
+      600,
+      scrollable: settingsScrollable,
+    );
+    final deleteAllDataButton = find.byKey(
+      const ValueKey('delete-all-database-data'),
+    );
+    await tester.ensureVisible(deleteAllDataButton);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteAllDataButton);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('delete-database-data-dialog')),
+      findsOneWidget,
+    );
+    var deleteButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('confirm-delete-database-data')),
+    );
+    expect(deleteButton.onPressed, isNull);
+    await tester.enterText(
+      find.byKey(const ValueKey('database-delete-confirmation-field')),
+      'BORRAR',
+    );
+    await tester.pumpAndSettle();
+    deleteButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('confirm-delete-database-data')),
+    );
+    expect(deleteButton.onPressed, isNotNull);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(
       find.text('Idioma'),
       -500,
-      scrollable: find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable && widget.axisDirection == AxisDirection.down,
-      ),
+      scrollable: settingsScrollable,
     );
     expect(
       Localizations.localeOf(tester.element(find.text('Idioma'))).languageCode,
@@ -574,6 +662,20 @@ void main() {
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Applied: Serious'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Delete all data'),
+      600,
+      scrollable: settingsScrollable,
+    );
+    await tester.ensureVisible(deleteAllDataButton);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteAllDataButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete all data?'), findsOneWidget);
+    expect(find.textContaining('Type DELETE to confirm'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
   });
 }
 

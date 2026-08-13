@@ -2249,4 +2249,21 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
     final escapedPath = targetPath.replaceAll("'", "''");
     await customStatement("VACUUM INTO '$escapedPath'");
   }
+
+  Future<void> clearAllUserData() async {
+    await transaction(() async {
+      await delete(pomodoroRuntimeRecords).go();
+      await delete(routineItemRunRecords).go();
+      await delete(routineRunRecords).go();
+      await delete(routineItemRecords).go();
+      await delete(routineDayRecords).go();
+      await delete(routineRecords).go();
+      await delete(taskCompletionEventRecords).go();
+      await delete(pomodoroSessionRecords).go();
+      await delete(taskRecords).go();
+      await delete(goalRecords).go();
+      await delete(calendarEventRecords).go();
+      await delete(reportingMetadataRecords).go();
+    });
+  }
 }

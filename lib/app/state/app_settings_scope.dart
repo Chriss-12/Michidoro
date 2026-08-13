@@ -67,6 +67,7 @@ class AppSettingsScope extends InheritedWidget {
     required this.onOpenReport,
     required this.onExportDatabaseBackup,
     required this.onImportDatabaseBackup,
+    required this.onDeleteAllDatabaseData,
     required this.onTestNotification,
     required this.onClearNotifications,
     required super.child,
@@ -136,6 +137,7 @@ class AppSettingsScope extends InheritedWidget {
   final Future<void> Function(String path) onOpenReport;
   final Future<String> Function() onExportDatabaseBackup;
   final Future<void> Function(String directoryPath) onImportDatabaseBackup;
+  final Future<void> Function() onDeleteAllDatabaseData;
   final Future<void> Function() onTestNotification;
   final VoidCallback onClearNotifications;
 

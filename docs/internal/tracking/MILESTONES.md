@@ -2902,3 +2902,84 @@ Implementation evidence on 2026-08-09:
 
 Tracks:
 - `REQ-V9-009`
+
+## Approved roadmap - Productivity V10
+
+### V10-M0 - Unified Goals Planning Hub
+
+Priority: 1
+
+Status: Verified
+
+Objective:
+Move the complete calendar planning experience into Goals and add explicit
+goal-period filtering without duplicating data, routes, or persistence.
+
+Deliverables:
+- [x] Remove the separate Home Planning card.
+- [x] Make Goals render calendar, selected-day goals, tasks, routine
+      occurrences, and events.
+- [x] Add All, Day, Week, Month, Year, and custom-range goal filters.
+- [x] Present custom ranges in a compact Start/End calendar dialog with visible
+      range highlighting and no full-screen system picker.
+- [x] Keep undated goals visible and dated goals ordered chronologically.
+- [x] Preserve create/edit/delete, task planning, routine opening, and Focus
+      entry behavior.
+- [x] Redirect or alias legacy calendar navigation to Goals.
+
+Quality gates:
+- [x] Focused widget tests cover every period boundary and undated goals.
+- [x] Navigation tests prove Home has no Planning card and `/calendar` lands in
+      the Goals tab.
+- [x] Spanish/English, 320 px, large text, light/dark, and portrait visual checks
+      pass without overflow.
+- [x] `dart format`, `flutter analyze`, and full `flutter test` pass.
+
+Verification evidence on 2026-08-11:
+- Clean analyzer and 245 passing tests.
+- Inclusive period-boundary, undated-goal, legacy-route, and unified-calendar
+  coverage passed.
+- RMX3301 portrait inspection confirmed Home without the Planning card and
+  Goals with the calendar, two-row filters, and selected-day agenda.
+- Start/End range interaction and 320 px large-text rendering passed focused
+  widget coverage.
+- RMX3301 inspection confirmed direct opening, readable Inicio/Fin fields,
+  inclusive range highlighting, and the guarded Apply action.
+- Release APK built and updated without clearing the existing local database.
+
+Tracks:
+- `REQ-V10-001`
+
+### V10-M1 - Protected database reset
+
+Priority: 2
+
+Status: Verified
+
+Objective:
+Provide an explicit, transaction-safe way to clear every record from the
+unified SQLite database while retaining local preferences and external files.
+
+Deliverables:
+- [x] Add a final danger-zone card to Settings.
+- [x] Require typed `BORRAR` / `DELETE` confirmation.
+- [x] Clear all 12 unified tables in dependency-safe order and one transaction.
+- [x] Stop active Focus runtime and refresh all feature controllers.
+- [x] Preserve settings JSON, selected folders, reports, and external backups.
+
+Quality gates:
+- [x] Persistence tests verify every table is empty and foreign keys remain
+      valid after reset.
+- [x] Widget tests verify cancel, disabled confirmation, and bilingual copy.
+- [x] Clean analyzer and full Flutter test suite.
+- [x] Release APK update and physical portrait verification.
+
+Verification evidence:
+- Clean analysis and 247 automated tests on 2026-08-11.
+- Release APK installed on RMX3301; destructive card, confirmation dialog,
+  typed `BORRAR`, and enabled final action inspected in portrait.
+- Physical deletion was intentionally cancelled; the transactional destructive
+  path is covered with a populated in-memory SQLite database.
+
+Tracks:
+- `REQ-SET-007`

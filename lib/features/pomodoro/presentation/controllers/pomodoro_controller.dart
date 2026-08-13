@@ -422,6 +422,38 @@ class PomodoroController {
     unawaited(checkpointRuntime());
   }
 
+  void stopForDatabaseReset() {
+    _timer?.cancel();
+    isRunning.value = false;
+    _lastTickAt = null;
+  }
+
+  void resetAfterDatabaseClear() {
+    _timer?.cancel();
+    isRunning.value = false;
+    phase.value = PomodoroPhase.focus;
+    _currentFocusSeconds = _focusSeconds;
+    remainingSeconds.value = _currentFocusSeconds;
+    sessions.value = const [];
+    activeGoalId.value = null;
+    activeTaskId.value = null;
+    activeTaskTitle.value = null;
+    activeTaskEstimatedSeconds.value = null;
+    focusStartMoodScore.value = null;
+    pendingReflectionSessionId.value = null;
+    hasActiveRuntime.value = false;
+    hasStartedRuntime.value = false;
+    maximumConcentrationEnabled.value = false;
+    planMode.value = PomodoroPlanMode.singleBlock;
+    currentBlockIndex.value = 1;
+    totalBlocks.value = 1;
+    _startedAt = null;
+    _lastTickAt = null;
+    _runtimeCreatedAt = null;
+    _hasStructuredTaskPlan = false;
+    _pendingReflectionSessionIds.clear();
+  }
+
   void discardSession() {
     _timer?.cancel();
     isRunning.value = false;

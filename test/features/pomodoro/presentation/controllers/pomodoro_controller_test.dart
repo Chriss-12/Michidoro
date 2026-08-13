@@ -35,6 +35,43 @@ void main() {
       expect(controller.sessions.value, isEmpty);
     });
 
+    test(
+      'resets runtime and history state after the database is cleared',
+      () async {
+        final repository = _MemoryPomodoroSessionsRepository();
+        await repository.saveCompletedSession(
+          startedAt: DateTime(2026, 8, 11, 8),
+          endedAt: DateTime(2026, 8, 11, 8, 25),
+          plannedSeconds: 1500,
+          focusedSeconds: 1500,
+          taskId: 'task-1',
+        );
+        final controller = PomodoroController(repository: repository);
+        await controller.loadSessions();
+        controller
+          ..selectTask(
+            taskId: 'task-1',
+            taskTitle: 'Task',
+            estimatedSeconds: 3600,
+          )
+          ..maximumConcentrationMode = true
+          ..start()
+          ..stopForDatabaseReset()
+          ..resetAfterDatabaseClear();
+
+        expect(controller.isRunning.value, isFalse);
+        expect(controller.sessions.value, isEmpty);
+        expect(controller.selectedTaskId, isNull);
+        expect(controller.selectedGoalId, isNull);
+        expect(controller.pendingReflectionSessionId.value, isNull);
+        expect(controller.hasActiveRuntime.value, isFalse);
+        expect(controller.hasStartedRuntime.value, isFalse);
+        expect(controller.maximumConcentrationEnabled.value, isFalse);
+        expect(controller.currentBlockIndex.value, 1);
+        expect(controller.totalBlocks.value, 1);
+      },
+    );
+
     test('discards an interrupted session without saving history', () async {
       final controller = PomodoroController(
         repository: _MemoryPomodoroSessionsRepository(),

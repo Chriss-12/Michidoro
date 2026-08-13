@@ -28,6 +28,15 @@ Use `go_router` as the routing boundary. Keep route definitions discoverable and
   parameter for edits, and remains the full-screen route for existing routines
   and direct links without adding another navigation destination.
 
+## Unified planning
+
+- `/goals` is the only bottom-navigation destination for planning. It composes
+  the calendar, goal-period filtering, and the selected-day agenda for goals,
+  tasks, routine occurrences, and events.
+- Home does not expose a separate Planning route or card.
+- `/calendar` remains as a compatibility route and redirects to `/goals` so
+  existing internal links and local notifications keep working.
+
 ## Required checks
 
 - [ ] Relevant requirement or decision is linked.

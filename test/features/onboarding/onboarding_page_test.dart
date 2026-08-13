@@ -248,6 +248,7 @@ class _OnboardingTestApp extends StatelessWidget {
           onOpenReport: (_) async {},
           onExportDatabaseBackup: () async => '',
           onImportDatabaseBackup: (_) async {},
+          onDeleteAllDatabaseData: () async {},
           onTestNotification: () async {},
           onClearNotifications: () {},
           child: MediaQuery(

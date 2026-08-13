@@ -11,7 +11,7 @@
 
 - Introducción de primera apertura con cuatro pantallas, progreso, retroceso,
   omisión y contenido en español o inglés.
-- Planificación por calendario desde Home.
+- Planificación por calendario integrada en Objetivos.
 - Objetivos por fecha con edición y eliminación.
 - Tareas rápidas sin fecha desde Tasks.
 - Tareas planificadas asociadas a día y opcionalmente a objetivo.
@@ -32,8 +32,16 @@
 - Carpeta configurable para guardar reportes.
 - Selector de carpeta para reportes, exportación e importación de backup local.
 - Preferencias locales de temporizador y reportes.
+- Opción protegida en Ajustes para borrar todos los datos de la base local,
+  con confirmación escrita y conservación de preferencias y archivos exportados.
 
 ### Cambiado
+
+- Objetivos ahora reúne el calendario, el listado de objetivos y la agenda de
+  tareas, rutinas y eventos. Incluye filtros por todos, día, semana, mes, año y
+  rango de fechas; el acceso separado de Planificación se retiró de Inicio.
+- El filtro por rango ahora usa un calendario compacto dentro de la app, con
+  fechas de inicio y fin visibles y el intervalo seleccionado resaltado.
 
 - **Crear rutina** ahora abre el editor guiado en una ventana dentro de Tareas,
   con fondo desenfocado, adaptación al teclado y confirmación antes de descartar

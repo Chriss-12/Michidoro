@@ -43,6 +43,198 @@ class SettingsPage extends StatelessWidget {
         _NotificationsCard(),
         SizedBox(height: 26),
         _TypographyPresetCard(),
+        SizedBox(height: 26),
+        _DatabaseDataCard(),
+        SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _DatabaseDataCard extends StatelessWidget {
+  const _DatabaseDataCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppSettingsScope.of(context);
+    final colors = Theme.of(context).colorScheme;
+
+    return GlassCard(
+      key: const ValueKey('database-danger-zone'),
+      padding: AppCardPaddings.compact,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle(
+            icon: Icons.storage_rounded,
+            title: context.tr('Datos de la aplicación', 'Application data'),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            context.tr(
+              'Borra objetivos, tareas, sesiones, rutinas, calendario y estadísticas. Tus ajustes y archivos exportados se conservan.',
+              'Deletes goals, tasks, sessions, routines, calendar data, and statistics. Settings and exported files are retained.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const ValueKey('delete-all-database-data'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colors.error,
+                side: BorderSide(color: colors.error),
+              ),
+              onPressed: () => _confirmAndDelete(context, settings),
+              icon: const Icon(Icons.delete_forever_rounded),
+              label: Text(
+                context.tr('Borrar todos los datos', 'Delete all data'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmAndDelete(
+    BuildContext context,
+    AppSettingsScope settings,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _DeleteDatabaseDataDialog(),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await settings.onDeleteAllDatabaseData();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr(
+              'Todos los datos de la base de datos fueron borrados.',
+              'All database data was deleted.',
+            ),
+          ),
+        ),
+      );
+    } on Object {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr(
+              'No se pudieron borrar los datos. Inténtalo de nuevo.',
+              'The data could not be deleted. Try again.',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _DeleteDatabaseDataDialog extends StatefulWidget {
+  const _DeleteDatabaseDataDialog();
+
+  @override
+  State<_DeleteDatabaseDataDialog> createState() =>
+      _DeleteDatabaseDataDialogState();
+}
+
+class _DeleteDatabaseDataDialogState extends State<_DeleteDatabaseDataDialog> {
+  late final TextEditingController _confirmationController;
+  bool _confirmed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _confirmationController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
+    final confirmation = isEnglish ? 'DELETE' : 'BORRAR';
+    final colors = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      key: const ValueKey('delete-database-data-dialog'),
+      icon: Icon(Icons.warning_amber_rounded, color: colors.error),
+      title: Text(
+        context.tr('¿Borrar todos los datos?', 'Delete all data?'),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.tr(
+                'Esta acción es irreversible. Se eliminará toda la información guardada en la base de datos. El tema, idioma, perfil y archivos exportados no se borrarán.',
+                'This action cannot be undone. All information stored in the database will be deleted. Theme, language, profile, and exported files will not be removed.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.tr(
+                'Para confirmar, escribe $confirmation.',
+                'Type $confirmation to confirm.',
+              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const ValueKey('database-delete-confirmation-field'),
+              controller: _confirmationController,
+              autocorrect: false,
+              enableSuggestions: false,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: context.tr('Confirmación', 'Confirmation'),
+                hintText: confirmation,
+              ),
+              onChanged: (value) {
+                final matches = value.trim().toUpperCase() == confirmation;
+                if (matches != _confirmed) {
+                  setState(() => _confirmed = matches);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(context.tr('Cancelar', 'Cancel')),
+        ),
+        FilledButton.icon(
+          key: const ValueKey('confirm-delete-database-data'),
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.error,
+            foregroundColor: colors.onError,
+          ),
+          onPressed: _confirmed ? () => Navigator.of(context).pop(true) : null,
+          icon: const Icon(Icons.delete_forever_rounded),
+          label: Text(
+            context.tr('Borrar definitivamente', 'Delete permanently'),
+          ),
+        ),
       ],
     );
   }

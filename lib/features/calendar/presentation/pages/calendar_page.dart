@@ -9,8 +9,10 @@ import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/calendar/domain/entities/calendar_event.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
+import 'package:pomodoro_app_v1/features/calendar/presentation/widgets/goal_date_range_dialog.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
+import 'package:pomodoro_app_v1/features/goals/presentation/models/goal_period_filter.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
@@ -55,6 +57,8 @@ class _CalendarPageState extends State<CalendarPage> {
   RoutinesController? _routinesController;
   late DateTime _visibleMonth;
   late DateTime _selectedDay;
+  GoalPeriod _goalPeriod = GoalPeriod.all;
+  DateTimeRange? _goalDateRange;
   List<RoutineScheduleOccurrence> _routineSchedule = const [];
   bool _isLoading = true;
 
@@ -109,7 +113,7 @@ class _CalendarPageState extends State<CalendarPage> {
       padding: AppCardPaddings.pageWithTop,
       children: [
         Text(
-          context.tr('Calendario', 'Calendar'),
+          context.tr('Planificación', 'Planning'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontSize: AppDesignTokens.mainTitleFontSize,
             fontWeight: FontWeight.w700,
@@ -118,8 +122,8 @@ class _CalendarPageState extends State<CalendarPage> {
         const SizedBox(height: 4),
         Text(
           context.tr(
-            'Planifica tus bloques de enfoque sin salir del modo offline.',
-            'Plan your focus blocks while staying fully offline.',
+            'Organiza objetivos, tareas y rutinas en un solo lugar.',
+            'Organize goals, tasks, and routines in one place.',
           ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
@@ -157,6 +161,35 @@ class _CalendarPageState extends State<CalendarPage> {
           },
           onDaySelected: (day) {
             setState(() => _selectedDay = day);
+          },
+        ),
+        const SizedBox(height: 18),
+        SignalBuilder(
+          builder: (context) {
+            final goals = filterGoalsForPeriod(
+              _goalsController.goals.value,
+              period: _goalPeriod,
+              referenceDay: _selectedDay,
+              customRange: _goalDateRange,
+            );
+            return _GoalPeriodCard(
+              period: _goalPeriod,
+              periodLabel: _goalPeriodLabel(
+                context,
+                period: _goalPeriod,
+                referenceDay: _selectedDay,
+                customRange: _goalDateRange,
+              ),
+              hasSelectedRange: _goalDateRange != null,
+              goals: goals,
+              tasks: _tasksController.tasks.value,
+              onPeriodChanged: _changeGoalPeriod,
+              onPrevious: () => _shiftGoalPeriod(-1),
+              onNext: () => _shiftGoalPeriod(1),
+              onPickPeriod: _pickGoalPeriod,
+              onEditGoal: _showEditGoalDialog,
+              onDeleteGoal: _confirmDeleteGoal,
+            );
           },
         ),
         const SizedBox(height: 18),
@@ -202,8 +235,6 @@ class _CalendarPageState extends State<CalendarPage> {
                 }
                 unawaited(startTaskFocusFlow(context: context, task: task));
               },
-              onEditGoal: _showEditGoalDialog,
-              onDeleteGoal: _confirmDeleteGoal,
               onOpenRoutine: (occurrence) => context.push(
                 '${RoutineEditorPage.routePath}?id=${occurrence.sourceRoutineId}',
               ),
@@ -212,6 +243,70 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
       ],
     );
+  }
+
+  void _changeGoalPeriod(GoalPeriod period) {
+    setState(() => _goalPeriod = period);
+    if (period == GoalPeriod.range && _goalDateRange == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _goalPeriod == GoalPeriod.range &&
+            _goalDateRange == null) {
+          unawaited(_pickGoalPeriod());
+        }
+      });
+    }
+  }
+
+  void _shiftGoalPeriod(int direction) {
+    final shifted = switch (_goalPeriod) {
+      GoalPeriod.day => _selectedDay.add(Duration(days: direction)),
+      GoalPeriod.week => _selectedDay.add(Duration(days: 7 * direction)),
+      GoalPeriod.month => _shiftMonth(_selectedDay, direction),
+      GoalPeriod.year => _shiftYear(_selectedDay, direction),
+      GoalPeriod.all || GoalPeriod.range => _selectedDay,
+    };
+    if (_sameDate(shifted, _selectedDay)) return;
+    setState(() {
+      _selectedDay = shifted;
+      _visibleMonth = DateTime(shifted.year, shifted.month);
+    });
+    unawaited(_loadRoutineSchedule());
+  }
+
+  Future<void> _pickGoalPeriod() async {
+    final now = DateTime.now();
+    if (_goalPeriod == GoalPeriod.range) {
+      final picked = await showGoalDateRangeDialog(
+        context: context,
+        firstDate: DateTime(now.year - 10),
+        lastDate: DateTime(now.year + 10, 12, 31),
+        initialDateRange: _goalDateRange,
+      );
+      if (!mounted) return;
+      if (picked == null) {
+        if (_goalDateRange == null) {
+          setState(() => _goalPeriod = GoalPeriod.all);
+        }
+        return;
+      }
+      setState(() => _goalDateRange = picked);
+      return;
+    }
+
+    if (_goalPeriod == GoalPeriod.all) return;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDay,
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year + 10, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDay = picked;
+      _visibleMonth = DateTime(picked.year, picked.month);
+    });
+    unawaited(_loadRoutineSchedule());
   }
 
   Future<void> _loadPlanningData() async {
@@ -323,13 +418,19 @@ class _CalendarPageState extends State<CalendarPage> {
       context: context,
       builder: (dialogContext) => _EditCalendarGoalDialog(
         goal: goal,
-        selectedDay: _selectedDay,
-        onSave: (rawTitle) {
-          return _updateGoalFromDialog(
-            goal: goal,
-            rawTitle: rawTitle,
-          );
-        },
+        onSave:
+            ({
+              required rawTitle,
+              required targetSessions,
+              required targetDate,
+            }) {
+              return _updateGoalFromDialog(
+                goal: goal,
+                rawTitle: rawTitle,
+                targetSessions: targetSessions,
+                targetDate: targetDate,
+              );
+            },
       ),
     );
   }
@@ -469,12 +570,14 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<String?> _updateGoalFromDialog({
     required ProductivityGoal goal,
     required String rawTitle,
+    required int targetSessions,
+    required DateTime? targetDate,
   }) async {
     final saved = await _goalsController.updateGoalDetails(
       id: goal.id,
       rawTitle: rawTitle,
-      targetSessions: goal.targetSessions,
-      targetDate: _selectedDay,
+      targetSessions: targetSessions,
+      targetDate: targetDate,
     );
 
     if (!saved) {
@@ -651,13 +754,16 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
 class _EditCalendarGoalDialog extends StatefulWidget {
   const _EditCalendarGoalDialog({
     required this.goal,
-    required this.selectedDay,
     required this.onSave,
   });
 
   final ProductivityGoal goal;
-  final DateTime selectedDay;
-  final Future<String?> Function(String rawTitle) onSave;
+  final Future<String?> Function({
+    required String rawTitle,
+    required int targetSessions,
+    required DateTime? targetDate,
+  })
+  onSave;
 
   @override
   State<_EditCalendarGoalDialog> createState() =>
@@ -666,6 +772,8 @@ class _EditCalendarGoalDialog extends StatefulWidget {
 
 class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
   late final TextEditingController _titleController;
+  late int _targetSessions;
+  late DateTime? _targetDate;
   String? _validationMessage;
   bool _isSaving = false;
 
@@ -673,6 +781,8 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.goal.title);
+    _targetSessions = widget.goal.targetSessions;
+    _targetDate = widget.goal.targetDate;
   }
 
   @override
@@ -688,7 +798,9 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
 
     setState(() => _isSaving = true);
     final validationMessage = await widget.onSave(
-      _titleController.text,
+      rawTitle: _titleController.text,
+      targetSessions: _targetSessions,
+      targetDate: _targetDate,
     );
 
     if (!mounted) {
@@ -706,16 +818,23 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
     Navigator.of(context).pop();
   }
 
+  Future<void> _pickTargetDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _targetDate ?? now,
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year + 10, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _targetDate = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: Text(
-        context.tr(
-          'Editar objetivo de ${_formatShortDate(widget.selectedDay)}',
-          'Edit goal for ${_formatShortDate(widget.selectedDay)}',
-        ),
-      ),
+      title: Text(context.tr('Editar objetivo', 'Edit goal')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -728,6 +847,79 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
               prefixIcon: const Icon(Icons.flag_rounded),
             ),
             onSubmitted: (_) => unawaited(_submit()),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isSaving ? null : _pickTargetDate,
+                  icon: const Icon(Icons.event_rounded),
+                  label: Text(
+                    _targetDate == null
+                        ? context.tr('Elegir fecha', 'Choose date')
+                        : _formatSelectedDay(context, _targetDate!),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              if (_targetDate != null) ...[
+                const SizedBox(width: 8),
+                IconButton.outlined(
+                  tooltip: context.tr('Quitar fecha', 'Remove date'),
+                  onPressed: _isSaving
+                      ? null
+                      : () => setState(() => _targetDate = null),
+                  icon: const Icon(Icons.event_busy_rounded),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('Meta Pomodoro', 'Pomodoro target'),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    Text(
+                      context.tr(
+                        'Sesiones necesarias para completarlo',
+                        'Sessions needed to complete it',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton.outlined(
+                tooltip: context.tr('Reducir meta', 'Decrease target'),
+                onPressed: _isSaving || _targetSessions <= 1
+                    ? null
+                    : () => setState(() => _targetSessions -= 1),
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              SizedBox(
+                width: 44,
+                child: Text(
+                  '$_targetSessions',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              IconButton.outlined(
+                tooltip: context.tr('Aumentar meta', 'Increase target'),
+                onPressed: _isSaving || _targetSessions >= 24
+                    ? null
+                    : () => setState(() => _targetSessions += 1),
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
           ),
         ],
       ),
@@ -1474,6 +1666,321 @@ class _DayCell extends StatelessWidget {
   }
 }
 
+class _GoalPeriodCard extends StatelessWidget {
+  const _GoalPeriodCard({
+    required this.period,
+    required this.periodLabel,
+    required this.hasSelectedRange,
+    required this.goals,
+    required this.tasks,
+    required this.onPeriodChanged,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onPickPeriod,
+    required this.onEditGoal,
+    required this.onDeleteGoal,
+  });
+
+  final GoalPeriod period;
+  final String periodLabel;
+  final bool hasSelectedRange;
+  final List<ProductivityGoal> goals;
+  final List<Task> tasks;
+  final ValueChanged<GoalPeriod> onPeriodChanged;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onPickPeriod;
+  final ValueChanged<ProductivityGoal> onEditGoal;
+  final ValueChanged<ProductivityGoal> onDeleteGoal;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final canStep = period != GoalPeriod.all && period != GoalPeriod.range;
+
+    return GlassCard(
+      key: const ValueKey('goal-period-card'),
+      padding: AppCardPaddings.spacious,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.tr('Objetivos', 'Goals'),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontSize: AppDesignTokens.sectionTitleFontSize,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                constraints: const BoxConstraints(minWidth: 34),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: palette.primaryMuted,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${goals.length}',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: palette.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Column(
+            key: const ValueKey('goal-period-selector'),
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: _GoalPeriodSegment(
+                  period: period,
+                  values: const [
+                    GoalPeriod.all,
+                    GoalPeriod.day,
+                    GoalPeriod.week,
+                  ],
+                  onChanged: onPeriodChanged,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: _GoalPeriodSegment(
+                  period: period,
+                  values: const [
+                    GoalPeriod.month,
+                    GoalPeriod.year,
+                    GoalPeriod.range,
+                  ],
+                  onChanged: onPeriodChanged,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              if (canStep)
+                IconButton.outlined(
+                  key: const ValueKey('previous-goal-period'),
+                  tooltip: context.tr('Periodo anterior', 'Previous period'),
+                  onPressed: onPrevious,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+              if (canStep) const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey('pick-goal-period'),
+                  onPressed: period == GoalPeriod.all ? null : onPickPeriod,
+                  icon: Icon(
+                    period == GoalPeriod.range
+                        ? Icons.date_range_rounded
+                        : Icons.calendar_today_rounded,
+                  ),
+                  label: Text(
+                    periodLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              if (canStep) const SizedBox(width: 8),
+              if (canStep)
+                IconButton.outlined(
+                  key: const ValueKey('next-goal-period'),
+                  tooltip: context.tr('Periodo siguiente', 'Next period'),
+                  onPressed: onNext,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (goals.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Row(
+                children: [
+                  Icon(Icons.flag_outlined, color: palette.textSecondary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      period == GoalPeriod.range && !hasSelectedRange
+                          ? context.tr(
+                              'Selecciona un rango de fechas.',
+                              'Select a date range.',
+                            )
+                          : context.tr(
+                              'No hay objetivos en este periodo.',
+                              'There are no goals in this period.',
+                            ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            for (var index = 0; index < goals.length; index++) ...[
+              _PeriodGoalTile(
+                goal: goals[index],
+                summary: TaskStatusSummary.fromTasks(
+                  tasks.where((task) => task.goalId == goals[index].id),
+                ),
+                onEdit: () => onEditGoal(goals[index]),
+                onDelete: () => onDeleteGoal(goals[index]),
+              ),
+              if (index != goals.length - 1) const Divider(height: 20),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalPeriodSegment extends StatelessWidget {
+  const _GoalPeriodSegment({
+    required this.period,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final GoalPeriod period;
+  final List<GoalPeriod> values;
+  final ValueChanged<GoalPeriod> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<GoalPeriod>(
+      showSelectedIcon: false,
+      emptySelectionAllowed: true,
+      segments: [
+        for (final value in values)
+          ButtonSegment(
+            value: value,
+            label: Text(_goalPeriodName(context, value)),
+          ),
+      ],
+      selected: values.contains(period) ? {period} : const {},
+      onSelectionChanged: (selection) {
+        if (selection.isNotEmpty) onChanged(selection.first);
+      },
+    );
+  }
+}
+
+class _PeriodGoalTile extends StatelessWidget {
+  const _PeriodGoalTile({
+    required this.goal,
+    required this.summary,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final ProductivityGoal goal;
+  final TaskStatusSummary summary;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final dateLabel = goal.targetDate == null
+        ? context.tr('Sin fecha', 'No date')
+        : _formatSelectedDay(context, goal.targetDate!);
+
+    return Semantics(
+      container: true,
+      child: Row(
+        key: ValueKey('period-goal-${goal.id}'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Icon(Icons.flag_rounded, color: palette.secondary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  goal.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dateLabel,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: summary.completionRatio,
+                  minHeight: 6,
+                  borderRadius: BorderRadius.circular(8),
+                  color: palette.primary,
+                  backgroundColor: palette.neutralSoft,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    '${summary.completed}/${summary.total} tareas completadas',
+                    '${summary.completed}/${summary.total} tasks completed',
+                  ),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: palette.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<_GoalDeadlineAction>(
+            tooltip: context.tr('Opciones de objetivo', 'Goal options'),
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (action) {
+              switch (action) {
+                case _GoalDeadlineAction.edit:
+                  onEdit();
+                case _GoalDeadlineAction.delete:
+                  onDelete();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _GoalDeadlineAction.edit,
+                child: ListTile(
+                  leading: const Icon(Icons.edit_rounded),
+                  title: Text(context.tr('Editar objetivo', 'Edit goal')),
+                ),
+              ),
+              PopupMenuItem(
+                value: _GoalDeadlineAction.delete,
+                child: ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(context.tr('Eliminar objetivo', 'Delete goal')),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AgendaCard extends StatelessWidget {
   const _AgendaCard({
     required this.selectedDay,
@@ -1490,8 +1997,6 @@ class _AgendaCard extends StatelessWidget {
     required this.onEditTaskPlanning,
     required this.onDeleteTask,
     required this.onStartTaskFocus,
-    required this.onEditGoal,
-    required this.onDeleteGoal,
     required this.onOpenRoutine,
   });
 
@@ -1509,8 +2014,6 @@ class _AgendaCard extends StatelessWidget {
   final ValueChanged<Task> onEditTaskPlanning;
   final ValueChanged<Task> onDeleteTask;
   final ValueChanged<Task> onStartTaskFocus;
-  final ValueChanged<ProductivityGoal> onEditGoal;
-  final ValueChanged<ProductivityGoal> onDeleteGoal;
   final ValueChanged<RoutineScheduleOccurrence> onOpenRoutine;
 
   @override
@@ -1600,14 +2103,6 @@ class _AgendaCard extends StatelessWidget {
               routines.isEmpty)
             _EmptyAgenda(day: selectedDay)
           else ...[
-            for (final goal in goals) ...[
-              _GoalDeadlineTile(
-                goal: goal,
-                onEdit: () => onEditGoal(goal),
-                onDelete: () => onDeleteGoal(goal),
-              ),
-              const SizedBox(height: 12),
-            ],
             if (routines.isNotEmpty) ...[
               _AgendaSectionTitle(
                 icon: Icons.event_repeat_rounded,
@@ -1797,80 +2292,6 @@ class _TaskStatusSummaryMenuItem extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalDeadlineTile extends StatelessWidget {
-  const _GoalDeadlineTile({
-    required this.goal,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final ProductivityGoal goal;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.flag_rounded, color: palette.secondary, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  goal.title,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                _Tag(label: context.tr('Objetivo', 'Goal')),
-              ],
-            ),
-          ),
-          PopupMenuButton<_GoalDeadlineAction>(
-            tooltip: context.tr('Opciones de objetivo', 'Goal options'),
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (action) {
-              switch (action) {
-                case _GoalDeadlineAction.edit:
-                  onEdit();
-                case _GoalDeadlineAction.delete:
-                  onDelete();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: _GoalDeadlineAction.edit,
-                child: ListTile(
-                  leading: const Icon(Icons.edit_rounded),
-                  title: Text(context.tr('Editar objetivo', 'Edit goal')),
-                ),
-              ),
-              PopupMenuItem(
-                value: _GoalDeadlineAction.delete,
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(context.tr('Eliminar objetivo', 'Delete goal')),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -2368,6 +2789,59 @@ bool _sameDate(DateTime first, DateTime second) {
   return first.year == second.year &&
       first.month == second.month &&
       first.day == second.day;
+}
+
+String _goalPeriodLabel(
+  BuildContext context, {
+  required GoalPeriod period,
+  required DateTime referenceDay,
+  required DateTimeRange? customRange,
+}) {
+  final weekStart = referenceDay.subtract(
+    Duration(days: referenceDay.weekday - 1),
+  );
+  final weekEnd = weekStart.add(const Duration(days: 6));
+  return switch (period) {
+    GoalPeriod.all => context.tr('Todos los objetivos', 'All goals'),
+    GoalPeriod.day => _formatSelectedDay(context, referenceDay),
+    GoalPeriod.week =>
+      '${_formatShortDate(weekStart)} - '
+          '${_formatShortDate(weekEnd)}',
+    GoalPeriod.month => _formatMonth(context, referenceDay),
+    GoalPeriod.year => '${referenceDay.year}',
+    GoalPeriod.range =>
+      customRange == null
+          ? context.tr('Seleccionar rango', 'Select range')
+          : '${_formatShortDate(customRange.start)} - '
+                '${_formatShortDate(customRange.end)}',
+  };
+}
+
+String _goalPeriodName(BuildContext context, GoalPeriod period) {
+  return switch (period) {
+    GoalPeriod.all => context.tr('Todos', 'All'),
+    GoalPeriod.day => context.tr('Día', 'Day'),
+    GoalPeriod.week => context.tr('Semana', 'Week'),
+    GoalPeriod.month => context.tr('Mes', 'Month'),
+    GoalPeriod.year => context.tr('Año', 'Year'),
+    GoalPeriod.range => context.tr('Rango', 'Range'),
+  };
+}
+
+DateTime _shiftMonth(DateTime date, int delta) {
+  final targetMonth = DateTime(date.year, date.month + delta);
+  final lastDay = DateTime(targetMonth.year, targetMonth.month + 1, 0).day;
+  return DateTime(
+    targetMonth.year,
+    targetMonth.month,
+    date.day.clamp(1, lastDay),
+  );
+}
+
+DateTime _shiftYear(DateTime date, int delta) {
+  final year = date.year + delta;
+  final lastDay = DateTime(year, date.month + 1, 0).day;
+  return DateTime(year, date.month, date.day.clamp(1, lastDay));
 }
 
 String _formatMonth(BuildContext context, DateTime date) {

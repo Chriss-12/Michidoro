@@ -189,3 +189,47 @@ Verification notes:
   device.
 - The preference is stored as `languageCode` in the existing local Settings
   JSON; no application database schema change was required.
+
+### REQ-SET-007 - Clear unified database data
+
+Status: Verified
+
+Objective:
+Allow the user to irreversibly remove all records from the unified local
+database without deleting application preferences or external backups.
+
+Checklist:
+- [x] Requirement approved by the user on 2026-08-11.
+- [x] Transactional database operation implemented.
+- [x] Active Pomodoro and in-memory feature state synchronized.
+- [x] Protected bilingual Settings UI implemented.
+- [x] Automated and physical checks passed.
+- [x] Documentation and traceability verified.
+
+Acceptance criteria:
+- [x] Settings exposes a clearly separated destructive data action.
+- [x] The confirmation explains exactly what is deleted and retained.
+- [x] The destructive action remains disabled until the user types `BORRAR`
+      in Spanish or `DELETE` in English.
+- [x] One transaction removes goals, tasks, completion events, Pomodoro
+      sessions and runtime, routines and their runs/items, reporting metadata,
+      and calendar events while preserving schema and indexes.
+- [x] A running timer is stopped without recreating runtime data after the
+      transaction.
+- [x] Goals, Tasks, Calendar, Routines, Focus, and reports immediately observe
+      the empty database without restarting the app.
+- [x] Theme, language, typography, profile, timer preferences, exported
+      backups, and exported reports are retained.
+- [x] Failures do not show a success message and remain recoverable.
+- [x] The implementation remains offline-first and adds no package or schema
+      migration.
+
+Verification evidence on 2026-08-11:
+- `flutter analyze` passed and the full 247-test suite passed.
+- Persistence coverage populated and cleared all 12 unified tables, retained
+  schema version 5, and passed `PRAGMA foreign_key_check`.
+- Widget coverage verified cancellation, disabled confirmation, and Spanish
+  and English confirmation copy.
+- The release APK was installed on RMX3301 and the card, dialog, typed
+  confirmation, and enabled destructive state were inspected in portrait.
+  The physical destructive action was cancelled to preserve device data.

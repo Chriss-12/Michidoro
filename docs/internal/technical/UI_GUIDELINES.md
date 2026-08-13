@@ -30,8 +30,17 @@ Build Material 3 UI with clear spacing, accessible labels, responsive layouts, a
 - Compact list filters must use an anchored content-sized menu rather than a
   full-width form field. Avoid redundant floating labels such as `Show` when the
   selected value and filter icon already communicate the control's purpose.
+- Period filters with more than three compact choices must remain immediately
+  visible in portrait. Use balanced segmented rows instead of a clipped or
+  horizontally discoverable control.
+- Date-range filters must expose separate Start and End fields in a bounded
+  in-app calendar dialog, highlight the selected interval, and avoid replacing
+  the current workflow with a full-screen system picker.
 - Keep the Pomodoro ring center limited to the current countdown and phase.
   Task-plan metadata belongs in the information action directly below the ring.
+- Irreversible database actions belong in a final, visually separated Settings
+  card. Explain deleted and retained data, require typed bilingual confirmation,
+  and keep the final destructive action disabled until the phrase matches.
 
 ## Required checks
 

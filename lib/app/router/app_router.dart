@@ -67,7 +67,7 @@ class AppRouter {
             path: GoalsPage.routePath,
             pageBuilder: (context, state) => _buildTransitionPage(
               state: state,
-              child: const GoalsPage(),
+              child: const CalendarPage(),
             ),
           ),
           GoRoute(
@@ -79,10 +79,7 @@ class AppRouter {
           ),
           GoRoute(
             path: CalendarPage.routePath,
-            pageBuilder: (context, state) => _buildTransitionPage(
-              state: state,
-              child: const CalendarPage(),
-            ),
+            redirect: (context, state) => GoalsPage.routePath,
           ),
         ],
       ),

@@ -20,11 +20,11 @@ La pantalla **Home** resume el estado del día y del mes:
 - rendimiento del mes actual;
 - historial semanal;
 - progreso diario y semanal por colores;
-- acceso a planificación y exportación de reportes.
+- acceso a exportación de reportes.
 
 ## Planificación
 
-Desde **Home > Planificación** podés:
+Desde **Objetivos** podés:
 
 - elegir una fecha en el calendario;
 - crear objetivos para el día seleccionado;
@@ -34,6 +34,14 @@ Desde **Home > Planificación** podés:
 - mover tareas rápidas a una fecha;
 - cambiar el estado de las tareas;
 - eliminar tareas desde la planificación.
+
+Sobre el calendario aparece el listado de objetivos. Se puede mostrar todo o
+filtrar por día, semana, mes, año o un rango de fechas. Los objetivos sin fecha
+permanecen disponibles al elegir **Todos**.
+
+Al elegir **Rango**, se abre un calendario compacto con **Inicio** y **Fin**.
+Seleccioná ambos extremos del periodo y tocá **Aplicar**; los
+días comprendidos se resaltan para revisar el intervalo antes de confirmarlo.
 
 Las tareas creadas desde planificación siempre quedan asociadas a la fecha seleccionada.
 
@@ -105,19 +113,11 @@ no se suma al avance de la tarea. La app también pregunta cómo te sentís del 
 al 5 mediante cinco iconos de rostro. Si quedan varias respuestas pendientes,
 se conservan en orden incluso después de cerrar y volver a abrir la app.
 
-## Objetivos
-
-La sección **Goals** muestra:
-
-- total de objetivos;
-- progreso general organizado por filas para leer cada métrica con claridad;
-- progreso de cada objetivo según sus tareas;
-- tareas pendientes, en progreso y completadas;
-- resumen de tareas sin objetivo.
-
 ## Calendario
 
-El calendario muestra objetivos y tareas planificadas. Los días usan colores según el porcentaje de tareas completadas:
+El calendario integrado en **Objetivos** muestra objetivos, tareas planificadas,
+rutinas y eventos del día seleccionado. Los días usan colores según el
+porcentaje de tareas completadas:
 
 - rojo: sin tareas o hasta 20%;
 - amarillo: hasta 50%;
@@ -165,6 +165,13 @@ En **Settings** podés ajustar:
 - vibración física al finalizar, con patrones **Suave**, **Normal**, **Doble** e
   **Intensa** y un botón para probarlos;
 - alertas y preferencias locales disponibles.
+- borrado protegido de todos los datos de la base local.
+
+En **Settings > Datos de la aplicación**, la opción **Borrar todos los datos**
+elimina objetivos, tareas, sesiones, rutinas, calendario y estadísticas. Para
+confirmar, tenés que escribir **BORRAR**. Esta acción es irreversible, pero
+conserva el tema, idioma, tipografía, perfil, preferencias del temporizador y
+los reportes o copias de seguridad que ya exportaste.
 
 Cuando la app está abierta, las tareas planificadas para el día pueden generar un recordatorio local con el tono seleccionado. Las notificaciones se acumulan en la parte superior derecha y, al abrirlas, llevan al calendario para revisar la planificación.
 

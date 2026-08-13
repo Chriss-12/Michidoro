@@ -296,7 +296,7 @@ class RoutinesView extends StatelessWidget {
 class _RoutineFilterMenu extends StatelessWidget {
   const _RoutineFilterMenu({required this.value, required this.onChanged});
 
-  static const double _menuWidth = double.infinity;
+  static const double _menuWidth = 220;
 
   final RoutineFilter value;
   final ValueChanged<RoutineFilter> onChanged;

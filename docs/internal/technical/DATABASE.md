@@ -424,3 +424,17 @@ Verification evidence on 2026-08-04:
 - Persistence, queue restoration, report formula, Home, and PDF tests passed.
 - `flutter analyze` passed and the full suite passed with 159 tests.
 
+## Protected database reset
+
+Settings can invoke `clearAllUserData` to remove every user record from the
+unified SQLite database. The operation deletes all 12 tables in dependency-safe
+order inside one transaction, preserving the schema, indexes, and database
+version. The app stops any active Pomodoro before deletion and reloads Goals,
+Tasks, Calendar, Routines, Focus, reminders, and report-backed state afterward.
+
+The reset does not delete the separate settings JSON or files outside SQLite.
+Theme, language, typography, profile, timer preferences, selected folders,
+exported reports, and exported database backups remain available. Verification
+populated all tables, cleared them, retained schema version 5, and passed
+`PRAGMA foreign_key_check`.
+

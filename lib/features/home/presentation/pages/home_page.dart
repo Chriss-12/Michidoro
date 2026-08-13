@@ -9,7 +9,6 @@ import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
-import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
@@ -52,8 +51,6 @@ class HomePage extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 36),
-        const _CalendarPlanningCard(),
-        const SizedBox(height: 18),
         const _RoutineTodayCard(),
         const _TaskStatusOverviewCard(),
         const SizedBox(height: 18),
@@ -277,51 +274,6 @@ String _homeClock(BuildContext context, DateTime value) =>
     MaterialLocalizations.of(context).formatTimeOfDay(
       TimeOfDay(hour: value.hour, minute: value.minute),
     );
-
-class _CalendarPlanningCard extends StatelessWidget {
-  const _CalendarPlanningCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return GlassCard(
-      padding: AppCardPaddings.compact,
-      child: Row(
-        children: [
-          _SoftIcon(icon: Icons.calendar_month_rounded, color: palette.primary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.tr('Planificación', 'Planning'),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  context.tr(
-                    'Revisa tu calendario local de enfoque.',
-                    'Review your local focus calendar.',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: context.tr('Abrir calendario', 'Open calendar'),
-            onPressed: () => context.push(CalendarPage.routePath),
-            icon: const Icon(Icons.arrow_forward_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 enum _PerformanceRange { day, week, month, year }
 

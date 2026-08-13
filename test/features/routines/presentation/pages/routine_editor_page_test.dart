@@ -317,7 +317,7 @@ void main() {
     );
     expect(find.byType(RoutineEditorPage), findsOneWidget);
     await expectLater(
-      find.byType(Overlay).first,
+      find.byKey(const ValueKey('routine-create-dialog')),
       matchesGoldenFile('goldens/routine_create_dialog.png'),
     );
 
