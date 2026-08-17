@@ -211,10 +211,17 @@ Visual refinement evidence on 2026-08-11:
   label. Its anchored control and three-option popup both use a verified 220 px
   width; the release APK passed direct closed/open-menu inspection on RMX3301.
 - Creating a routine now opens the same four-step flow in a centered modal over
-  `Tareas -> Rutinas`, with a dimmed blurred background and no navigation reset.
+  `Tareas -> Rutinas`, with a dimmed background and no navigation reset.
   Editing an existing routine remains full-screen. A seventh phone golden,
   keyboard-open inspection, dirty-draft confirmation, and direct RMX3301
   discard check passed; the temporary draft was not persisted.
+- On 2026-08-15 the creation modal moved to an opaque themed canvas and removed
+  its live full-screen blur after RMX3301 diagnostics showed costly opening
+  frames in the debug build. The icon picker now uses labelled selectable tiles
+  for daily list, morning, work, exercise, and study instead of unexplained
+  circles. Scoped analysis and all 393 tests pass; an optimized release APK was
+  built and installed preserving data. Final post-authentication device timing
+  remains for the user-visible smoke check.
 
 ## REQ-V9-004 - Daily materialization and ordinary task integration
 

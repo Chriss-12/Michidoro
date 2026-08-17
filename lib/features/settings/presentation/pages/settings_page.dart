@@ -13,6 +13,14 @@ import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
 import 'package:pomodoro_app_v1/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/widgets/routine_reminder_capability_tile.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/device_identity_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/device_identity_settings_card.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/local_app_lock_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/local_security_settings_card.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_group_enrollment_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_group_enrollment_settings_card.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_storage_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_storage_settings_card.dart';
 import 'package:pomodoro_app_v1/l10n/app_language.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
@@ -26,26 +34,38 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: AppCardPaddings.page,
-      children: const [
-        SizedBox(height: 24),
-        _ProfileCard(),
-        SizedBox(height: 26),
-        _AppearanceCard(),
-        SizedBox(height: 26),
-        _LanguageCard(),
-        SizedBox(height: 26),
-        _OnboardingPreviewCard(),
-        SizedBox(height: 26),
-        _FocusTimesCard(),
-        SizedBox(height: 26),
-        _ReportsCard(),
-        SizedBox(height: 26),
-        _NotificationsCard(),
-        SizedBox(height: 26),
-        _TypographyPresetCard(),
-        SizedBox(height: 26),
-        _DatabaseDataCard(),
-        SizedBox(height: 24),
+      children: [
+        const SizedBox(height: 24),
+        const _ProfileCard(),
+        const SizedBox(height: 26),
+        const _AppearanceCard(),
+        const SizedBox(height: 26),
+        const _LanguageCard(),
+        const SizedBox(height: 26),
+        const _OnboardingPreviewCard(),
+        const SizedBox(height: 26),
+        const _FocusTimesCard(),
+        const SizedBox(height: 26),
+        const _ReportsCard(),
+        const SizedBox(height: 26),
+        const _NotificationsCard(),
+        const SizedBox(height: 26),
+        SyncStorageSettingsCard(controller: SyncStorageScope.of(context)),
+        DeviceIdentitySettingsSection(
+          identityController: DeviceIdentityScope.of(context),
+          storageController: SyncStorageScope.of(context),
+        ),
+        SyncGroupEnrollmentSettingsCard(
+          controller: SyncGroupEnrollmentScope.of(context),
+          storageController: SyncStorageScope.of(context),
+        ),
+        const SizedBox(height: 26),
+        LocalSecuritySettingsCard(controller: LocalAppLockScope.of(context)),
+        const SizedBox(height: 26),
+        const _TypographyPresetCard(),
+        const SizedBox(height: 26),
+        const _DatabaseDataCard(),
+        const SizedBox(height: 24),
       ],
     );
   }

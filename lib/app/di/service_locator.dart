@@ -22,6 +22,51 @@ import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_r
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/settings/data/repositories/file_settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/repositories/drift_sync_exchange_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/repositories/file_device_identity_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/repositories/file_local_unlock_policy_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/repositories/file_sync_group_enrollment_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/repositories/file_sync_storage_config_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_device_bound_key_protector.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_device_name_provider.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_data_folder_picker.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_data_folder_validator.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_group_manifest_discovery.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_group_manifest_publisher.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_operation_discovery.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_sync_operation_publisher.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/configured_sync_mutation_coordinator.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/drift_sync_incoming_application_service.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/drift_sync_initial_bootstrap_service.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/drift_sync_local_data_inspector.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/drift_sync_outbox_publication_service.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/drift_sync_recovery_snapshot_service.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/secure_sync_id_generator.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/sync_group_crypto.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/repositories/device_identity_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/repositories/local_unlock_policy_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_group_enrollment_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_storage_config_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/device_bound_key_protector.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/device_name_provider.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_data_folder_picker.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_data_folder_validator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_group_manifest_discovery.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_group_manifest_publisher.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_incoming_application_service.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_initial_bootstrap_service.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_local_data_inspector.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_mutation_coordinator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_operation_discovery.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_operation_publisher.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_outbox_publication_service.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_recovery_snapshot_service.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/device_identity_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/local_app_lock_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_group_enrollment_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_storage_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/data/repositories/drift_tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
@@ -30,14 +75,186 @@ final GetIt serviceLocator = GetIt.instance;
 
 Future<void> configureDependencies() async {
   await LegacyDatabaseMigrator.migrateIfNeeded();
+  if (!serviceLocator.isRegistered<MichiFocusDatabase>()) {
+    serviceLocator.registerSingleton<MichiFocusDatabase>(MichiFocusDatabase());
+  }
   if (!serviceLocator.isRegistered<SettingsRepository>()) {
     serviceLocator.registerLazySingleton<SettingsRepository>(
       FileSettingsRepository.new,
     );
   }
 
-  if (!serviceLocator.isRegistered<MichiFocusDatabase>()) {
-    serviceLocator.registerSingleton<MichiFocusDatabase>(MichiFocusDatabase());
+  if (!serviceLocator.isRegistered<LocalUnlockPolicyRepository>()) {
+    serviceLocator.registerLazySingleton<LocalUnlockPolicyRepository>(
+      FileLocalUnlockPolicyRepository.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<LocalDeviceAuthenticator>()) {
+    serviceLocator.registerLazySingleton<LocalDeviceAuthenticator>(
+      AndroidLocalDeviceAuthenticator.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<LocalAppLockController>()) {
+    serviceLocator.registerSingleton<LocalAppLockController>(
+      LocalAppLockController(
+        repository: serviceLocator<LocalUnlockPolicyRepository>(),
+        authenticator: serviceLocator<LocalDeviceAuthenticator>(),
+      ),
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncStorageController>()) {
+    serviceLocator
+      ..registerLazySingleton<SyncStorageConfigRepository>(
+        FileSyncStorageConfigRepository.new,
+      )
+      ..registerLazySingleton<SyncDataFolderPicker>(
+        () => pickAndroidSyncDataFolder,
+      )
+      ..registerLazySingleton<SyncDataFolderValidator>(
+        () => AndroidSyncDataFolderValidator().validate,
+      )
+      ..registerSingleton<SyncStorageController>(
+        SyncStorageController(
+          repository: serviceLocator<SyncStorageConfigRepository>(),
+          folderPicker: serviceLocator<SyncDataFolderPicker>(),
+          folderValidator: serviceLocator<SyncDataFolderValidator>(),
+        ),
+      );
+  }
+  if (!serviceLocator.isRegistered<SecureSyncIdGenerator>()) {
+    serviceLocator.registerLazySingleton<SecureSyncIdGenerator>(
+      SecureSyncIdGenerator.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<DeviceIdentityController>()) {
+    serviceLocator
+      ..registerLazySingleton<DeviceIdentityRepository>(
+        FileDeviceIdentityRepository.new,
+      )
+      ..registerLazySingleton<DeviceNameProvider>(
+        () => AndroidDeviceNameProvider().suggestedName,
+      )
+      ..registerSingleton<DeviceIdentityController>(
+        DeviceIdentityController(
+          repository: serviceLocator<DeviceIdentityRepository>(),
+          deviceNameProvider: serviceLocator<DeviceNameProvider>(),
+          idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+        ),
+      );
+  }
+  if (!serviceLocator.isRegistered<DeviceBoundKeyProtector>()) {
+    serviceLocator.registerLazySingleton<DeviceBoundKeyProtector>(
+      AndroidDeviceBoundKeyProtector.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncGroupManifestPublisher>()) {
+    serviceLocator.registerLazySingleton<SyncGroupManifestPublisher>(
+      AndroidSyncGroupManifestPublisher.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncGroupManifestDiscovery>()) {
+    serviceLocator.registerLazySingleton<SyncGroupManifestDiscovery>(
+      () => const AndroidSyncGroupManifestDiscovery().call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncOperationPublisher>()) {
+    serviceLocator.registerLazySingleton<SyncOperationPublisher>(
+      AndroidSyncOperationPublisher.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncOperationDiscovery>()) {
+    serviceLocator.registerLazySingleton<SyncOperationDiscovery>(
+      () => const AndroidSyncOperationDiscovery().call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncLocalDataInspector>()) {
+    serviceLocator.registerLazySingleton<SyncLocalDataInspector>(
+      () => DriftSyncLocalDataInspector(
+        serviceLocator<MichiFocusDatabase>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncRecoverySnapshotService>()) {
+    serviceLocator.registerLazySingleton<SyncRecoverySnapshotService>(
+      () => DriftSyncRecoverySnapshotService(
+        database: serviceLocator<MichiFocusDatabase>(),
+        crypto: serviceLocator<SyncGroupCrypto>(),
+        idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncGroupEnrollmentRepository>()) {
+    serviceLocator.registerLazySingleton<SyncGroupEnrollmentRepository>(
+      FileSyncGroupEnrollmentRepository.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncGroupCrypto>()) {
+    serviceLocator.registerLazySingleton<SyncGroupCrypto>(SyncGroupCrypto.new);
+  }
+  if (!serviceLocator.isRegistered<DriftSyncExchangeRepository>()) {
+    serviceLocator.registerLazySingleton<DriftSyncExchangeRepository>(
+      () => DriftSyncExchangeRepository(serviceLocator<MichiFocusDatabase>()),
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncMutationCoordinator>()) {
+    serviceLocator.registerLazySingleton<SyncMutationCoordinator>(
+      () => ConfiguredSyncMutationCoordinator(
+        storageRepository: serviceLocator<SyncStorageConfigRepository>(),
+        enrollmentRepository: serviceLocator<SyncGroupEnrollmentRepository>(),
+        identityRepository: serviceLocator<DeviceIdentityRepository>(),
+        exchangeRepository: serviceLocator<DriftSyncExchangeRepository>(),
+        idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncOutboxPublicationService>()) {
+    serviceLocator.registerLazySingleton<SyncOutboxPublicationService>(
+      () => DriftSyncOutboxPublicationService(
+        repository: serviceLocator<DriftSyncExchangeRepository>(),
+        crypto: serviceLocator<SyncGroupCrypto>(),
+        publisher: serviceLocator<SyncOperationPublisher>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncInitialBootstrapService>()) {
+    serviceLocator.registerLazySingleton<SyncInitialBootstrapService>(
+      () => DriftSyncInitialBootstrapService(
+        database: serviceLocator<MichiFocusDatabase>(),
+        exchangeRepository: serviceLocator<DriftSyncExchangeRepository>(),
+        idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncIncomingApplicationService>()) {
+    serviceLocator.registerLazySingleton<SyncIncomingApplicationService>(
+      () => DriftSyncIncomingApplicationService(
+        exchangeRepository: serviceLocator<DriftSyncExchangeRepository>(),
+        discovery: serviceLocator<SyncOperationDiscovery>(),
+        crypto: serviceLocator<SyncGroupCrypto>(),
+      ).call,
+    );
+  }
+  if (!serviceLocator.isRegistered<SyncGroupEnrollmentController>()) {
+    serviceLocator.registerSingleton<SyncGroupEnrollmentController>(
+      SyncGroupEnrollmentController(
+        repository: serviceLocator<SyncGroupEnrollmentRepository>(),
+        crypto: serviceLocator<SyncGroupCrypto>(),
+        keyProtector: serviceLocator<DeviceBoundKeyProtector>(),
+        authenticator: serviceLocator<LocalDeviceAuthenticator>(),
+        idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+        manifestDiscovery: serviceLocator<SyncGroupManifestDiscovery>(),
+        manifestPublisher: serviceLocator<SyncGroupManifestPublisher>(),
+        localDataInspector: serviceLocator<SyncLocalDataInspector>(),
+        recoverySnapshotService: serviceLocator<SyncRecoverySnapshotService>(),
+        outboxPublicationService:
+            serviceLocator<SyncOutboxPublicationService>(),
+        incomingApplicationService:
+            serviceLocator<SyncIncomingApplicationService>(),
+        initialBootstrapService: serviceLocator<SyncInitialBootstrapService>(),
+        identityRepository: serviceLocator<DeviceIdentityRepository>(),
+        refreshApplicationData: _refreshSynchronizedApplicationData,
+      ),
+    );
   }
 
   if (!serviceLocator.isRegistered<GoalsDao>()) {
@@ -46,7 +263,11 @@ Future<void> configureDependencies() async {
         () => GoalsDao(serviceLocator<MichiFocusDatabase>()),
       )
       ..registerLazySingleton<GoalsRepository>(
-        () => DriftGoalsRepository(serviceLocator<GoalsDao>()),
+        () => DriftGoalsRepository(
+          serviceLocator<GoalsDao>(),
+          sync: serviceLocator<SyncMutationCoordinator>(),
+          idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+        ),
       );
   }
 
@@ -95,6 +316,8 @@ Future<void> configureDependencies() async {
       ..registerLazySingleton<CalendarEventsRepository>(
         () => DriftCalendarEventsRepository(
           serviceLocator<CalendarEventsDao>(),
+          sync: serviceLocator<SyncMutationCoordinator>(),
+          idGenerator: serviceLocator<SecureSyncIdGenerator>(),
         ),
       );
   }
@@ -113,7 +336,11 @@ Future<void> configureDependencies() async {
         () => TasksDao(serviceLocator<MichiFocusDatabase>()),
       )
       ..registerLazySingleton<TasksRepository>(
-        () => DriftTasksRepository(serviceLocator<TasksDao>()),
+        () => DriftTasksRepository(
+          serviceLocator<TasksDao>(),
+          sync: serviceLocator<SyncMutationCoordinator>(),
+          idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+        ),
       );
   }
 
@@ -124,7 +351,10 @@ Future<void> configureDependencies() async {
   }
   if (!serviceLocator.isRegistered<RoutinesRepository>()) {
     serviceLocator.registerLazySingleton<RoutinesRepository>(
-      () => DriftRoutinesRepository(serviceLocator<RoutinesDao>()),
+      () => DriftRoutinesRepository(
+        serviceLocator<RoutinesDao>(),
+        sync: serviceLocator<SyncMutationCoordinator>(),
+      ),
     );
   }
   if (!serviceLocator.isRegistered<RoutinesController>()) {
@@ -167,4 +397,21 @@ void _loadInBackground(Future<void> load) {
       Zone.current.handleUncaughtError(error, stackTrace);
     }),
   );
+}
+
+Future<void> _refreshSynchronizedApplicationData() async {
+  final loads = <Future<void>>[];
+  if (serviceLocator.isRegistered<GoalsController>()) {
+    loads.add(serviceLocator<GoalsController>().loadGoals());
+  }
+  if (serviceLocator.isRegistered<TasksController>()) {
+    loads.add(serviceLocator<TasksController>().loadTasks());
+  }
+  if (serviceLocator.isRegistered<CalendarController>()) {
+    loads.add(serviceLocator<CalendarController>().loadEvents());
+  }
+  if (serviceLocator.isRegistered<RoutinesController>()) {
+    loads.add(serviceLocator<RoutinesController>().load());
+  }
+  await Future.wait(loads);
 }

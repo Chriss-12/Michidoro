@@ -3,7 +3,10 @@ package com.example.pomodoro_app_v1
 import android.app.Activity
 import android.app.AlarmManager
 import android.Manifest
+import android.app.KeyguardManager
 import android.app.NotificationManager
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
@@ -17,25 +20,45 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.CancellationSignal
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.DocumentsContract
+import android.util.Log
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.security.keystore.KeyProperties
+import android.security.keystore.UserNotAuthenticatedException
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.UUID
+import javax.crypto.AEADBadTagException
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 class MainActivity : FlutterActivity() {
     private val channelName = "michifocus/native_files"
     private val routineReminderChannelName = "michifocus/routine_reminders"
+    private val localAuthChannelName = "michifocus/local_auth"
+    private val deviceIdentityChannelName = "michifocus/device_identity"
+    private val groupKeystoreChannelName = "michifocus/group_keystore"
     private val pickProfileImageRequest = 4101
     private val pickFolderRequest = 4102
     private val pickBackupImportFolderRequest = 4103
+    private val localCredentialRequest = 4105
     private val backupFileNames = setOf(
         "michifocus.sqlite",
     )
@@ -48,6 +71,8 @@ class MainActivity : FlutterActivity() {
 
     private var pendingResult: MethodChannel.Result? = null
     private var pendingRequestCode: Int? = null
+    private var pendingLocalAuthResult: MethodChannel.Result? = null
+    private var localAuthCancellationSignal: CancellationSignal? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -62,6 +87,220 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, localAuthChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isAvailable" -> result.success(isLocalAuthenticationAvailable())
+                    "authenticate" -> authenticateLocally(result)
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, deviceIdentityChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getSuggestedName" -> result.success(suggestedDeviceName())
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, groupKeystoreChannelName)
+            .setMethodCallHandler { call, result -> handleGroupKeystoreCall(call, result) }
+    }
+
+    private fun handleGroupKeystoreCall(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            when (call.method) {
+                "isAvailable" -> result.success(isLocalAuthenticationAvailable())
+                "hasKey" -> result.success(groupKeyStore().containsAlias(groupKeyAlias(call)))
+                "wrap" -> wrapGroupDataKey(call, result)
+                "unwrap" -> unwrapGroupDataKey(call, result)
+                "delete" -> {
+                    groupKeyStore().deleteEntry(groupKeyAlias(call))
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        } catch (_: UserNotAuthenticatedException) {
+            result.error("authentication_required", "Se requiere autenticación del dispositivo.", null)
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            result.error("key_invalidated", "La clave del dispositivo fue invalidada.", null)
+        } catch (_: AEADBadTagException) {
+            result.error("integrity_failed", "La envoltura local fue modificada.", null)
+        } catch (error: Exception) {
+            result.error("keystore_unavailable", error.message ?: "Android Keystore no está disponible.", null)
+        }
+    }
+
+    private fun wrapGroupDataKey(call: MethodCall, result: MethodChannel.Result) {
+        val groupId = requiredGroupId(call)
+        val clearKey = requireNotNull(call.argument<ByteArray>("clearKey"))
+        require(clearKey.size == 32) { "La clave de datos debe tener 32 bytes." }
+        try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateGroupWrappingKey(groupId))
+            cipher.updateAAD(groupKeyAssociatedData(groupId))
+            val cipherText = cipher.doFinal(clearKey)
+            result.success(mapOf("nonce" to cipher.iv, "cipherText" to cipherText))
+        } finally {
+            clearKey.fill(0)
+        }
+    }
+
+    private fun unwrapGroupDataKey(call: MethodCall, result: MethodChannel.Result) {
+        val groupId = requiredGroupId(call)
+        val nonce = requireNotNull(call.argument<ByteArray>("nonce"))
+        val cipherText = requireNotNull(call.argument<ByteArray>("cipherText"))
+        require(nonce.size == 12) { "El nonce local debe tener 12 bytes." }
+        require(cipherText.size == 48) { "La envoltura local debe tener 48 bytes." }
+        val wrappingKey = groupKeyStore().getKey(groupKeyAlias(groupId), null) as? SecretKey
+            ?: throw KeyPermanentlyInvalidatedException()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, wrappingKey, GCMParameterSpec(128, nonce))
+        cipher.updateAAD(groupKeyAssociatedData(groupId))
+        val clearKey = cipher.doFinal(cipherText)
+        require(clearKey.size == 32) { "La clave local recuperada no es válida." }
+        result.success(clearKey)
+    }
+
+    private fun getOrCreateGroupWrappingKey(groupId: String): SecretKey {
+        val keyStore = groupKeyStore()
+        val alias = groupKeyAlias(groupId)
+        (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+
+        val builder = KeyGenParameterSpec.Builder(
+            alias,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .setRandomizedEncryptionRequired(true)
+            .setUserAuthenticationRequired(true)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setUserAuthenticationParameters(
+                300,
+                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            builder.setUserAuthenticationValidityDurationSeconds(300)
+        }
+
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(builder.build())
+        return generator.generateKey()
+    }
+
+    private fun groupKeyStore(): KeyStore {
+        return KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    }
+
+    private fun requiredGroupId(call: MethodCall): String {
+        val groupId = requireNotNull(call.argument<String>("groupId")).trim()
+        require(Regex("^group_[a-f0-9]{32}$").matches(groupId)) { "Identificador de grupo inválido." }
+        return groupId
+    }
+
+    private fun groupKeyAlias(call: MethodCall): String = groupKeyAlias(requiredGroupId(call))
+
+    private fun groupKeyAlias(groupId: String): String = "michifocus.sync.$groupId.v1"
+
+    private fun groupKeyAssociatedData(groupId: String): ByteArray {
+        return "michifocus|1|$groupId|device-cache".toByteArray(Charsets.UTF_8)
+    }
+
+    private fun suggestedDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER.trim()
+        val model = Build.MODEL.trim()
+        if (manufacturer.isEmpty()) return model.ifEmpty { "Teléfono Android" }
+        if (model.isEmpty()) return manufacturer
+        if (model.startsWith(manufacturer, ignoreCase = true)) return model
+        val displayManufacturer = manufacturer.replaceFirstChar { character ->
+            if (character.isLowerCase()) character.titlecase() else character.toString()
+        }
+        return "$displayManufacturer $model"
+    }
+
+    private fun isLocalAuthenticationAvailable(): Boolean {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        return keyguardManager.isDeviceSecure
+    }
+
+    private fun authenticateLocally(result: MethodChannel.Result) {
+        if (pendingLocalAuthResult != null) {
+            result.error("authentication_busy", "Ya hay una autenticacion en curso.", null)
+            return
+        }
+        if (!isLocalAuthenticationAvailable()) {
+            result.success(false)
+            return
+        }
+
+        pendingLocalAuthResult = result
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            showBiometricOrCredentialPrompt()
+        } else {
+            showDeviceCredentialPrompt()
+        }
+    }
+
+    private fun showBiometricOrCredentialPrompt() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            showDeviceCredentialPrompt()
+            return
+        }
+
+        val builder = BiometricPrompt.Builder(this)
+            .setTitle("Desbloquear MichiFocus")
+            .setSubtitle("Usa la seguridad registrada en este dispositivo")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            builder.setDeviceCredentialAllowed(true)
+        }
+
+        localAuthCancellationSignal = CancellationSignal()
+        builder.build().authenticate(
+            localAuthCancellationSignal!!,
+            mainExecutor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    authenticationResult: BiometricPrompt.AuthenticationResult,
+                ) {
+                    completeLocalAuthentication(true)
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    completeLocalAuthentication(false)
+                }
+            },
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun showDeviceCredentialPrompt() {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+            "Desbloquear MichiFocus",
+            "Usa el PIN, patron o contrasena de este dispositivo.",
+        )
+        if (intent == null) {
+            completeLocalAuthentication(false)
+            return
+        }
+        startActivityForResult(intent, localCredentialRequest)
+    }
+
+    private fun completeLocalAuthentication(authenticated: Boolean) {
+        val result = pendingLocalAuthResult ?: return
+        pendingLocalAuthResult = null
+        localAuthCancellationSignal = null
+        result.success(authenticated)
     }
 
     private fun replaceRoutineReminders(call: MethodCall, result: MethodChannel.Result) {
@@ -144,6 +383,12 @@ class MainActivity : FlutterActivity() {
                 },
             )
             "saveFileToExternalFolder" -> saveFileToExternalFolder(call, result)
+            "validateSyncFolder" -> validateSyncFolder(call, result)
+            "publishSyncGroupManifest" -> publishSyncGroupManifest(call, result)
+            "publishSyncRecoverySnapshot" -> publishSyncRecoverySnapshot(call, result)
+            "publishSyncOperation" -> publishSyncOperation(call, result)
+            "discoverSyncOperations" -> discoverSyncOperations(call, result)
+            "discoverSyncGroupManifests" -> discoverSyncGroupManifests(call, result)
             "exportBackupToExternalFolder" -> exportBackupToExternalFolder(call, result)
             "openFile" -> openFile(call, result)
             "playCompletionSound" -> playCompletionSound(call, result)
@@ -170,6 +415,10 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == localCredentialRequest) {
+            completeLocalAuthentication(resultCode == Activity.RESULT_OK)
+            return
+        }
         val result = pendingResult ?: return
         if (requestCode != pendingRequestCode) {
             return
@@ -246,6 +495,611 @@ class MainActivity : FlutterActivity() {
             )
         } catch (error: Exception) {
             result.error("external_save_failed", error.message ?: "No se pudo guardar el archivo.", null)
+        }
+    }
+
+    private fun validateSyncFolder(call: MethodCall, result: MethodChannel.Result) {
+        var probeUri: Uri? = null
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val probeBytes = "michifocus-folder-check-v1".toByteArray(Charsets.UTF_8)
+            val probe = writeBytesToTree(
+                folderUri,
+                ".michifocus-check-${UUID.randomUUID()}.tmp",
+                "application/octet-stream",
+                probeBytes,
+            )
+            probeUri = probe.uri
+            val readBytes = contentResolver.openInputStream(probe.uri).use { input ->
+                requireNotNull(input) { "No se pudo leer el archivo de comprobación." }
+                input.readBytes()
+            }
+            check(readBytes.contentEquals(probeBytes)) {
+                "La carpeta cambió el archivo de comprobación."
+            }
+            check(DocumentsContract.deleteDocument(contentResolver, probe.uri)) {
+                "No se pudo retirar el archivo de comprobación."
+            }
+            probeUri = null
+            result.success(true)
+        } catch (_: Exception) {
+            probeUri?.let { uri ->
+                try {
+                    DocumentsContract.deleteDocument(contentResolver, uri)
+                } catch (_: Exception) {
+                    // Best effort: never hide the original validation failure.
+                }
+            }
+            result.success(false)
+        }
+    }
+
+    private fun publishSyncGroupManifest(call: MethodCall, result: MethodChannel.Result) {
+        var temporaryUri: Uri? = null
+        var createdFinalUri: Uri? = null
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val groupId = requireNotNull(call.argument<String>("groupId")).trim()
+            require(Regex("^group_[a-f0-9]{32}$").matches(groupId)) {
+                "El identificador del grupo no es válido."
+            }
+            val bytes = requireNotNull(call.argument<ByteArray>("bytes"))
+            require(bytes.isNotEmpty() && bytes.size <= 64 * 1024) {
+                "El manifiesto del grupo no tiene un tamaño válido."
+            }
+            val finalName = "michifocus-$groupId.v1.json"
+            val relativePath = finalName
+
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!readDocumentBytes(existing.uri).contentEquals(bytes)) {
+                    throw GroupManifestConflictException()
+                }
+                result.success(
+                    mapOf(
+                        "relativePath" to relativePath,
+                        "atomicFinalization" to true,
+                    ),
+                )
+                return
+            }
+
+            val temporary = writeBytesToTree(
+                folderUri,
+                ".michifocus-$groupId-${UUID.randomUUID()}.tmp",
+                "application/octet-stream",
+                bytes,
+            )
+            temporaryUri = temporary.uri
+            check(readDocumentBytes(temporary.uri).contentEquals(bytes)) {
+                "La carpeta cambió el manifiesto temporal."
+            }
+
+            val renamedUri = try {
+                DocumentsContract.renameDocument(contentResolver, temporary.uri, finalName)
+            } catch (_: Exception) {
+                null
+            }
+            if (renamedUri != null) {
+                temporaryUri = null
+                check(readDocumentBytes(renamedUri).contentEquals(bytes)) {
+                    "La carpeta cambió el manifiesto final."
+                }
+                result.success(
+                    mapOf(
+                        "relativePath" to relativePath,
+                        "atomicFinalization" to true,
+                    ),
+                )
+                return
+            }
+
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!readDocumentBytes(existing.uri).contentEquals(bytes)) {
+                    throw GroupManifestConflictException()
+                }
+                DocumentsContract.deleteDocument(contentResolver, temporary.uri)
+                temporaryUri = null
+                result.success(
+                    mapOf(
+                        "relativePath" to relativePath,
+                        "atomicFinalization" to false,
+                    ),
+                )
+                return
+            }
+
+            val parentUri = documentUriForTree(folderUri)
+            val finalUri = DocumentsContract.createDocument(
+                contentResolver,
+                parentUri,
+                "application/json",
+                finalName,
+            ) ?: throw IllegalStateException("No se pudo crear el manifiesto final.")
+            createdFinalUri = finalUri
+            contentResolver.openOutputStream(finalUri, "w").use { output ->
+                requireNotNull(output) { "No se pudo escribir el manifiesto final." }
+                output.write(bytes)
+            }
+            check(readDocumentBytes(finalUri).contentEquals(bytes)) {
+                "La carpeta cambió el manifiesto final."
+            }
+            DocumentsContract.deleteDocument(contentResolver, temporary.uri)
+            temporaryUri = null
+            createdFinalUri = null
+            result.success(
+                mapOf(
+                    "relativePath" to relativePath,
+                    "atomicFinalization" to false,
+                ),
+            )
+        } catch (_: GroupManifestConflictException) {
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "group_manifest_conflict",
+                "La carpeta contiene un manifiesto diferente para este grupo.",
+                null,
+            )
+        } catch (error: Exception) {
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "group_manifest_publish_failed",
+                error.message ?: "No se pudo publicar el manifiesto del grupo.",
+                null,
+            )
+        }
+    }
+
+    private fun readDocumentBytes(uri: Uri): ByteArray {
+        return contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "No se pudo leer el documento." }
+            input.readBytes()
+        }
+    }
+
+    private fun publishSyncOperation(call: MethodCall, result: MethodChannel.Result) {
+        var temporaryUri: Uri? = null
+        var createdFinalUri: Uri? = null
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val groupId = requireNotNull(call.argument<String>("groupId")).trim()
+            val installationId = requireNotNull(call.argument<String>("installationId")).trim()
+            val operationId = requireNotNull(call.argument<String>("operationId")).trim()
+            val originCounter = requireNotNull(call.argument<Number>("originCounter")).toLong()
+            val bytes = requireNotNull(call.argument<ByteArray>("bytes"))
+            require(Regex("^group_[a-f0-9]{32}$").matches(groupId))
+            require(Regex("^installation_[a-f0-9]{32}$").matches(installationId))
+            require(Regex("^operation_[a-f0-9]{32}$").matches(operationId))
+            require(originCounter in 1..Long.MAX_VALUE)
+            require(bytes.isNotEmpty() && bytes.size <= 384 * 1024)
+
+            val counter = originCounter.toString().padStart(20, '0')
+            val finalName = "michifocus-op-${installationId.removePrefix("installation_")}-" +
+                "$counter-${operationId.removePrefix("operation_")}.v1.json"
+            val relativePath = finalName
+
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!readDocumentBytes(existing.uri).contentEquals(bytes)) {
+                    throw GroupManifestConflictException()
+                }
+                result.success(
+                    mapOf("relativePath" to relativePath, "atomicFinalization" to true),
+                )
+                return
+            }
+
+            val temporary = createTreeDocument(
+                folderUri,
+                ".michifocus-$operationId-${UUID.randomUUID()}.tmp",
+                "application/octet-stream",
+            )
+            temporaryUri = temporary
+            writeDocumentBytes(temporary, bytes)
+            check(readDocumentBytes(temporary).contentEquals(bytes)) {
+                "La carpeta cambió la operación temporal."
+            }
+
+            val renamedUri = try {
+                DocumentsContract.renameDocument(contentResolver, temporary, finalName)
+            } catch (_: Exception) {
+                null
+            }
+            if (renamedUri != null) {
+                temporaryUri = null
+                check(readDocumentBytes(renamedUri).contentEquals(bytes)) {
+                    "La carpeta cambió la operación final."
+                }
+                result.success(
+                    mapOf("relativePath" to relativePath, "atomicFinalization" to true),
+                )
+                return
+            }
+
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!readDocumentBytes(existing.uri).contentEquals(bytes)) {
+                    throw GroupManifestConflictException()
+                }
+                DocumentsContract.deleteDocument(contentResolver, temporary)
+                temporaryUri = null
+                result.success(
+                    mapOf("relativePath" to relativePath, "atomicFinalization" to false),
+                )
+                return
+            }
+
+            val finalUri = createTreeDocument(folderUri, finalName, "application/json")
+            createdFinalUri = finalUri
+            writeDocumentBytes(finalUri, bytes)
+            check(readDocumentBytes(finalUri).contentEquals(bytes)) {
+                "La carpeta cambió la operación final."
+            }
+            DocumentsContract.deleteDocument(contentResolver, temporary)
+            temporaryUri = null
+            createdFinalUri = null
+            result.success(
+                mapOf("relativePath" to relativePath, "atomicFinalization" to false),
+            )
+        } catch (_: GroupManifestConflictException) {
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "sync_operation_conflict",
+                "Ya existe otra operación con ese identificador o contador.",
+                null,
+            )
+        } catch (error: Exception) {
+            Log.e("MichiFocusSync", "No se pudo publicar la operación cifrada.", error)
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "sync_operation_publish_failed",
+                error.message ?: "No se pudo publicar la operación cifrada.",
+                null,
+            )
+        }
+    }
+
+    private fun discoverSyncOperations(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val localInstallationId =
+                requireNotNull(call.argument<String>("localInstallationId")).trim()
+            val installationPattern = Regex("^installation_[a-f0-9]{32}$")
+            val filePattern = Regex(
+                "^michifocus-op-([a-f0-9]{32})-(\\d{20})-" +
+                    "([a-f0-9]{32})\\.v1\\.json$",
+            )
+            require(installationPattern.matches(localInstallationId))
+
+            val discovered = mutableListOf<Map<String, Any>>()
+            var visited = 0
+            for (document in childDocuments(folderUri)) {
+                val match = filePattern.matchEntire(document.displayName) ?: continue
+                if ("installation_${match.groupValues[1]}" == localInstallationId) continue
+                if (++visited > 4096) {
+                    throw IllegalStateException("Hay demasiados archivos de sincronización.")
+                }
+                val bytes = readDocumentBytesLimited(document.uri, 384 * 1024)
+                discovered.add(
+                    mapOf(
+                        "relativePath" to document.displayName,
+                        "bytes" to bytes,
+                    ),
+                )
+            }
+            result.success(discovered)
+        } catch (error: Exception) {
+            result.error(
+                "sync_operation_discovery_failed",
+                error.message ?: "No se pudieron revisar los cambios recibidos.",
+                null,
+            )
+        }
+    }
+
+    private fun getOrCreateDirectoryUnder(parentUri: Uri, name: String): Uri {
+        findChildUnder(parentUri, name)?.let { return it.uri }
+        return DocumentsContract.createDocument(
+            contentResolver,
+            parentUri,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            name,
+        ) ?: throw IllegalStateException("No se pudo crear la carpeta $name.")
+    }
+
+    private fun createDocumentUnder(parentUri: Uri, name: String, mimeType: String): Uri {
+        return DocumentsContract.createDocument(
+            contentResolver,
+            parentUri,
+            mimeType,
+            name,
+        ) ?: throw IllegalStateException("No se pudo crear el documento $name.")
+    }
+
+    private fun writeDocumentBytes(uri: Uri, bytes: ByteArray) {
+        contentResolver.openOutputStream(uri, "w").use { output ->
+            requireNotNull(output) { "No se pudo escribir el documento." }
+            output.write(bytes)
+        }
+    }
+
+    private fun findChildUnder(parentUri: Uri, displayName: String): DocumentEntry? {
+        val parentId = DocumentsContract.getDocumentId(parentUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, parentId)
+        contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            )
+            val nameIndex = cursor.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            )
+            while (cursor.moveToNext()) {
+                if (cursor.getString(nameIndex) == displayName) {
+                    return DocumentEntry(
+                        DocumentsContract.buildDocumentUriUsingTree(
+                            parentUri,
+                            cursor.getString(idIndex),
+                        ),
+                        displayName,
+                    )
+                }
+            }
+        }
+        return null
+    }
+
+    private fun childDocumentsUnder(parentUri: Uri): List<DocumentEntry> {
+        val parentId = DocumentsContract.getDocumentId(parentUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, parentId)
+        val entries = mutableListOf<DocumentEntry>()
+        contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            )
+            val nameIndex = cursor.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            )
+            while (cursor.moveToNext()) {
+                entries.add(
+                    DocumentEntry(
+                        DocumentsContract.buildDocumentUriUsingTree(
+                            parentUri,
+                            cursor.getString(idIndex),
+                        ),
+                        cursor.getString(nameIndex),
+                    ),
+                )
+            }
+        }
+        return entries
+    }
+
+    private fun publishSyncRecoverySnapshot(call: MethodCall, result: MethodChannel.Result) {
+        var temporaryUri: Uri? = null
+        var createdFinalUri: Uri? = null
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val groupId = requireNotNull(call.argument<String>("groupId")).trim()
+            val snapshotId = requireNotNull(call.argument<String>("snapshotId")).trim()
+            require(Regex("^group_[a-f0-9]{32}$").matches(groupId))
+            require(Regex("^snapshot_[a-f0-9]{32}$").matches(snapshotId))
+            val source = File(requireNotNull(call.argument<String>("sourcePath"))).canonicalFile
+            val cacheBoundary = cacheDir.canonicalFile
+            require(source.path.startsWith(cacheBoundary.path + File.separator)) {
+                "La instantánea temporal no pertenece a MichiFocus."
+            }
+            require(source.isFile && source.length() > 0L) {
+                "La instantánea cifrada no está disponible."
+            }
+
+            val expectedDigest = digest(source.inputStream())
+            val finalName = "michifocus-$groupId-recovery-$snapshotId.v1.json"
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!documentMatches(existing.uri, source.length(), expectedDigest)) {
+                    throw GroupManifestConflictException()
+                }
+                result.success(
+                    mapOf("relativePath" to finalName, "atomicFinalization" to true),
+                )
+                return
+            }
+
+            val temporaryName = ".michifocus-$snapshotId-${UUID.randomUUID()}.tmp"
+            val temporary = createTreeDocument(
+                folderUri,
+                temporaryName,
+                "application/octet-stream",
+            )
+            temporaryUri = temporary
+            copyFileToDocument(source, temporary)
+            check(documentMatches(temporary, source.length(), expectedDigest)) {
+                "La carpeta cambió la instantánea temporal."
+            }
+
+            val renamedUri = try {
+                DocumentsContract.renameDocument(contentResolver, temporary, finalName)
+            } catch (_: Exception) {
+                null
+            }
+            if (renamedUri != null) {
+                temporaryUri = null
+                check(documentMatches(renamedUri, source.length(), expectedDigest)) {
+                    "La carpeta cambió la instantánea final."
+                }
+                result.success(
+                    mapOf("relativePath" to finalName, "atomicFinalization" to true),
+                )
+                return
+            }
+
+            findChild(folderUri, finalName)?.let { existing ->
+                if (!documentMatches(existing.uri, source.length(), expectedDigest)) {
+                    throw GroupManifestConflictException()
+                }
+                DocumentsContract.deleteDocument(contentResolver, temporary)
+                temporaryUri = null
+                result.success(
+                    mapOf("relativePath" to finalName, "atomicFinalization" to false),
+                )
+                return
+            }
+
+            val finalUri = createTreeDocument(folderUri, finalName, "application/json")
+            createdFinalUri = finalUri
+            copyFileToDocument(source, finalUri)
+            check(documentMatches(finalUri, source.length(), expectedDigest)) {
+                "La carpeta cambió la instantánea final."
+            }
+            DocumentsContract.deleteDocument(contentResolver, temporary)
+            temporaryUri = null
+            createdFinalUri = null
+            result.success(
+                mapOf("relativePath" to finalName, "atomicFinalization" to false),
+            )
+        } catch (_: GroupManifestConflictException) {
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "recovery_snapshot_conflict",
+                "Ya existe otra instantánea con ese identificador.",
+                null,
+            )
+        } catch (error: Exception) {
+            cleanupDocument(temporaryUri)
+            cleanupDocument(createdFinalUri)
+            result.error(
+                "recovery_snapshot_publish_failed",
+                error.message ?: "No se pudo guardar la instantánea.",
+                null,
+            )
+        }
+    }
+
+    private fun createTreeDocument(folderUri: Uri, name: String, mimeType: String): Uri {
+        return DocumentsContract.createDocument(
+            contentResolver,
+            documentUriForTree(folderUri),
+            mimeType,
+            name,
+        ) ?: throw IllegalStateException("No se pudo crear el documento.")
+    }
+
+    private fun copyFileToDocument(source: File, target: Uri) {
+        source.inputStream().use { input ->
+            contentResolver.openOutputStream(target, "w").use { output ->
+                requireNotNull(output) { "No se pudo escribir el documento." }
+                input.copyTo(output)
+            }
+        }
+    }
+
+    private fun documentMatches(uri: Uri, expectedSize: Long, expectedDigest: ByteArray): Boolean {
+        val size = contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        ).use { cursor ->
+            if (cursor == null || !cursor.moveToFirst() || cursor.isNull(0)) -1L
+            else cursor.getLong(0)
+        }
+        return size == expectedSize && digestDocument(uri).contentEquals(expectedDigest)
+    }
+
+    private fun digestDocument(uri: Uri): ByteArray {
+        return contentResolver.openInputStream(uri).use { input ->
+            digest(requireNotNull(input) { "No se pudo leer la instantánea." })
+        }
+    }
+
+    private fun digest(input: InputStream): ByteArray {
+        val messageDigest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(32 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            messageDigest.update(buffer, 0, count)
+        }
+        input.close()
+        return messageDigest.digest()
+    }
+
+    private fun discoverSyncGroupManifests(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val folderUri = Uri.parse(requireNotNull(call.argument<String>("folderUri")))
+            val finalNamePattern = Regex("^michifocus-group_[a-f0-9]{32}\\.v1\\.json$")
+            val manifests = mutableListOf<Map<String, Any>>()
+            for (document in childDocuments(folderUri)) {
+                if (!finalNamePattern.matches(document.displayName)) continue
+                try {
+                    manifests.add(
+                        mapOf(
+                            "relativePath" to document.displayName,
+                            "bytes" to readDocumentBytesLimited(document.uri, 64 * 1024),
+                        ),
+                    )
+                } catch (_: Exception) {
+                    manifests.add(
+                        mapOf(
+                            "relativePath" to document.displayName,
+                            "bytes" to ByteArray(0),
+                        ),
+                    )
+                }
+            }
+            result.success(manifests)
+        } catch (error: Exception) {
+            result.error(
+                "group_manifest_discovery_failed",
+                error.message ?: "No se pudieron revisar los grupos de la carpeta.",
+                null,
+            )
+        }
+    }
+
+    private fun readDocumentBytesLimited(uri: Uri, maximumBytes: Int): ByteArray {
+        return contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "No se pudo leer el documento." }
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            var total = 0
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                total += count
+                require(total <= maximumBytes) { "El documento supera el límite permitido." }
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        }
+    }
+
+    private fun cleanupDocument(uri: Uri?) {
+        if (uri == null) return
+        try {
+            DocumentsContract.deleteDocument(contentResolver, uri)
+        } catch (_: Exception) {
+            // Best effort cleanup. The original publication failure remains authoritative.
         }
     }
 
@@ -621,4 +1475,6 @@ class MainActivity : FlutterActivity() {
         val uri: Uri,
         val displayName: String,
     )
+
+    private class GroupManifestConflictException : Exception()
 }

@@ -51,6 +51,7 @@ void main() {
     addTearDown(fixture.dispose);
     final raw = sqlite3.open(fixture.file.path);
     _dropRoutineTables(raw);
+    _dropSyncTables(raw);
     raw
       ..execute('PRAGMA user_version = 4')
       ..dispose();
@@ -62,7 +63,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      5,
+      6,
     );
     expect(await database.select(database.routineRecords).get(), isEmpty);
   });
@@ -265,6 +266,17 @@ void _dropRoutineTables(Database database) {
     ..execute('DROP TABLE routine_items')
     ..execute('DROP TABLE routine_days')
     ..execute('DROP TABLE routines');
+}
+
+void _dropSyncTables(Database database) {
+  database
+    ..execute('DROP TABLE sync_acknowledgements')
+    ..execute('DROP TABLE sync_conflicts')
+    ..execute('DROP TABLE sync_tombstones')
+    ..execute('DROP TABLE sync_entity_versions')
+    ..execute('DROP TABLE sync_applied_operations')
+    ..execute('DROP TABLE sync_outbox')
+    ..execute('DROP TABLE sync_local_state');
 }
 
 class _DatabaseFixture {

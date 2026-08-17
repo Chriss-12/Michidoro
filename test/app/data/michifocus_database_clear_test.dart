@@ -119,6 +119,101 @@ void main() {
               createdAt: now,
             ),
           );
+      await database
+          .into(database.syncLocalStateRecords)
+          .insert(
+            SyncLocalStateRecordsCompanion.insert(
+              groupId: 'group-1',
+              installationId: 'phone-1',
+              protocolVersion: 1,
+              logicalCounter: const Value(1),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.syncOutboxRecords)
+          .insert(
+            SyncOutboxRecordsCompanion.insert(
+              operationId: 'local-operation-1',
+              groupId: 'group-1',
+              originDeviceId: 'phone-1',
+              originCounter: 1,
+              entityType: 'goal',
+              entityId: 'goal-1',
+              parentVersionJson: '{}',
+              changedFieldsJson: '{}',
+              operationKind: 'update',
+              protocolVersion: 1,
+              payloadSha256:
+                  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              createdAt: now,
+            ),
+          );
+      await database
+          .into(database.syncAppliedOperationRecords)
+          .insert(
+            SyncAppliedOperationRecordsCompanion.insert(
+              operationId: 'remote-operation-1',
+              groupId: 'group-1',
+              originDeviceId: 'phone-2',
+              originCounter: 1,
+              payloadSha256:
+                  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              appliedAt: now,
+            ),
+          );
+      await database
+          .into(database.syncEntityVersionRecords)
+          .insert(
+            SyncEntityVersionRecordsCompanion.insert(
+              groupId: 'group-1',
+              entityType: 'goal',
+              entityId: 'goal-1',
+              fieldName: 'title',
+              causalVersionJson: '{"phone-1":1}',
+              operationId: 'local-operation-1',
+              originDeviceId: 'phone-1',
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.syncTombstoneRecords)
+          .insert(
+            SyncTombstoneRecordsCompanion.insert(
+              groupId: 'group-1',
+              entityType: 'task',
+              entityId: 'deleted-task',
+              causalVersionJson: '{"phone-1":1}',
+              operationId: 'delete-operation-1',
+              originDeviceId: 'phone-1',
+              deletedAt: now,
+            ),
+          );
+      await database
+          .into(database.syncConflictRecords)
+          .insert(
+            SyncConflictRecordsCompanion.insert(
+              id: 'conflict-1',
+              groupId: 'group-1',
+              entityType: 'goal',
+              entityId: 'goal-1',
+              fieldName: const Value('title'),
+              candidatesJson: '[]',
+              createdAt: now,
+            ),
+          );
+      await database
+          .into(database.syncAcknowledgementRecords)
+          .insert(
+            SyncAcknowledgementRecordsCompanion.insert(
+              groupId: 'group-1',
+              observerDeviceId: 'phone-1',
+              originDeviceId: 'phone-2',
+              acknowledgedCounter: 1,
+              updatedAt: now,
+            ),
+          );
 
       for (final table in database.allTables) {
         expect(

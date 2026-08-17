@@ -2983,3 +2983,644 @@ Verification evidence:
 
 Tracks:
 - `REQ-SET-007`
+
+## Approved roadmap - Productivity V11
+
+Productivity V11 adds optional Android-to-Android synchronization through a
+user-selected folder transported by Syncthing. Single-device mode remains the
+default. The user approved implementation and then required password plus
+recovery-key encryption on 2026-08-13, superseding the earlier plaintext choice.
+No real user data may be published until the cryptographic design and dependency
+boundary pass review.
+
+### V11-M0 - Synchronization contract and risk prototype
+
+Priority: 1
+
+Status: In Progress
+
+Objective:
+Freeze the product boundary and prove the highest-risk causal, Android storage,
+and Syncthing assumptions before changing production persistence.
+
+Deliverables:
+- [ ] Approve single-device default and selected-folder semantics.
+- [ ] Approve the 12-table synchronization/local-only policy.
+- [ ] Prototype secure IDs, per-device counters, causal comparison, and
+      field-level concurrent merge with two-, three-, and four-device fixtures.
+- [x] Prototype immutable publication and stable-file detection through the
+      existing Android document-tree boundary without adding a package.
+- [x] Require authenticated application-level encryption with password and an
+      independent recovery key; plaintext exchange is rejected.
+- [ ] Select and approve a maintained cryptographic implementation, algorithm
+      suite, KDF parameters, Android Keystore boundary, and key-rotation format.
+- [ ] Prototype password unlock, recovery unlock, wrong-key rejection, tamper
+      rejection, and measured KDF performance on target Android hardware.
+- [ ] Record measured file-count, latency, and compaction estimates.
+
+Quality gates:
+- [ ] The prototype proves convergence under reordered and duplicated delivery.
+- [ ] Clock skew cannot change causal or conflict outcomes.
+- [ ] A truncated or foreign-group file cannot reach application tables.
+- [x] Encryption, password, and recovery-key product decisions are approved.
+- [ ] Cryptographic dependency/native boundary and threat model are approved.
+
+Implementation evidence on 2026-08-13:
+- Added an isolated `features/sync` prototype with immutable causal versions,
+  causal candidates, field/record merge, and scoped 128-bit secure identifiers.
+- Logical counters classify equal, older, newer, and concurrent state without
+  reading wall-clock timestamps.
+- Compatible concurrent fields merge, concurrent same-field values remain
+  visible, repeated operations are idempotent, and causally older candidates
+  are removed.
+- Nine focused tests pass. They cover all four-device compatible-delivery
+  permutations with a duplicate, all three-record conflict permutations, and
+  4,000 generated identifiers.
+- The complete Flutter suite passes with 266 tests.
+- The V11 files are analysis-clean. Full repository analysis retains one
+  pre-existing info-level dependency warning in a temporary physical-verification
+  script outside V11.
+- No schema, DI, UI, Android, Syncthing folder, or production data path changed.
+- The user superseded the earlier plaintext choice on 2026-08-13 and required
+  password plus recovery-key encryption. No encryption code or package has been
+  added; security design and dependency approval remain M0 gates.
+
+Tracks:
+- `REQ-V11-001`
+- `REQ-V11-002`
+- `REQ-V11-003`
+- `REQ-V11-009`
+
+### V11-M0.1 - Local biometric/PIN unlock and protected key access
+
+Priority: 2
+
+Status: In Progress
+
+Objective:
+Add the optional local security boundary that lets Android biometrics or the
+registered device credential unlock MichiFocus and its device-protected group key
+without asking for the group password on every normal application opening.
+
+Deliverables:
+- [x] Implement and persist `Never`, `Immediately`, `After 1 minute`, and
+      `After 5 minutes` policies with protection disabled by default.
+- [x] Implement the policy controller, persist it, load it before application
+      content, and wire monotonic lifecycle decisions into production.
+- [x] Add a native capability and authentication bridge for strong biometric or
+      device credential, with a system credential fallback on older Android.
+- [x] Wrap the cached group DEK with a device-bound Android Keystore key that
+      requires successful user authentication.
+- [x] Gate every cold start with the existing Android system authenticator before
+      any bootstrap/loading work, then run the percentage loading exactly once.
+- [ ] Add system-prompt unlock, locked-content overlay, cancellation, retry,
+      secure-key invalidation, and password/recovery rebind flows.
+- [ ] Defer incoming encrypted operation application while locked and resume it
+      only after the local key becomes available.
+
+Quality gates:
+- [x] Policy, cold-start, timeout-boundary, repeated-lifecycle, and fail-closed
+      unit tests pass.
+- [x] Startup widget tests prove pending or cancelled authentication cannot start
+      bootstrap or expose percentage loading, while success starts it once.
+- [ ] Widget tests prove sensitive content and navigation cannot bypass the lock.
+- [ ] Native tests prove the app never handles the Android device credential and
+      cannot use the protected key without authorized system authentication.
+- [ ] Restart, cancellation, biometric/device-credential fallback, Keystore
+      invalidation, and recovery pass on supported physical Android phones.
+
+Tracks:
+- `REQ-V11-003`
+- `REQ-V11-010`
+
+Implementation evidence on 2026-08-13:
+- Added an isolated `LocalUnlockPolicy` with disabled, immediate, one-minute,
+  and five-minute choices; enabled policies start locked after process restart.
+- Added a Signals-based lifecycle controller using an injectable monotonic source.
+  Repeated background events cannot extend the grace period, and invalid negative
+  elapsed time fails closed.
+- Ten focused lock-policy tests and all 19 sync tests pass. The complete Flutter
+  suite passed with 266 tests in the first isolated slice.
+- The second slice adds a dedicated policy repository/file, DI registration,
+  startup loading, real lifecycle wiring, and a themed lock gate that removes
+  sensitive routed content while locked.
+- Four repository tests, two added controller persistence tests, and four lock-gate
+  widget tests bring focused sync coverage to 29 passing tests and the complete
+  Flutter suite to 276 passing tests. Scoped analysis reports no issues.
+- The unlock button deliberately remains disabled until a trusted Android
+  authenticator is wired. No native authentication, Keystore access, Android
+  file, package dependency, user-facing enable switch, or sync data path changed.
+- The third slice connects the lock gate to a native Android system prompt. The
+  channel exposes only capability and boolean success; cancellation, missing
+  bridge, unavailable device security, and native errors fail closed.
+- Android 10+ offers the platform biometric/device-credential dialog. Android
+  6-9 uses platform credential confirmation. No PIN, pattern, password, face, or
+  fingerprint material crosses into Dart.
+- Seven new controller/bridge tests bring focused sync coverage to 36 passing
+  tests and the complete suite to 283. Scoped analysis is clean, and a debug APK
+  compiles successfully with the installed Java 17 without changing Gradle.
+- Android Keystore key wrapping, user-facing policy selection, key invalidation,
+  physical-device authentication, and encrypted DEK access remain pending.
+- The fourth slice adds the user-facing Settings card and an inherited
+  controller boundary without scattering service-locator access into widgets.
+  Enabling defaults to five minutes; immediate and one-/five-minute choices are
+  visible only while protection is active.
+- Every enable, timeout change, and disable action authenticates first. Four
+  widget tests prove successful persistence and unchanged state after
+  cancellation. Focused sync coverage reaches 40 tests and the complete suite
+  reaches 287 passing tests; scoped analysis remains clean.
+- Android Keystore work remains correctly deferred until group enrollment owns a
+  real DEK to wrap; this UI slice creates no placeholder secret or false key state.
+
+Implementation evidence on 2026-08-15:
+- The application composition root now mounts the lock surface and requests the
+  existing Android system authenticator before import, migration, dependency
+  registration, database access, reconciliation, or controller loading.
+- Authentication failure, cancellation, unavailability, and bridge errors stay
+  fail-closed with a retry action. Successful startup authentication is handed to
+  the existing local-lock controller so no redundant second prompt appears before
+  entering the application.
+- Three startup widget tests plus the existing controller/gate coverage pass as a
+  22-test focused set. Scoped analysis is clean and the debug APK builds. The full
+  suite is currently blocked by an unrelated pre-existing UTC/local-time assertion
+  in `drift_sync_outbox_publication_service_test.dart`; full analysis retains only
+  the unrelated temporary `sqlite3` dependency notice.
+
+### V11-M1 - Local storage mode, recovery folder, and sync metadata
+
+Priority: 3
+
+Status: In Progress
+
+Objective:
+Add the safe local foundation while preserving current behavior when the
+multi-device switch is off.
+
+Deliverables:
+- [x] Add single-device/multi-device setting with single device as the default.
+- [x] Let either mode select, validate, change, or disconnect its data folder.
+- [ ] Keep live `michifocus.sqlite` in private app storage.
+- [ ] In single-device mode, create versioned, consistent recovery snapshots.
+- [x] Design and migrate durable group/device, outbox, applied-operation,
+      causal-version, tombstone, conflict, and acknowledgement metadata.
+- [x] Preserve all existing rows, IDs, foreign keys, indexes, import, export,
+      reset, reports, and device-local settings.
+
+Quality gates:
+- [x] Schema migration fixtures preserve all 12 existing tables and representative data.
+- [ ] Folder-access loss never blocks ordinary offline use.
+- [ ] Mode-off regression tests prove no exchange work or new user-visible behavior.
+- [ ] Build Runner, formatting, analyzer, focused tests, and full suite pass.
+
+Tracks:
+- `REQ-V11-001`
+- `REQ-V11-004`
+- `REQ-V11-008`
+
+Implementation evidence on 2026-08-13:
+- Added a persisted `singleDevice`/`multipleDevices` configuration with malformed
+  or future values falling back to single device and no selected folder.
+- Added a user-facing Settings card in both modes for selecting, changing, and
+  disconnecting an Android document-tree folder. The persisted URI and friendly
+  label contain no user task data or credential.
+- The multiple-device choice requires confirmation explaining that the private
+  live database is not moved and no data is shared until a protected group is
+  created or joined.
+- Changing mode preserves the folder reference; disconnecting it preserves mode
+  and does not touch the private database. Mode selection currently prepares UI
+  state only and cannot publish exchange data.
+- Thirteen focused storage tests bring all sync coverage to 53 passing tests; the
+  complete Flutter suite passes with 300 tests, scoped analysis is clean, and the
+  debug APK compiles with Java 17.
+- Folder write validation, recovery snapshots before operational transitions,
+  group metadata, exchange metadata, and physical permission-loss checks remain.
+
+Implementation evidence on 2026-08-14:
+- Unified schema version 6 adds seven private metadata tables for the local
+  logical counter, durable outbox, applied ledger, field versions, tombstones,
+  conflicts, and acknowledgement watermarks. The 12 application tables, their
+  row identifiers, foreign keys, and indexes are unchanged.
+- A new Drift boundary commits a caller-supplied application mutation, counter
+  advance, and outbox row atomically. Remote application and idempotency-ledger
+  insertion are also atomic; exact repeats are ignored and inconsistent reuse
+  of an operation ID or origin counter is rejected.
+- Schema 1-5 migration, import validation, total reset, rollback, monotonic
+  counter, and deduplication checks pass in 21 focused tests. Build Runner and
+  scoped analysis pass, and all 381 tests pass. Full analysis keeps only the
+  unrelated existing `tmp/verify_physical_database_round_trip.dart` notice.
+- The debug APK builds, installs over the existing app without clearing data,
+  launches, and is confirmed as the focused activity on the connected RMX3301.
+- No existing goal/task/calendar/routine repository is wired to this boundary
+  yet, so this slice cannot publish or apply user-data changes and does not
+  falsely activate task or routine transfer.
+
+### V11-M2 - Device enrollment and immutable exchange engine
+
+Priority: 4
+
+Status: In Progress
+
+Objective:
+Create or join a sync group and exchange validated operations without requiring
+manual identifiers or shared mutable files.
+
+Deliverables:
+- [x] Generate stable installation identity and editable friendly name.
+- [ ] Create group manifest, owner-encoded immutable operation namespace,
+      protocol version, and counters.
+- [ ] Publish durable outbox operations with temporary/finalized file handling.
+- [ ] Scan, validate, deduplicate, defer, retry, apply, acknowledge, and quarantine.
+- [ ] Support safe empty-device bootstrap and populated-device merge/replace choice.
+- [ ] Refresh only affected controllers after successful remote commit.
+
+Quality gates:
+- [ ] Reinstall, duplicate model names, renamed devices, group mismatch, future
+      protocol, missing parent, partial file, and repeated file tests pass.
+- [ ] Local commit survives publication failure and retries exactly once logically.
+- [ ] Remote aggregate rollback leaves no partial database or applied-ledger state.
+
+Tracks:
+- `REQ-V11-002`
+- `REQ-V11-003`
+- `REQ-V11-004`
+
+Approval and implementation evidence on 2026-08-13:
+- The user's repeated instruction to continue approved starting this milestone's
+  first bounded slice; group creation, enrollment, encryption, and exchange remain
+  unavailable until their own gates are implemented.
+- MichiFocus now creates one private, secure-random 128-bit installation ID on
+  first startup and reuses it across later app startups. The identifier does not
+  depend on the phone model, friendly name, clock, folder, or Syncthing.
+- Android proposes a local manufacturer/model label with a safe fallback. The
+  multiple-device Settings surface lets the user rename it and shows only a short
+  internal-ID suffix for disambiguation; renaming preserves the full identity.
+- Identity initialization is wired through dependency injection before app content
+  and persisted separately from the live SQLite database and selected shared folder.
+- Thirteen new identity tests cover missing/malformed storage, persistence, native
+  bridge failure, stable restart, model suggestion, rename safety, single-mode
+  hiding, and multiple-mode UI. All 66 sync tests and the full 313-test suite pass;
+  final focused tests and scoped production analysis are clean, and the debug APK
+  compiles with the Android native model bridge.
+- Group ID creation, duplicate-name device lists, reinstall/recovery authority,
+  retirement, encrypted enrollment, and physical-phone inspection remain pending.
+
+Additional implementation evidence on 2026-08-13:
+- Folder selection now succeeds only after Android creates a unique probe file,
+  writes known non-sensitive bytes, reads and compares them, and removes the file.
+- Settings rechecks an existing folder without touching SQLite. Revoked access is
+  shown as an actionable warning with a retry/reselection path; the stored folder
+  reference remains available for recovery and all local app flows stay independent.
+- Seven new validator/controller/widget tests bring focused sync coverage to 73
+  and the complete suite to 320 passing tests. Scoped production analysis is clean
+  and the debug APK compiles with the native Storage Access Framework probe.
+- The approved cryptographic review found no mature memory-hard password KDF in
+  the current dependency set. To avoid a weak or partial group, password, recovery
+  key, DEK, and group-manifest persistence remain unimplemented pending an explicit
+  dependency approval and measured Android parameter review.
+- The user then explicitly approved the required dependency. `cryptography 2.9.0`
+  was added without changing Android Gradle.
+- Added the versioned `argon2id-aes256gcm-v1` key-manifest core: one random
+  256-bit DEK is wrapped independently through the password and a random 256-bit
+  recovery key. Authenticated context binds each wrapper to its group and purpose;
+  password and plaintext keys are absent from serialized JSON.
+- Six focused tests prove both unlock paths, JSON secrecy, wrong-credential,
+  cross-group and tamper rejection, password policy, and pre-KDF rejection of
+  hostile parameters. Sync coverage reaches 79 tests and the complete suite 326;
+  full analysis retains only the unrelated pre-existing `tmp` dependency notice.
+- The provisional profile is 64 MiB, three passes, one lane, and 32-byte output.
+  Physical Android timing/memory review remains required before create/join UI,
+  group persistence, or external manifest publication.
+- Added the device-bound key-protection contract and Android Keystore bridge.
+  Android generates a non-exportable per-group AES-256 key, requires system user
+  authentication, and wraps the group DEK with AES-GCM plus group-bound context.
+- Six bridge tests cover availability, key presence, wrap/unwrap contracts,
+  deletion, native error mapping, and unavailable bridges. Focused sync coverage
+  reaches 85 passing tests; the complete Flutter suite reaches 332 passing tests
+  and scoped V11 analysis is clean.
+- The debug APK compiles, installs over the existing app without clearing its
+  data, and launches on the connected Android phone. At that bridge-only slice,
+  no physical enrollment entry point existed and Keystore invocation remained a
+  pending gate.
+- Added the first-phone enrollment controller, atomic encrypted local repository,
+  inherited presentation scope, and multi-device Settings card. No password or
+  recovery key is written to disk; the recovery key exists only during the
+  confirmation step.
+- Creation requires a selected folder, matching 12-character-or-longer password,
+  and Android authentication. Confirmation persists the versioned key manifest
+  and device-bound envelope; cancellation removes the provisional Keystore alias.
+- Eleven new repository/controller/widget tests bring focused sync coverage to
+  96 and the full Flutter suite to 343. Scoped V11 analysis is clean, and the
+  rebuilt APK installs preserving data and launches on the connected phone.
+- Application-data publication, joining a second phone, rebind/recovery UI, and
+  a user-completed physical cryptographic enrollment remain pending.
+- A dedicated physical RMX3301 diagnostic then measured the production Argon2id
+  profile at 1,670 ms for group creation and 1,000 ms for password unlock without
+  an out-of-memory failure. The normal APK was rebuilt, reinstalled preserving
+  data, relaunched, and confirmed as the resumed activity afterward.
+- Added immutable, idempotent group-manifest publication through Android SAF.
+  Temporary bytes are read back before finalization, rename is preferred, and a
+  verified-copy fallback supports document providers without rename.
+- The publisher refuses to overwrite different bytes for the same group. Folder
+  failure or conflict preserves local enrollment and exposes an honest retry;
+  successful UI copy says only that Syncthing can transport the file.
+- Four publisher bridge tests and one publication-retry controller test bring
+  focused sync coverage to 101 and the full suite to 348. Scoped analysis is
+  clean and the native APK compiles. The previously connected phone was offline,
+  so physical SAF publication remains explicitly pending.
+- Added read-only joining-phone manifest discovery. Android returns only exact
+  finalized group-manifest names with a 64 KiB ceiling; Dart repeats the group,
+  protocol, suite, KDF, and envelope-shape checks before any expensive KDF work.
+- The multi-device Settings card can search and report valid groups and rejected
+  files without enrolling, decrypting, importing, or changing local SQLite data.
+  Seven added checks bring sync coverage to 108 and the full suite to 355. Scoped
+  analysis is clean; the APK compiles, installs preserving data, and launches on
+  the wirelessly connected RMX3301. Physical SAF discovery with a user-selected
+  folder and data bootstrap remain pending.
+- Added password-or-recovery linking for a validated discovered group. Correct
+  credentials are followed by Android system authentication; the same group ID
+  and DEK are protected with this phone's Keystore key without creating a second
+  group or touching the private SQLite database.
+- Wrong credentials, cancelled authentication, and persistence failures leave no
+  enrollment; a provisional device alias is removed after a failed save and the
+  mutable clear-key buffer is erased. Seven new checks bring focused sync coverage
+  to 115 and the complete suite to 362. Scoped analysis is clean; the APK builds,
+  installs preserving data, and launches on RMX3301. User-completed physical
+  folder/password/biometric linking and bootstrap/merge decisions remain.
+- Added a read-only joining-phone data inspection across goals, tasks, calendar
+  events, focus sessions, completion events, routines, and routine runs. Empty
+  phones record an empty-bootstrap intent; populated phones require an explicit
+  merge-or-replace choice before secure enrollment can finish.
+- The choice is persisted but no data is changed yet. Replacement remains gated
+  on a verified recovery snapshot. Five new checks bring sync coverage to 120 and
+  the complete suite to 367; scoped analysis is clean and full analysis retains
+  only the unrelated existing temporary `sqlite3` notice. The debug APK builds,
+  installs preserving app data, and launches as the resumed activity on RMX3301.
+- Added full encrypted recovery snapshots after explicit user authorization.
+  MichiFocus snapshots with `VACUUM INTO`, validates the isolated 12-table SQLite
+  copy, encrypts/authenticates it with the group DEK, and asks Android SAF to
+  verify the immutable final artifact without exposing the live database.
+- Populated new joins fail closed until the snapshot succeeds. Previously
+  enrolled phones receive a post-enrollment action protected by Android system
+  authentication; no group-password re-entry is required. Failed publication
+  preserves both local data and enrollment and removes private temporaries.
+- Nine new checks bring sync coverage to 129 and the complete suite to 376.
+  Drift generation and scoped analysis pass; full analysis retains only the
+  unrelated existing temporary `sqlite3` notice. The debug APK builds, installs
+  preserving data, and launches on RMX3301. Physical user-confirmed SAF snapshot
+  creation and application-data exchange remain pending.
+
+### V11-M3 - Core goals, tasks, and calendar convergence
+
+Priority: 5
+
+Status: In Progress
+
+Objective:
+Deliver the first useful multi-device slice for stable mutable user data before
+adding routines and focus history.
+
+Deliverables:
+- [ ] Synchronize goal create/edit/delete and task detachment rules.
+- [x] Synchronize task create, planning fields, goal link, status, and deletion.
+- [ ] Synchronize calendar event create and deletion behavior.
+- [ ] Merge concurrent disjoint fields automatically.
+- [ ] Surface same-field and delete/update conflicts.
+- [ ] Preserve tombstones across long-offline delivery.
+
+Quality gates:
+- [ ] Two-, three-, and four-device permutations converge without duplicates.
+- [ ] Foreign keys and task-completion history remain valid under every delivery order.
+- [ ] Existing single-device Goals, Tasks, Calendar, and reports do not regress.
+
+Progress on 2026-08-15:
+- Goal, task, and calendar create/mutation paths now generate causal operations
+  atomically with their local SQLite work when multiple-device mode is enrolled.
+- An authenticated action encrypts pending operations and publishes immutable
+  files only beneath this installation's directory; failures remain retryable.
+- The Settings warning that transfer was inactive was replaced by the real
+  `Preparar cambios para Syncthing` action and honest local publication status.
+- Remote scanning, application, conflict surfacing, calendar deletion, and the
+  convergence quality gates remain open; therefore no deliverable above is yet
+  marked complete.
+- Scoped analysis and all 393 tests pass. The debug APK builds with Java 17,
+  installs preserving data, launches, and remains running on RMX3301.
+
+Incoming progress on 2026-08-15:
+- Android SAF now enumerates bounded canonical operation files only from other
+  installation directories. Dart repeats path/envelope checks, authenticates
+  and decrypts the payload, rejects foreign or unsupported operations, and
+  processes dependencies in goal/routine/task/calendar order.
+- Task create/update/delete and compatible field merges apply transactionally
+  with the applied-operation ledger and causal versions. Exact repeats are
+  no-ops; concurrent same-field and delete/update work creates a durable
+  conflict rather than overwriting or resurrecting deleted data.
+- Settings now exposes `Revisar cambios recibidos`, requires Android
+  authentication, creates the encrypted recovery snapshot first when needed,
+  reports applied/conflict/deferred/rejected counts, and refreshes app data only
+  after commit. Calendar deletion, conflict choices, quarantine movement, and
+  multi-phone convergence gates remain open.
+- Clean scoped analysis and the complete 399-test suite pass after the incoming
+  application, routine publication, idempotency, same-field conflict, and
+  delayed-update-after-delete coverage.
+- The final release APK compiles with the Android SAF scanner, installs with
+  `adb install -r` preserving data, launches, and remains focused/running on the
+  RMX3301. User-authenticated folder review and two-phone Syncthing transport
+  remain the physical acceptance gate.
+- Added idempotent initial publication for mutable data that existed before
+  enrollment. Preparing changes queues goals, routine aggregates, tasks, and
+  calendar events in dependency order only when the entity has no causal history,
+  tombstone, or prior outbox operation.
+- The eligibility check, counter advance, outbox insertion, and initial field
+  versions are transactional. Repeating preparation keeps the same four logical
+  operations in the populated fixture instead of creating duplicates.
+- Drift generation, formatting, clean `lib`/`test` analysis, focused bootstrap,
+  key-buffer, publisher/discovery, and controller tests, and the complete
+  404-test suite pass. Empty-device
+  restore, replace-local execution, immutable history, and physical two-phone
+  transport/application remain pending.
+- Physical inspection then identified two independent blockers: the populated
+  Poco retained `restoreIntoEmpty` while reporting 18 local records, and Realme
+  retained four operations after nested SAF publication failed.
+- Bootstrap now runs for every enrollment except explicit `replaceLocal`, skips
+  remote-origin baselines, and repairs an older local-only update with one full
+  create baseline. Operation publication/discovery uses unique flat root names
+  because root-level manifests and encrypted recovery files already work on both
+  selected Android document providers.
+- A follow-up Realme diagnostic found that Android returned the unwrapped DEK as
+  an unmodifiable byte list, so secure erasure threw after publication. The
+  controller now makes an explicitly mutable short-lived copy before use and
+  erases that copy; tests exercise an unmodifiable platform result.
+- The first flat operation name was still about 137 characters. It is now a
+  bounded hexadecimal `michifocus-op-...` name of about 108 characters while
+  retaining owner, counter, and operation identity. This addresses document
+  providers whose practical filename limit is shorter than the filesystem's
+  nominal limit. Release APK installation succeeds on Poco and Realme without
+  clearing data; authenticated two-phone publication and transport remain open.
+
+Tracks:
+- `REQ-V11-004`
+- `REQ-V11-005`
+
+### V11-M4 - Routine aggregates and immutable history
+
+Priority: 6
+
+Status: In Progress
+
+Objective:
+Synchronize routine definitions and completed history without duplicating daily
+materialization or inventing report data.
+
+Deliverables:
+- [x] Synchronize routine template, weekdays, ordered items, lifecycle, and reminders as an aggregate.
+- [ ] Preserve one logical routine occurrence and item materialization per existing key.
+- [ ] Append and deduplicate routine-run, item-run, Pomodoro-session, and
+      task-completion history.
+- [ ] Recompute conservative reporting trust metadata and derived statistics.
+- [ ] Defer dependent history until its required parent data is available.
+
+Quality gates:
+- [ ] Simultaneous daily reconciliation on four phones creates one logical occurrence.
+- [ ] Archived/deleted templates, task links, snapshots, mood, optional items,
+      skips, missed runs, and reminders retain current semantics.
+- [ ] Converged phones produce equivalent report inputs and totals.
+
+Progress on 2026-08-15:
+- Routine create/edit, pause/resume, archive/restore, and guarded deletion now
+  produce encrypted causal operations. Templates carry weekdays, ordered items,
+  goal links, optionality, reminders, and Pomodoro preferences as one aggregate.
+- A received aggregate applies through the existing Drift aggregate transaction;
+  retries are idempotent and lifecycle operations share one aggregate causal
+  field so concurrent routine intent cannot be silently split.
+- Routine runs, item runs, completion history, Focus history, report trust, and
+  four-phone materialization convergence remain open.
+
+Tracks:
+- `REQ-V11-004`
+- `REQ-V11-005`
+
+### V11-M5 - Conflict center, tombstones, and deterministic resolution
+
+Priority: 7
+
+Status: Proposed
+
+Objective:
+Make unavoidable concurrent intent visible and ensure one resolution converges
+on every active phone.
+
+Deliverables:
+- [ ] Add a conflict center grouped by entity and origin device.
+- [ ] Show local, remote, and relevant merged context with friendly device names.
+- [ ] Offer use-local, use-remote, and safe preserve-both actions where applicable.
+- [ ] Publish every resolution as a causally newer operation.
+- [ ] Implement delete/update resolution and resurrection prevention.
+- [ ] Distinguish user conflicts from quarantined integrity/protocol failures.
+
+Quality gates:
+- [ ] Concurrent same-field, delete/update, duplicate resolution, delayed
+      resolution, and third-device arrival cases converge.
+- [ ] No conflict is silently resolved by wall-clock ordering.
+- [ ] Spanish, English, 320 px, large text, light/dark, and accessibility checks pass.
+
+Tracks:
+- `REQ-V11-005`
+- `REQ-V11-007`
+
+### V11-M6 - Pomodoro ownership and completed-result synchronization
+
+Priority: 8
+
+Status: Proposed
+
+Objective:
+Synchronize useful Focus outcomes while keeping the active timer safe and honest
+under delayed file transport.
+
+Deliverables:
+- [ ] Keep `pomodoro_runtime` local to its origin phone.
+- [ ] Publish and display last-known task/device ownership as informational state.
+- [ ] Synchronize completed session, task progress, completion event, mood, and
+      routine outcome as one logical result.
+- [ ] Preserve simultaneous legitimate sessions without dropping focused time.
+- [ ] Explain that disconnected phones cannot provide a global timer lock.
+
+Quality gates:
+- [ ] Running, paused, break, early-stop, complete, mood-pending, restart, and
+      owner-offline cases preserve current local recovery.
+- [ ] Contradictory task state becomes a deterministic merge or visible conflict.
+- [ ] No remote operation starts, stops, transfers, or reconstructs a live countdown.
+
+Tracks:
+- `REQ-V11-006`
+
+### V11-M7 - Status, guidance, retention, and device lifecycle
+
+Priority: 9
+
+Status: Proposed
+
+Objective:
+Make the feature understandable and keep its files bounded without abandoning
+offline devices silently.
+
+Deliverables:
+- [ ] Show device, folder, local publication, remote observation, conflict, and
+      last-processing status without claiming unobservable transport completion.
+- [ ] Add `Preparar y revisar cambios` and `Abrir Syncthing` actions.
+- [ ] Add bilingual Syncthing background, battery, run-condition, folder, and
+      overlap-online instructions.
+- [ ] Add acknowledgement watermarks, safe snapshot compaction, and retention.
+- [ ] Add rename, disconnect, retire, stale-device, lost-folder, and recovery flows.
+- [ ] Preserve the selected folder and other phones' files when leaving the group.
+
+Quality gates:
+- [ ] File growth remains within the approved bound after high-volume compaction.
+- [ ] No tombstone is removed while an active device can still need it.
+- [ ] Device retirement and rejoin cannot grant stale write authority silently.
+- [ ] Settings remain simple in single-device mode and responsive in multi-device mode.
+
+Tracks:
+- `REQ-V11-007`
+- `REQ-V11-008`
+
+### V11-M8 - Integrated multi-device verification and documentation
+
+Priority: 10
+
+Status: Proposed
+
+Objective:
+Verify the complete system with simulations and real Android phones before
+declaring synchronization stable.
+
+Deliverables:
+- [ ] Run adversarial two-, three-, and four-device operation permutations.
+- [ ] Run migration, corruption, interruption, permission-loss, reinstall,
+      stale-device, clock-skew, retention, and high-volume tests.
+- [ ] Verify two physical Android phones with Syncthing-Fork in foreground,
+      background, delayed, offline, restart, and battery-restricted conditions.
+- [ ] Verify tasks, goals, calendar, routines, completed Pomodoros, conflicts,
+      reports, backup, restore, and mode transitions end to end.
+- [ ] Update database, architecture, UI, routing, requirements, traceability,
+      client manuals, quick-start, troubleshooting, and changelog.
+
+Definition of done:
+- [ ] Every REQ-V11 requirement has direct evidence and no unresolved critical finding.
+- [ ] Drift generation, formatting, clean analyzer, focused tests, and full suite pass.
+- [ ] Single-device mode has no verified regression.
+- [ ] Two-phone physical evidence proves eventual delivery and conflict convergence.
+- [ ] Limitations and Syncthing dependency are clear in Spanish and English.
+- [ ] The release retains an immediate recovery path to a verified local snapshot.
+
+Tracks:
+- `REQ-V11-001`
+- `REQ-V11-002`
+- `REQ-V11-003`
+- `REQ-V11-004`
+- `REQ-V11-005`
+- `REQ-V11-006`
+- `REQ-V11-007`
+- `REQ-V11-008`
+- `REQ-V11-009`
+- `REQ-V11-010`

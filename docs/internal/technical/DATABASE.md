@@ -11,7 +11,7 @@ The current local persistence model uses one Drift-managed SQLite file,
 
 Current Drift-backed SQLite store:
 
-The unified database is currently at schema version 5. The `Introduced` column
+The unified database is currently at schema version 6. The `Introduced` column
 records the first unified-schema version containing each table.
 
 | SQLite table | Introduced | Purpose |
@@ -28,6 +28,13 @@ records the first unified-schema version containing each table.
 | `routine_items` | 5 | Ordered task templates scheduled within a routine. |
 | `routine_runs` | 5 | Dated routine occurrence and immutable routine snapshots. |
 | `routine_item_runs` | 5 | Idempotent task materialization link and historical item outcome. |
+| `sync_local_state` | 6 | Per-group installation identity, protocol version, and monotonic local counter. |
+| `sync_outbox` | 6 | Durable local operation descriptions awaiting immutable publication. |
+| `sync_applied_operations` | 6 | Idempotency ledger for validated remote operations. |
+| `sync_entity_versions` | 6 | Per-field causal versions without rewriting legacy entity IDs. |
+| `sync_tombstones` | 6 | Causal deletion records retained for offline devices. |
+| `sync_conflicts` | 6 | Durable unresolved/resolved conflict candidates. |
+| `sync_acknowledgements` | 6 | Per-observer progress watermarks for each origin device. |
 
 Logical relationships:
 
@@ -48,6 +55,8 @@ Important boundary:
   Pomodoro history links.
 - Settings and timer preferences are stored through the local JSON settings
   repository, not as Drift tables and not as part of database backups.
+- The 12 application-data tables remain unchanged. Schema 6 adds seven private
+  synchronization-metadata tables; none is a second live user database.
 - Database export checkpoints the active timer, creates a consistent SQLite
   snapshot with `VACUUM INTO`, and exports only that `michifocus.sqlite` file.
 - Database import selects a local backup folder, stages `michifocus.sqlite`,
@@ -437,4 +446,30 @@ Theme, language, typography, profile, timer preferences, selected folders,
 exported reports, and exported database backups remain available. Verification
 populated all tables, cleared them, retained schema version 5, and passed
 `PRAGMA foreign_key_check`.
+
+## V11 incoming causal application
+
+Finalized encrypted operation files are never opened as databases. After SAF
+path validation, authenticated decryption, group/protocol checks, and causal
+classification, supported goal, task, calendar-event, and routine changes apply
+to the private `michifocus.sqlite` inside one Drift transaction together with
+their `sync_applied_operations`, field-version, tombstone, or conflict record.
+Exact repeats are no-ops. Missing parents remain unapplied so a later folder
+review can retry them. Routine templates, weekdays, and ordered items use the
+existing aggregate transaction. A stale or concurrent update cannot remove a
+tombstone and revive deleted data silently.
+
+## V11 initial mutable-data bootstrap
+
+Preparing encrypted changes now scans the existing mutable goals, routine
+aggregates, tasks, and calendar events in dependency order. An entity is queued
+as a causal `create` when it has no tombstone, no prior local create, and no
+remote-origin baseline. A local-only update from an older build is repaired by
+one later full create baseline; repeating the preparation sees that create and
+skips it. The eligibility check, logical
+counter advance, outbox insert, and initial field versions share one Drift
+transaction. Repeating preparation is therefore idempotent and does not modify
+the application row. No schema change was required. Pomodoro sessions,
+completion events, and routine-run history remain excluded until their
+append-only synchronization contract is implemented.
 

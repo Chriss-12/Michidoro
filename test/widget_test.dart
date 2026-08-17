@@ -18,6 +18,7 @@ import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/notification_settings_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/pages/settings_page.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/local_app_lock_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
@@ -74,7 +75,9 @@ void main() {
       durationMinutes: 120,
     );
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(
+      MyApp(localAppLockController: LocalAppLockController()),
+    );
 
     expect(find.text('MichiDoro'), findsOneWidget);
     expect(find.text('0%'), findsOneWidget);

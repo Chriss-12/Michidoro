@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -49,32 +48,32 @@ class RoutinesView extends StatelessWidget {
       barrierLabel: context.tr('Crear rutina', 'Create routine'),
       barrierColor: Theme.of(
         context,
-      ).colorScheme.scrim.withValues(alpha: 0.28),
-      transitionDuration: const Duration(milliseconds: 220),
+      ).colorScheme.scrim.withValues(alpha: 0.46),
+      transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (dialogContext, _, _) {
         final size = MediaQuery.sizeOf(dialogContext);
         return SizedBox.expand(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: SafeArea(
-              minimum: const EdgeInsets.all(12),
-              child: Center(
-                child: Material(
-                  key: const ValueKey('routine-create-dialog'),
-                  color: palette.surface,
-                  elevation: 12,
-                  shadowColor: palette.textPrimary.withValues(alpha: 0.2),
-                  clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            minimum: const EdgeInsets.all(12),
+            child: Center(
+              child: Material(
+                key: const ValueKey('routine-create-dialog'),
+                color: palette.surface,
+                elevation: 10,
+                shadowColor: palette.textPrimary.withValues(alpha: 0.22),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: math.min(size.width - 24, 560),
-                    height: math.min(size.height - 48, 840),
-                    child: RoutineEditorPage(
-                      onResult: (saved) => Navigator.of(
-                        dialogContext,
-                        rootNavigator: true,
-                      ).pop(saved),
-                    ),
+                  side: BorderSide(color: palette.neutralSoft),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: math.min(size.width - 24, 560),
+                  height: math.min(size.height - 48, 840),
+                  child: RoutineEditorPage(
+                    onResult: (saved) => Navigator.of(
+                      dialogContext,
+                      rootNavigator: true,
+                    ).pop(saved),
                   ),
                 ),
               ),
@@ -91,7 +90,7 @@ class RoutinesView extends StatelessWidget {
         return FadeTransition(
           opacity: curved,
           child: ScaleTransition(
-            scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
+            scale: Tween<double>(begin: 0.985, end: 1).animate(curved),
             child: child,
           ),
         );

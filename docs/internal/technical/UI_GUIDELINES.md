@@ -23,10 +23,12 @@ Build Material 3 UI with clear spacing, accessible labels, responsive layouts, a
 - Multi-step editors must keep one stable progress header, consistently grouped
   controls, and a fixed full-width action footer. Modal editors must use the same
   section hierarchy and remain scrollable at supported portrait text sizes.
-- In-context creation flows may use a bounded modal with a blurred barrier when
-  the user should remain anchored to the source view. Preserve `SafeArea`,
-  keyboard resizing, fixed actions, and dirty-draft protection; do not compress
-  multi-step forms into a small dialog.
+- In-context creation flows may use a bounded modal with a dimmed barrier when
+  the user should remain anchored to the source view. Large modal editors must
+  use an opaque themed canvas and avoid live full-screen blur, which can cause
+  frame drops on high-resolution phones. Preserve `SafeArea`, keyboard resizing,
+  fixed actions, and dirty-draft protection; do not compress multi-step forms
+  into a small dialog.
 - Compact list filters must use an anchored content-sized menu rather than a
   full-width form field. Avoid redundant floating labels such as `Show` when the
   selected value and filter icon already communicate the control's purpose.

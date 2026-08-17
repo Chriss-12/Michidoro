@@ -20,6 +20,17 @@ import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routi
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:pomodoro_app_v1/features/splash/presentation/pages/splash_page.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/device_identity_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/local_app_lock_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_group_enrollment_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_storage_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/device_identity_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/local_app_lock_gate.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/local_app_lock_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_group_enrollment_scope.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_storage_scope.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations.dart';
@@ -37,22 +48,73 @@ Future<void> main() async {
 }
 
 class AppBootstrap extends StatefulWidget {
-  const AppBootstrap({super.key});
+  const AppBootstrap({
+    this.startupAuthenticator,
+    this.initializeApp,
+    this.initializedApp,
+    super.key,
+  });
+
+  final LocalDeviceAuthenticator? startupAuthenticator;
+  final Future<void> Function()? initializeApp;
+  final Widget? initializedApp;
 
   @override
   State<AppBootstrap> createState() => _AppBootstrapState();
 }
 
 class _AppBootstrapState extends State<AppBootstrap> {
-  late Future<void> _initialization = _startInitialization();
+  late final LocalDeviceAuthenticator _startupAuthenticator;
+  Future<void>? _initialization;
+  bool _isAuthenticating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startupAuthenticator =
+        widget.startupAuthenticator ?? const AndroidLocalDeviceAuthenticator();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_requestStartupAuthentication());
+    });
+  }
 
   Future<void> _startInitialization() {
-    return _initializeApp().timeout(const Duration(seconds: 30));
+    return (widget.initializeApp ?? _initializeApp)().timeout(
+      const Duration(seconds: 30),
+    );
+  }
+
+  Future<void> _requestStartupAuthentication() async {
+    if (_isAuthenticating || _initialization != null) return;
+
+    setState(() => _isAuthenticating = true);
+    var authenticated = false;
+    try {
+      if (await _startupAuthenticator.isAvailable()) {
+        authenticated = await _startupAuthenticator.authenticate();
+      }
+    } on Object {
+      authenticated = false;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isAuthenticating = false;
+      if (authenticated) {
+        _initialization = _startInitialization();
+      }
+    });
   }
 
   Future<void> _initializeApp() async {
     await appSettingsController.applyPendingDatabaseImport();
     await configureDependencies();
+    final localAppLockController = serviceLocator<LocalAppLockController>();
+    await localAppLockController.loadPolicy();
+    localAppLockController.authenticationSucceeded();
+    await serviceLocator<SyncStorageController>().load();
+    await serviceLocator<DeviceIdentityController>().initialize();
+    await serviceLocator<SyncGroupEnrollmentController>().load();
     final routinesController = serviceLocator<RoutinesController>();
     final reconciliation = await routinesController.reconcileToday();
     if (reconciliation == null) {
@@ -77,19 +139,54 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
   @override
   Widget build(BuildContext context) {
+    final initialization = _initialization;
+    if (initialization == null) {
+      return _StartupAuthenticationApp(
+        isAuthenticating: _isAuthenticating,
+        onUnlockRequested: () => unawaited(_requestStartupAuthentication()),
+      );
+    }
+
     return FutureBuilder<void>(
-      future: _initialization,
+      future: initialization,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _StartupFailureApp(onRetry: _retry);
         }
 
         if (snapshot.connectionState == ConnectionState.done) {
-          return const MyApp();
+          return widget.initializedApp ?? const MyApp();
         }
 
         return const _StartupSplashApp();
       },
+    );
+  }
+}
+
+class _StartupAuthenticationApp extends StatelessWidget {
+  const _StartupAuthenticationApp({
+    required this.isAuthenticating,
+    required this.onUnlockRequested,
+  });
+
+  final bool isAuthenticating;
+  final VoidCallback onUnlockRequested;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      locale: appSettingsController.language.value.locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      onGenerateTitle: (context) => context.l10n.appTitle,
+      theme: AppTheme.fromPreset(AppThemePreset.natureFocus, isDark: false),
+      home: LocalAppLockGate(
+        isLocked: true,
+        onUnlockRequested: isAuthenticating ? null : onUnlockRequested,
+        child: const SizedBox.shrink(),
+      ),
     );
   }
 }
@@ -169,7 +266,18 @@ class _StartupFailureApp extends StatelessWidget {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({
+    this.localAppLockController,
+    this.deviceIdentityController,
+    this.syncGroupEnrollmentController,
+    this.syncStorageController,
+    super.key,
+  });
+
+  final LocalAppLockController? localAppLockController;
+  final DeviceIdentityController? deviceIdentityController;
+  final SyncGroupEnrollmentController? syncGroupEnrollmentController;
+  final SyncStorageController? syncStorageController;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -179,10 +287,32 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final ScheduledTaskReminderController _scheduledTaskReminders;
   RoutineReminderScheduler? _routineReminders;
   Timer? _routineRolloverTimer;
+  late final LocalAppLockController _localAppLockController;
+  late final DeviceIdentityController _deviceIdentityController;
+  late final SyncGroupEnrollmentController _syncGroupEnrollmentController;
+  late final SyncStorageController _syncStorageController;
 
   @override
   void initState() {
     super.initState();
+    _localAppLockController =
+        widget.localAppLockController ??
+        serviceLocator<LocalAppLockController>();
+    _syncStorageController =
+        widget.syncStorageController ??
+        (serviceLocator.isRegistered<SyncStorageController>()
+            ? serviceLocator<SyncStorageController>()
+            : SyncStorageController());
+    _deviceIdentityController =
+        widget.deviceIdentityController ??
+        (serviceLocator.isRegistered<DeviceIdentityController>()
+            ? serviceLocator<DeviceIdentityController>()
+            : DeviceIdentityController());
+    _syncGroupEnrollmentController =
+        widget.syncGroupEnrollmentController ??
+        (serviceLocator.isRegistered<SyncGroupEnrollmentController>()
+            ? serviceLocator<SyncGroupEnrollmentController>()
+            : SyncGroupEnrollmentController());
     WidgetsBinding.instance.addObserver(this);
     _scheduledTaskReminders = ScheduledTaskReminderController(
       settingsController: appSettingsController,
@@ -213,10 +343,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final pomodoroController = serviceLocator<PomodoroController>();
     if (state != AppLifecycleState.resumed) {
+      _localAppLockController.onBackgrounded();
       unawaited(pomodoroController.checkpointRuntime());
       return;
     }
 
+    _localAppLockController.onResumed();
     unawaited(pomodoroController.synchronizeWithClock());
     unawaited(_reconcileRoutineTasks());
     _scheduleRoutineRollover();
@@ -227,6 +359,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     await serviceLocator<RoutinesController>().reconcileToday();
     await serviceLocator<TasksController>().loadTasks();
     await _routineReminders?.synchronize();
+  }
+
+  Future<void> _requestLocalUnlock() async {
+    await _localAppLockController.requestUnlock();
   }
 
   Future<void> _deleteAllDatabaseData() async {
@@ -290,6 +426,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final fontScale = controller.fontScale.value;
         final typographyPreset = controller.typographyPreset.value;
         final language = controller.language.value;
+        final isLocallyLocked = _localAppLockController.isLocked.value;
 
         return MaterialApp.router(
           locale: language.locale,
@@ -306,6 +443,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               child: ResponsiveBreakpoints.builder(
                 child: SignalBuilder(
                   builder: (context) {
+                    if (isLocallyLocked) {
+                      return LocalAppLockGate(
+                        isLocked: true,
+                        onUnlockRequested: () => unawaited(
+                          _requestLocalUnlock(),
+                        ),
+                        child: const SizedBox.shrink(),
+                      );
+                    }
+
                     final settingsScope = AppSettingsScope(
                       themePreset: controller.themePreset.value,
                       isDarkMode: controller.isDarkMode.value,
@@ -489,7 +636,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       onDeleteAllDatabaseData: _deleteAllDatabaseData,
                       onTestNotification: controller.sendTestNotification,
                       onClearNotifications: controller.clearNotifications,
-                      child: routeChild,
+                      child: SyncStorageScope(
+                        controller: _syncStorageController,
+                        child: SyncGroupEnrollmentScope(
+                          controller: _syncGroupEnrollmentController,
+                          child: DeviceIdentityScope(
+                            controller: _deviceIdentityController,
+                            child: LocalAppLockScope(
+                              controller: _localAppLockController,
+                              child: routeChild,
+                            ),
+                          ),
+                        ),
+                      ),
                     );
 
                     return SignalBuilder(

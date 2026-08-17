@@ -48,6 +48,11 @@ void main() {
 
     expect(find.text('Información'), findsOneWidget);
     expect(find.text('Paso 1 de 4'), findsOneWidget);
+    expect(find.text('Lista diaria'), findsOneWidget);
+    expect(find.text('Mañana'), findsOneWidget);
+    expect(find.text('Trabajo'), findsOneWidget);
+    expect(find.text('Ejercicio'), findsOneWidget);
+    expect(find.text('Estudio'), findsOneWidget);
     await expectLater(
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/routine_editor_step_1.png'),
@@ -121,6 +126,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('continue-routine')));
     await tester.pumpAndSettle();
     expect(find.text('Days'), findsOneWidget);
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const ValueKey('routine-weekday-1'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('routine-weekday-1')));
     await tester.tap(find.byKey(const ValueKey('continue-routine')));
     await tester.pumpAndSettle();
@@ -316,13 +326,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(RoutineEditorPage), findsOneWidget);
+    final canvas = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('routine-editor-canvas')),
+    );
+    final canvasDecoration = canvas.decoration as BoxDecoration;
+    expect(canvasDecoration.color, isNotNull);
+    expect(canvasDecoration.gradient, isNull);
     await expectLater(
       find.byKey(const ValueKey('routine-create-dialog')),
       matchesGoldenFile('goldens/routine_create_dialog.png'),
     );
 
     await tester.enterText(find.byType(TextField).first, 'Rutina modal');
-    await tester.tap(find.byTooltip('Volver'));
+    await tester.tap(find.byTooltip('Cerrar'));
     await tester.pumpAndSettle();
     expect(find.text('Descartar cambios'), findsOneWidget);
     await tester.tap(find.text('Descartar'));

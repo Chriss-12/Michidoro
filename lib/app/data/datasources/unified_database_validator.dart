@@ -19,6 +19,13 @@ class UnifiedDatabaseValidator {
     'routine_items',
     'routine_runs',
     'routine_item_runs',
+    'sync_local_state',
+    'sync_outbox',
+    'sync_applied_operations',
+    'sync_entity_versions',
+    'sync_tombstones',
+    'sync_conflicts',
+    'sync_acknowledgements',
   };
 
   static const requiredIndexes = {
@@ -46,6 +53,10 @@ class UnifiedDatabaseValidator {
     'routine_item_runs_routine_item_id_idx',
     'routine_item_runs_schedule_status_idx',
     'routine_item_runs_run_position_idx',
+    'sync_outbox_origin_counter_uq',
+    'sync_outbox_state_created_idx',
+    'sync_applied_origin_counter_uq',
+    'sync_conflicts_entity_status_idx',
   };
 
   static const _indexContracts = <String, _IndexContract>{
@@ -133,6 +144,24 @@ class UnifiedDatabaseValidator {
     'routine_item_runs_run_position_idx': _IndexContract(
       'routine_item_runs',
       ['routine_run_id', 'position_snapshot'],
+    ),
+    'sync_outbox_origin_counter_uq': _IndexContract(
+      'sync_outbox',
+      ['group_id', 'origin_device_id', 'origin_counter'],
+      unique: true,
+    ),
+    'sync_outbox_state_created_idx': _IndexContract(
+      'sync_outbox',
+      ['publication_state', 'created_at'],
+    ),
+    'sync_applied_origin_counter_uq': _IndexContract(
+      'sync_applied_operations',
+      ['group_id', 'origin_device_id', 'origin_counter'],
+      unique: true,
+    ),
+    'sync_conflicts_entity_status_idx': _IndexContract(
+      'sync_conflicts',
+      ['group_id', 'entity_type', 'entity_id', 'status'],
     ),
   };
 

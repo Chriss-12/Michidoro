@@ -380,6 +380,162 @@ class CalendarEventRecords extends Table {
   String get tableName => 'calendar_events';
 }
 
+class SyncLocalStateRecords extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get installationId => text()();
+  IntColumn get protocolVersion => integer()();
+  IntColumn get logicalCounter => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {groupId};
+  @override
+  List<String> get customConstraints => [
+    'CHECK (protocol_version >= 1)',
+    'CHECK (logical_counter >= 0)',
+  ];
+  @override
+  String get tableName => 'sync_local_state';
+}
+
+@TableIndex(
+  name: 'sync_outbox_origin_counter_uq',
+  columns: {#groupId, #originDeviceId, #originCounter},
+  unique: true,
+)
+@TableIndex(
+  name: 'sync_outbox_state_created_idx',
+  columns: {#publicationState, #createdAt},
+)
+class SyncOutboxRecords extends Table {
+  TextColumn get operationId => text()();
+  TextColumn get groupId => text()();
+  TextColumn get originDeviceId => text()();
+  IntColumn get originCounter => integer()();
+  TextColumn get entityType => text()();
+  TextColumn get entityId => text()();
+  TextColumn get parentVersionJson => text()();
+  TextColumn get changedFieldsJson => text()();
+  TextColumn get operationKind => text()();
+  IntColumn get protocolVersion => integer()();
+  TextColumn get payloadSha256 => text()();
+  TextColumn get publicationState =>
+      text().withDefault(const Constant('pending'))();
+  IntColumn get publicationAttempts =>
+      integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get publishedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {operationId};
+  @override
+  List<String> get customConstraints => [
+    'CHECK (origin_counter >= 1)',
+    'CHECK (protocol_version >= 1)',
+    "CHECK (publication_state IN ('pending', 'publishing', 'published', 'failed'))",
+    'CHECK (publication_attempts >= 0)',
+  ];
+  @override
+  String get tableName => 'sync_outbox';
+}
+
+@TableIndex(
+  name: 'sync_applied_origin_counter_uq',
+  columns: {#groupId, #originDeviceId, #originCounter},
+  unique: true,
+)
+class SyncAppliedOperationRecords extends Table {
+  TextColumn get operationId => text()();
+  TextColumn get groupId => text()();
+  TextColumn get originDeviceId => text()();
+  IntColumn get originCounter => integer()();
+  TextColumn get payloadSha256 => text()();
+  DateTimeColumn get appliedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {operationId};
+  @override
+  List<String> get customConstraints => ['CHECK (origin_counter >= 1)'];
+  @override
+  String get tableName => 'sync_applied_operations';
+}
+
+class SyncEntityVersionRecords extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get entityType => text()();
+  TextColumn get entityId => text()();
+  TextColumn get fieldName => text()();
+  TextColumn get causalVersionJson => text()();
+  TextColumn get operationId => text()();
+  TextColumn get originDeviceId => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {
+    groupId,
+    entityType,
+    entityId,
+    fieldName,
+  };
+  @override
+  String get tableName => 'sync_entity_versions';
+}
+
+class SyncTombstoneRecords extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get entityType => text()();
+  TextColumn get entityId => text()();
+  TextColumn get causalVersionJson => text()();
+  TextColumn get operationId => text()();
+  TextColumn get originDeviceId => text()();
+  DateTimeColumn get deletedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {groupId, entityType, entityId};
+  @override
+  String get tableName => 'sync_tombstones';
+}
+
+@TableIndex(
+  name: 'sync_conflicts_entity_status_idx',
+  columns: {#groupId, #entityType, #entityId, #status},
+)
+class SyncConflictRecords extends Table {
+  TextColumn get id => text()();
+  TextColumn get groupId => text()();
+  TextColumn get entityType => text()();
+  TextColumn get entityId => text()();
+  TextColumn get fieldName => text().nullable()();
+  TextColumn get candidatesJson => text()();
+  TextColumn get status => text().withDefault(const Constant('open'))();
+  TextColumn get resolutionOperationId => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get resolvedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+  @override
+  List<String> get customConstraints => [
+    "CHECK (status IN ('open', 'resolved'))",
+    "CHECK ((status = 'open' AND resolution_operation_id IS NULL AND resolved_at IS NULL) OR (status = 'resolved' AND resolution_operation_id IS NOT NULL AND resolved_at IS NOT NULL))",
+  ];
+  @override
+  String get tableName => 'sync_conflicts';
+}
+
+class SyncAcknowledgementRecords extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get observerDeviceId => text()();
+  TextColumn get originDeviceId => text()();
+  IntColumn get acknowledgedCounter => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {
+    groupId,
+    observerDeviceId,
+    originDeviceId,
+  };
+  @override
+  List<String> get customConstraints => ['CHECK (acknowledged_counter >= 0)'];
+  @override
+  String get tableName => 'sync_acknowledgements';
+}
+
 @DriftAccessor(tables: [GoalRecords])
 class GoalsDao extends DatabaseAccessor<MichiFocusDatabase>
     with _$GoalsDaoMixin {
@@ -2148,6 +2304,13 @@ class ReportsDao extends DatabaseAccessor<MichiFocusDatabase>
     RoutineRunRecords,
     RoutineItemRunRecords,
     CalendarEventRecords,
+    SyncLocalStateRecords,
+    SyncOutboxRecords,
+    SyncAppliedOperationRecords,
+    SyncEntityVersionRecords,
+    SyncTombstoneRecords,
+    SyncConflictRecords,
+    SyncAcknowledgementRecords,
   ],
   daos: [
     GoalsDao,
@@ -2163,7 +2326,7 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
   MichiFocusDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'michifocus'));
 
-  static const currentSchemaVersion = 5;
+  static const currentSchemaVersion = 6;
   @override
   int get schemaVersion => currentSchemaVersion;
   @override
@@ -2238,6 +2401,19 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
         await migrator.createIndex(routineItemRunsScheduleStatusIdx);
         await migrator.createIndex(routineItemRunsRunPositionIdx);
       }
+      if (from < 6) {
+        await migrator.createTable(syncLocalStateRecords);
+        await migrator.createTable(syncOutboxRecords);
+        await migrator.createTable(syncAppliedOperationRecords);
+        await migrator.createTable(syncEntityVersionRecords);
+        await migrator.createTable(syncTombstoneRecords);
+        await migrator.createTable(syncConflictRecords);
+        await migrator.createTable(syncAcknowledgementRecords);
+        await migrator.createIndex(syncOutboxOriginCounterUq);
+        await migrator.createIndex(syncOutboxStateCreatedIdx);
+        await migrator.createIndex(syncAppliedOriginCounterUq);
+        await migrator.createIndex(syncConflictsEntityStatusIdx);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA journal_mode = DELETE');
@@ -2252,6 +2428,13 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
 
   Future<void> clearAllUserData() async {
     await transaction(() async {
+      await delete(syncAcknowledgementRecords).go();
+      await delete(syncConflictRecords).go();
+      await delete(syncTombstoneRecords).go();
+      await delete(syncEntityVersionRecords).go();
+      await delete(syncAppliedOperationRecords).go();
+      await delete(syncOutboxRecords).go();
+      await delete(syncLocalStateRecords).go();
       await delete(pomodoroRuntimeRecords).go();
       await delete(routineItemRunRecords).go();
       await delete(routineRunRecords).go();

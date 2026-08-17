@@ -1,13 +1,25 @@
 import 'package:drift/drift.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/secure_sync_id_generator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_mutation_coordinator.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart'
     as domain;
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 
 class DriftTasksRepository implements TasksRepository {
-  DriftTasksRepository(this._dao);
+  DriftTasksRepository(
+    this._dao, {
+    SyncMutationCoordinator? sync,
+    SecureSyncIdGenerator? idGenerator,
+    DateTime Function()? clock,
+  }) : _sync = sync,
+       _idGenerator = idGenerator,
+       _clock = clock ?? DateTime.now;
 
   final TasksDao _dao;
+  final SyncMutationCoordinator? _sync;
+  final SecureSyncIdGenerator? _idGenerator;
+  final DateTime Function() _clock;
   int _idSequence = 0;
 
   @override
@@ -47,17 +59,32 @@ class DriftTasksRepository implements TasksRepository {
     String? goalId,
     int? durationMinutes,
   }) async {
-    final now = DateTime.now();
-    final record = await _dao.insertTask(
-      TaskRecordsCompanion.insert(
-        id: _createLocalId(now),
-        title: title,
-        status: Value(status._storageValue),
-        scheduledDate: Value(scheduledDate),
-        goalId: Value(goalId),
-        durationMinutes: Value(durationMinutes),
-        createdAt: now,
-        updatedAt: now,
+    final now = _clock();
+    final id = _createLocalId(now);
+    final record = await _run(
+      entityId: id,
+      operationKind: 'create',
+      changedFields: {
+        'title': title,
+        'status': status._storageValue,
+        'isCompleted': status.isCompleted,
+        'scheduledDate': scheduledDate?.millisecondsSinceEpoch,
+        'goalId': goalId,
+        'durationMinutes': durationMinutes,
+        'createdAt': now.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.insertTask(
+        TaskRecordsCompanion.insert(
+          id: id,
+          title: title,
+          status: Value(status._storageValue),
+          scheduledDate: Value(scheduledDate),
+          goalId: Value(goalId),
+          durationMinutes: Value(durationMinutes),
+          createdAt: now,
+          updatedAt: now,
+        ),
       ),
     );
 
@@ -66,10 +93,14 @@ class DriftTasksRepository implements TasksRepository {
 
   @override
   Future<domain.Task?> updateTaskTitle(String id, String title) async {
-    final record = await _dao.updateTitle(
+    final now = _clock();
+    final record = await _runUpdate(
       id: id,
-      title: title,
-      updatedAt: DateTime.now(),
+      changedFields: {
+        'title': title,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updateTitle(id: id, title: title, updatedAt: now),
     );
 
     return record == null ? null : _toDomain(record);
@@ -82,13 +113,25 @@ class DriftTasksRepository implements TasksRepository {
       return null;
     }
 
-    final record = await _dao.updateCompletion(
-      id: id,
-      isCompleted: !current.isCompleted,
-      status: current.isCompleted
-          ? domain.TaskStatus.listed._storageValue
-          : domain.TaskStatus.completed._storageValue,
-      updatedAt: DateTime.now(),
+    final now = _clock();
+    final isCompleted = !current.isCompleted;
+    final status = current.isCompleted
+        ? domain.TaskStatus.listed._storageValue
+        : domain.TaskStatus.completed._storageValue;
+    final record = await _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: {
+        'isCompleted': isCompleted,
+        'status': status,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updateCompletion(
+        id: id,
+        isCompleted: isCompleted,
+        status: status,
+        updatedAt: now,
+      ),
     );
 
     return record == null ? null : _toDomain(record);
@@ -99,11 +142,20 @@ class DriftTasksRepository implements TasksRepository {
     String id,
     domain.TaskStatus status,
   ) async {
-    final record = await _dao.updateStatus(
+    final now = _clock();
+    final record = await _runUpdate(
       id: id,
-      status: status._storageValue,
-      isCompleted: status.isCompleted,
-      updatedAt: DateTime.now(),
+      changedFields: {
+        'status': status._storageValue,
+        'isCompleted': status.isCompleted,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updateStatus(
+        id: id,
+        status: status._storageValue,
+        isCompleted: status.isCompleted,
+        updatedAt: now,
+      ),
     );
 
     return record == null ? null : _toDomain(record);
@@ -111,10 +163,18 @@ class DriftTasksRepository implements TasksRepository {
 
   @override
   Future<domain.Task?> scheduleTask(String id, DateTime? scheduledDate) async {
-    final record = await _dao.updateSchedule(
+    final now = _clock();
+    final record = await _runUpdate(
       id: id,
-      scheduledDate: scheduledDate,
-      updatedAt: DateTime.now(),
+      changedFields: {
+        'scheduledDate': scheduledDate?.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updateSchedule(
+        id: id,
+        scheduledDate: scheduledDate,
+        updatedAt: now,
+      ),
     );
 
     return record == null ? null : _toDomain(record);
@@ -122,10 +182,14 @@ class DriftTasksRepository implements TasksRepository {
 
   @override
   Future<domain.Task?> assignTaskToGoal(String id, String? goalId) async {
-    final record = await _dao.updateGoal(
+    final now = _clock();
+    final record = await _runUpdate(
       id: id,
-      goalId: goalId,
-      updatedAt: DateTime.now(),
+      changedFields: {
+        'goalId': goalId,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updateGoal(id: id, goalId: goalId, updatedAt: now),
     );
 
     return record == null ? null : _toDomain(record);
@@ -137,23 +201,70 @@ class DriftTasksRepository implements TasksRepository {
     required String? goalId,
     required int durationMinutes,
   }) async {
-    final record = await _dao.updatePlanning(
+    final now = _clock();
+    final record = await _runUpdate(
       id: id,
-      goalId: goalId,
-      durationMinutes: durationMinutes,
-      updatedAt: DateTime.now(),
+      changedFields: {
+        'goalId': goalId,
+        'durationMinutes': durationMinutes,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.updatePlanning(
+        id: id,
+        goalId: goalId,
+        durationMinutes: durationMinutes,
+        updatedAt: now,
+      ),
     );
 
     return record == null ? null : _toDomain(record);
   }
 
   @override
-  Future<void> deleteTask(String id) {
-    return _dao.deleteById(id);
+  Future<void> deleteTask(String id) async {
+    if (await _dao.findById(id) == null) return;
+    await _run<void>(
+      entityId: id,
+      operationKind: 'delete',
+      changedFields: const {},
+      mutate: () => _dao.deleteById(id),
+    );
   }
 
   String _createLocalId(DateTime now) {
-    return '${now.microsecondsSinceEpoch}-${_idSequence++}';
+    return _idGenerator?.create('task') ??
+        '${now.microsecondsSinceEpoch}-${_idSequence++}';
+  }
+
+  Future<TaskRecord?> _runUpdate({
+    required String id,
+    required Map<String, Object?> changedFields,
+    required Future<TaskRecord?> Function() mutate,
+  }) async {
+    if (await _dao.findById(id) == null) return null;
+    return _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: changedFields,
+      mutate: mutate,
+    );
+  }
+
+  Future<T> _run<T>({
+    required String entityId,
+    required String operationKind,
+    required Map<String, Object?> changedFields,
+    required Future<T> Function() mutate,
+  }) {
+    final sync = _sync;
+    if (sync == null) return mutate();
+    return sync(
+      entityType: 'task',
+      entityId: entityId,
+      operationKind: operationKind,
+      changedFields: changedFields,
+      mutate: mutate,
+    );
   }
 
   domain.Task _toDomain(TaskRecord record) {

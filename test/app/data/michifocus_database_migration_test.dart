@@ -51,7 +51,7 @@ void main() {
       expect(metadata, hasLength(1));
       expect(metadata.single.id, 'completion-history');
       expect(runtime, isEmpty);
-      expect(version.read<int>('user_version'), 5);
+      expect(version.read<int>('user_version'), 6);
       expect(await database.select(database.routineRecords).get(), isEmpty);
       expect(
         indexes.map((row) => row.read<String>('name')).toSet(),
@@ -73,6 +73,7 @@ void main() {
 
     final rawDatabase = sqlite3.open(file.path);
     _dropRoutineTables(rawDatabase);
+    _dropSyncTables(rawDatabase);
     rawDatabase
       ..execute('DROP TABLE pomodoro_runtime')
       ..execute(
@@ -102,7 +103,7 @@ void main() {
       columns.map((column) => column.read<String>('name')),
       contains('mood_prompt_pending'),
     );
-    expect(version.read<int>('user_version'), 5);
+    expect(version.read<int>('user_version'), 6);
   });
 
   test('migrates populated schema 3 and preserves active runtime', () async {
@@ -147,6 +148,7 @@ void main() {
 
     final rawDatabase = sqlite3.open(file.path);
     _dropRoutineTables(rawDatabase);
+    _dropSyncTables(rawDatabase);
     rawDatabase
       ..execute(
         'ALTER TABLE pomodoro_sessions DROP COLUMN mood_prompt_pending',
@@ -168,7 +170,7 @@ void main() {
     expect(runtime?.id, 'active-runtime');
     expect(runtime?.taskId, 'task-v3');
     expect(runtime?.isRunning, isTrue);
-    expect(version.read<int>('user_version'), 5);
+    expect(version.read<int>('user_version'), 6);
     expect(await database.select(database.routineRecords).get(), isEmpty);
   });
 
@@ -215,6 +217,7 @@ void main() {
 
     final rawDatabase = sqlite3.open(file.path);
     _dropRoutineTables(rawDatabase);
+    _dropSyncTables(rawDatabase);
     rawDatabase
       ..execute('PRAGMA user_version = 4')
       ..dispose();
@@ -246,7 +249,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      5,
+      6,
     );
 
     await database.close();
@@ -260,7 +263,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      5,
+      6,
     );
     expect(
       await database
@@ -273,6 +276,48 @@ void main() {
       5,
     );
   });
+
+  test('migrates populated schema 5 and preserves application rows', () async {
+    final directory = Directory.systemTemp.createTempSync(
+      'michifocus_schema_5_migration',
+    );
+    final file = File('${directory.path}/michifocus.sqlite');
+    var database = MichiFocusDatabase(NativeDatabase(file));
+    final now = DateTime(2026, 8, 14, 9);
+    await GoalsDao(database).insertGoal(
+      GoalRecordsCompanion.insert(
+        id: 'goal-v5',
+        title: 'Preserved goal',
+        targetSessions: 4,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await database.close();
+
+    final rawDatabase = sqlite3.open(file.path);
+    _dropSyncTables(rawDatabase);
+    rawDatabase
+      ..execute('PRAGMA user_version = 5')
+      ..dispose();
+
+    database = MichiFocusDatabase(NativeDatabase(file));
+    addTearDown(() async {
+      await database.close();
+      directory.deleteSync(recursive: true);
+    });
+
+    expect(
+      (await GoalsDao(database).findById('goal-v5'))?.title,
+      'Preserved goal',
+    );
+    expect(await database.select(database.syncOutboxRecords).get(), isEmpty);
+    expect(
+      (await database.customSelect('PRAGMA user_version').getSingle())
+          .read<int>('user_version'),
+      6,
+    );
+  });
 }
 
 void _dropRoutineTables(Database database) {
@@ -282,6 +327,17 @@ void _dropRoutineTables(Database database) {
     ..execute('DROP TABLE routine_items')
     ..execute('DROP TABLE routine_days')
     ..execute('DROP TABLE routines');
+}
+
+void _dropSyncTables(Database database) {
+  database
+    ..execute('DROP TABLE sync_acknowledgements')
+    ..execute('DROP TABLE sync_conflicts')
+    ..execute('DROP TABLE sync_tombstones')
+    ..execute('DROP TABLE sync_entity_versions')
+    ..execute('DROP TABLE sync_applied_operations')
+    ..execute('DROP TABLE sync_outbox')
+    ..execute('DROP TABLE sync_local_state');
 }
 
 void _createSchemaOne(Database database) {

@@ -196,22 +196,32 @@ class _RoutineEditorPageState extends State<RoutineEditorPage> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final isCreateDialog = widget.onResult != null;
+    final editorBackground = Color.alphaBlend(
+      palette.primaryMuted.withValues(alpha: 0.22),
+      palette.surface,
+    );
     return PopScope<bool>(
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _requestClose();
       },
       child: Scaffold(
+        key: const ValueKey('routine-editor-scaffold'),
         resizeToAvoidBottomInset: true,
-        backgroundColor: palette.background,
+        backgroundColor: isCreateDialog ? editorBackground : palette.background,
         appBar: AppBar(
           backgroundColor: palette.surface,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
           leading: IconButton(
-            tooltip: context.tr('Volver', 'Back'),
+            tooltip: isCreateDialog
+                ? context.tr('Cerrar', 'Close')
+                : context.tr('Volver', 'Back'),
             onPressed: _requestClose,
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: Icon(
+              isCreateDialog ? Icons.close_rounded : Icons.arrow_back_rounded,
+            ),
           ),
           title: Text(
             widget.routineId == null
@@ -220,7 +230,10 @@ class _RoutineEditorPageState extends State<RoutineEditorPage> {
           ),
         ),
         body: DecoratedBox(
-          decoration: palette.appBackgroundDecoration,
+          key: const ValueKey('routine-editor-canvas'),
+          decoration: isCreateDialog
+              ? BoxDecoration(color: editorBackground)
+              : palette.appBackgroundDecoration,
           child: SafeArea(
             top: false,
             child: _loading
@@ -511,41 +524,67 @@ class _IdentityStep extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 18),
-      _SectionLabel(
-        icon: Icons.apps_rounded,
-        label: context.tr('Icono', 'Icon'),
-      ),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          for (final entry in _routineIcons.entries)
-            _ChoiceIcon(
-              selected: draft.iconKey == entry.key,
-              icon: entry.value,
-              tooltip: entry.key,
-              onPressed: () => onChanged(draft.copyWith(iconKey: entry.key)),
+      _EditorSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel(
+              icon: Icons.apps_rounded,
+              label: context.tr('Elige un icono', 'Choose an icon'),
             ),
-        ],
-      ),
-      const SizedBox(height: 20),
-      _SectionLabel(
-        icon: Icons.palette_outlined,
-        label: context.tr('Color', 'Color'),
-      ),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          for (final key in _routineColors)
-            _ColorChoice(
-              colorKey: key,
-              selected: draft.colorKey == key,
-              onPressed: () => onChanged(draft.copyWith(colorKey: key)),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final useOneColumn =
+                    constraints.maxWidth < 280 ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.2;
+                final tileWidth = useOneColumn
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final entry in _routineIcons.entries)
+                      _ChoiceIcon(
+                        width: tileWidth,
+                        selected: draft.iconKey == entry.key,
+                        icon: entry.value,
+                        label: _routineIconLabel(context, entry.key),
+                        onPressed: () =>
+                            onChanged(draft.copyWith(iconKey: entry.key)),
+                      ),
+                  ],
+                );
+              },
             ),
-        ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+      _EditorSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel(
+              icon: Icons.palette_outlined,
+              label: context.tr('Elige un color', 'Choose a color'),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final key in _routineColors)
+                  _ColorChoice(
+                    colorKey: key,
+                    selected: draft.colorKey == key,
+                    onPressed: () => onChanged(draft.copyWith(colorKey: key)),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     ],
   );
@@ -564,7 +603,10 @@ class _RoutinePreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.palette.surface,
+        color: Color.alphaBlend(
+          accent.withValues(alpha: 0.1),
+          context.palette.surface,
+        ),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: accent.withValues(alpha: 0.55)),
       ),
@@ -615,37 +657,88 @@ class _RoutinePreview extends StatelessWidget {
 
 class _ChoiceIcon extends StatelessWidget {
   const _ChoiceIcon({
+    required this.width,
     required this.selected,
     required this.icon,
-    required this.tooltip,
+    required this.label,
     required this.onPressed,
   });
+  final double width;
   final bool selected;
   final IconData icon;
-  final String tooltip;
+  final String label;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: 52,
-    child: IconButton.filledTonal(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: selected
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: label,
+    child: SizedBox(
+      width: width,
+      child: Material(
+        color: selected
             ? context.palette.primaryMuted
             : context.palette.surface,
-        foregroundColor: selected
-            ? context.palette.primary
-            : context.palette.textSecondary,
-        side: BorderSide(
-          color: selected
-              ? context.palette.primary
-              : context.palette.neutralSoft,
-          width: selected ? 2 : 1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: selected
+                ? context.palette.primary
+                : context.palette.neutralSoft,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? context.palette.surface
+                          : context.palette.primaryMuted,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: context.palette.primary, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: selected
+                            ? context.palette.primary
+                            : context.palette.textPrimary,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: context.palette.primary,
+                      size: 19,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      icon: Icon(icon),
     ),
   );
 }
@@ -756,22 +849,24 @@ class _RecurrenceStep extends StatelessWidget {
         label: context.tr('Días de la semana', 'Days of the week'),
       ),
       const SizedBox(height: 10),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (var day = 1; day <= 7; day++)
-            FilterChip(
-              key: ValueKey('routine-weekday-$day'),
-              label: Text(_dayName(context, day)),
-              selected: draft.weekdays.contains(day),
-              onSelected: (_) {
-                final days = draft.weekdays.toSet();
-                days.contains(day) ? days.remove(day) : days.add(day);
-                onChanged(draft.copyWith(weekdays: ([...days]..sort())));
-              },
-            ),
-        ],
+      _EditorSurface(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var day = 1; day <= 7; day++)
+              FilterChip(
+                key: ValueKey('routine-weekday-$day'),
+                label: Text(_dayName(context, day)),
+                selected: draft.weekdays.contains(day),
+                onSelected: (_) {
+                  final days = draft.weekdays.toSet();
+                  days.contains(day) ? days.remove(day) : days.add(day);
+                  onChanged(draft.copyWith(weekdays: ([...days]..sort())));
+                },
+              ),
+          ],
+        ),
       ),
       const SizedBox(height: 24),
       _SectionLabel(
@@ -779,17 +874,23 @@ class _RecurrenceStep extends StatelessWidget {
         label: context.tr('Selección rápida', 'Quick selection'),
       ),
       const SizedBox(height: 10),
-      _PresetDaysButton(
-        label: context.tr('Lunes a viernes', 'Monday to Friday'),
-        onPressed: () => onChanged(
-          draft.copyWith(weekdays: const [1, 2, 3, 4, 5]),
-        ),
-      ),
-      const SizedBox(height: 10),
-      _PresetDaysButton(
-        label: context.tr('Todos los días', 'Every day'),
-        onPressed: () => onChanged(
-          draft.copyWith(weekdays: const [1, 2, 3, 4, 5, 6, 7]),
+      _EditorSurface(
+        child: Column(
+          children: [
+            _PresetDaysButton(
+              label: context.tr('Lunes a viernes', 'Monday to Friday'),
+              onPressed: () => onChanged(
+                draft.copyWith(weekdays: const [1, 2, 3, 4, 5]),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _PresetDaysButton(
+              label: context.tr('Todos los días', 'Every day'),
+              onPressed: () => onChanged(
+                draft.copyWith(weekdays: const [1, 2, 3, 4, 5, 6, 7]),
+              ),
+            ),
+          ],
         ),
       ),
     ],
@@ -847,29 +948,36 @@ class _ItemsStep extends StatelessWidget {
     key: const ValueKey('routine-step-items'),
     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
     children: [
-      _SectionLabel(
-        icon: Icons.view_timeline_rounded,
-        label: context.tr('Secuencia', 'Sequence'),
-      ),
-      const SizedBox(height: 3),
-      Text(
-        context.tr(
-          '${draft.items.length} actividades',
-          '${draft.items.length} activities',
+      _EditorSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionLabel(
+              icon: Icons.view_timeline_rounded,
+              label: context.tr('Secuencia', 'Sequence'),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              context.tr(
+                '${draft.items.length} actividades',
+                '${draft.items.length} activities',
+              ),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: context.palette.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const ValueKey('add-routine-item'),
+              onPressed: () => _editItem(context),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(context.tr('Agregar actividad', 'Add activity')),
+            ),
+          ],
         ),
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: context.palette.textSecondary,
-        ),
-      ),
-      const SizedBox(height: 10),
-      FilledButton.icon(
-        key: const ValueKey('add-routine-item'),
-        onPressed: () => _editItem(context),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-        ),
-        icon: const Icon(Icons.add_rounded),
-        label: Text(context.tr('Agregar actividad', 'Add activity')),
       ),
       const SizedBox(height: 16),
       if (draft.items.isEmpty)
@@ -1699,11 +1807,11 @@ String _validationMessage(BuildContext context, RoutineValidationIssue issue) =>
     };
 
 const _routineIcons = <String, IconData>{
-  'routine': Icons.event_repeat_rounded,
-  'sun': Icons.wb_sunny_outlined,
-  'work': Icons.work_outline_rounded,
-  'fitness': Icons.fitness_center_rounded,
-  'book': Icons.menu_book_rounded,
+  'routine': Icons.checklist_rounded,
+  'sun': Icons.light_mode_rounded,
+  'work': Icons.laptop_mac_rounded,
+  'fitness': Icons.directions_run_rounded,
+  'book': Icons.school_rounded,
 };
 const _stepIcons = <IconData>[
   Icons.badge_outlined,
@@ -1712,6 +1820,14 @@ const _stepIcons = <IconData>[
   Icons.fact_check_outlined,
 ];
 const _routineColors = ['primary', 'secondary', 'tertiary', 'peach', 'neutral'];
+
+String _routineIconLabel(BuildContext context, String key) => switch (key) {
+  'sun' => context.tr('Mañana', 'Morning'),
+  'work' => context.tr('Trabajo', 'Work'),
+  'fitness' => context.tr('Ejercicio', 'Exercise'),
+  'book' => context.tr('Estudio', 'Study'),
+  _ => context.tr('Lista diaria', 'Daily list'),
+};
 
 Color _colorFor(AppPalette palette, String key) => switch (key) {
   'secondary' => palette.secondary,

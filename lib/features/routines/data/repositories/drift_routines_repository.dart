@@ -3,11 +3,14 @@ import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_mutation_coordinator.dart';
 
 class DriftRoutinesRepository implements RoutinesRepository {
-  DriftRoutinesRepository(this._dao);
+  DriftRoutinesRepository(this._dao, {SyncMutationCoordinator? sync})
+    : _sync = sync;
 
   final RoutinesDao _dao;
+  final SyncMutationCoordinator? _sync;
   var _idSequence = 0;
 
   @override
@@ -48,80 +51,188 @@ class DriftRoutinesRepository implements RoutinesRepository {
   @override
   Future<void> saveRoutine(Routine routine) async {
     _validateRoutine(routine);
-    await _dao.saveRoutineAggregate(
-      routine: RoutineRecordsCompanion.insert(
-        id: routine.id,
-        name: routine.name.trim(),
-        description: Value(_trimmedOrNull(routine.description)),
-        iconKey: Value(routine.iconKey),
-        colorKey: Value(routine.colorKey),
-        status: Value(routine.status.name),
-        pausedUntilLocalDate: Value(
-          routine.pausedUntilDate == null
-              ? null
-              : _dateToStorage(routine.pausedUntilDate!),
+    final operationKind = await _dao.findRoutineById(routine.id) == null
+        ? 'create'
+        : 'update';
+    await _run(
+      entityId: routine.id,
+      operationKind: operationKind,
+      changedFields: {'aggregate': _routineAggregate(routine)},
+      mutate: () => _dao.saveRoutineAggregate(
+        routine: RoutineRecordsCompanion.insert(
+          id: routine.id,
+          name: routine.name.trim(),
+          description: Value(_trimmedOrNull(routine.description)),
+          iconKey: Value(routine.iconKey),
+          colorKey: Value(routine.colorKey),
+          status: Value(routine.status.name),
+          pausedUntilLocalDate: Value(
+            routine.pausedUntilDate == null
+                ? null
+                : _dateToStorage(routine.pausedUntilDate!),
+          ),
+          archivedAt: Value(routine.archivedAt),
+          createdAt: routine.createdAt,
+          updatedAt: routine.updatedAt,
         ),
-        archivedAt: Value(routine.archivedAt),
-        createdAt: routine.createdAt,
-        updatedAt: routine.updatedAt,
+        days: routine.weekdays
+            .map(
+              (weekday) => RoutineDayRecordsCompanion.insert(
+                routineId: routine.id,
+                weekday: weekday,
+              ),
+            )
+            .toList(growable: false),
+        items: routine.items
+            .map(
+              (item) => RoutineItemRecordsCompanion.insert(
+                id: item.id,
+                routineId: routine.id,
+                position: item.position,
+                title: item.title.trim(),
+                scheduledMinute: item.scheduledMinute,
+                durationMinutes: item.durationMinutes,
+                goalId: Value(item.goalId),
+                isOptional: Value(item.isOptional),
+                reminderMinutesBefore: Value(item.reminderMinutesBefore),
+                pomodoroMode: Value(item.pomodoroMode.name),
+                customFocusMinutes: Value(item.customFocusMinutes),
+                customBreakMinutes: Value(item.customBreakMinutes),
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+              ),
+            )
+            .toList(growable: false),
       ),
-      days: routine.weekdays
-          .map(
-            (weekday) => RoutineDayRecordsCompanion.insert(
-              routineId: routine.id,
-              weekday: weekday,
-            ),
-          )
-          .toList(growable: false),
-      items: routine.items
-          .map(
-            (item) => RoutineItemRecordsCompanion.insert(
-              id: item.id,
-              routineId: routine.id,
-              position: item.position,
-              title: item.title.trim(),
-              scheduledMinute: item.scheduledMinute,
-              durationMinutes: item.durationMinutes,
-              goalId: Value(item.goalId),
-              isOptional: Value(item.isOptional),
-              reminderMinutesBefore: Value(item.reminderMinutesBefore),
-              pomodoroMode: Value(item.pomodoroMode.name),
-              customFocusMinutes: Value(item.customFocusMinutes),
-              customBreakMinutes: Value(item.customBreakMinutes),
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt,
-            ),
-          )
-          .toList(growable: false),
     );
   }
 
   @override
   Future<void> pauseRoutine(String id, {DateTime? until}) {
-    return _dao.pauseRoutine(
-      id: id,
-      untilLocalDate: until == null ? null : _dateToStorage(until),
-      updatedAt: DateTime.now(),
+    final now = DateTime.now();
+    return _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: {
+        'status': RoutineStatus.paused.name,
+        'pausedUntilLocalDate': until == null ? null : _dateToStorage(until),
+        'archivedAt': null,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.pauseRoutine(
+        id: id,
+        untilLocalDate: until == null ? null : _dateToStorage(until),
+        updatedAt: now,
+      ),
     );
   }
 
   @override
-  Future<void> resumeRoutine(String id) =>
-      _dao.resumeRoutine(id: id, updatedAt: DateTime.now());
+  Future<void> resumeRoutine(String id) {
+    final now = DateTime.now();
+    return _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: {
+        'status': RoutineStatus.active.name,
+        'pausedUntilLocalDate': null,
+        'archivedAt': null,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.resumeRoutine(id: id, updatedAt: now),
+    );
+  }
 
   @override
   Future<void> archiveRoutine(String id) {
     final now = DateTime.now();
-    return _dao.archiveRoutine(id: id, archivedAt: now);
+    return _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: {
+        'status': RoutineStatus.archived.name,
+        'pausedUntilLocalDate': null,
+        'archivedAt': now.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.archiveRoutine(id: id, archivedAt: now),
+    );
   }
 
   @override
-  Future<void> restoreRoutine(String id) =>
-      _dao.restoreRoutine(id: id, updatedAt: DateTime.now());
+  Future<void> restoreRoutine(String id) {
+    final now = DateTime.now();
+    return _run(
+      entityId: id,
+      operationKind: 'update',
+      changedFields: {
+        'status': RoutineStatus.active.name,
+        'pausedUntilLocalDate': null,
+        'archivedAt': null,
+        'updatedAt': now.millisecondsSinceEpoch,
+      },
+      mutate: () => _dao.restoreRoutine(id: id, updatedAt: now),
+    );
+  }
 
   @override
-  Future<void> deleteArchivedRoutine(String id) =>
-      _dao.deleteArchivedRoutine(id);
+  Future<void> deleteArchivedRoutine(String id) => _run(
+    entityId: id,
+    operationKind: 'delete',
+    changedFields: const {},
+    mutate: () => _dao.deleteArchivedRoutine(id),
+  );
+
+  Future<T> _run<T>({
+    required String entityId,
+    required String operationKind,
+    required Map<String, Object?> changedFields,
+    required Future<T> Function() mutate,
+  }) {
+    final sync = _sync;
+    if (sync == null) return mutate();
+    return sync(
+      entityType: 'routine',
+      entityId: entityId,
+      operationKind: operationKind,
+      changedFields: changedFields,
+      mutate: mutate,
+    );
+  }
+
+  Map<String, Object?> _routineAggregate(Routine routine) => {
+    'name': routine.name.trim(),
+    'description': _trimmedOrNull(routine.description),
+    'iconKey': routine.iconKey,
+    'colorKey': routine.colorKey,
+    'status': routine.status.name,
+    'pausedUntilLocalDate': routine.pausedUntilDate == null
+        ? null
+        : _dateToStorage(routine.pausedUntilDate!),
+    'archivedAt': routine.archivedAt?.millisecondsSinceEpoch,
+    'createdAt': routine.createdAt.millisecondsSinceEpoch,
+    'updatedAt': routine.updatedAt.millisecondsSinceEpoch,
+    'weekdays': routine.weekdays,
+    'items': routine.items
+        .map(
+          (item) => {
+            'id': item.id,
+            'position': item.position,
+            'title': item.title.trim(),
+            'scheduledMinute': item.scheduledMinute,
+            'durationMinutes': item.durationMinutes,
+            'goalId': item.goalId,
+            'isOptional': item.isOptional,
+            'reminderMinutesBefore': item.reminderMinutesBefore,
+            'pomodoroMode': item.pomodoroMode.name,
+            'customFocusMinutes': item.customFocusMinutes,
+            'customBreakMinutes': item.customBreakMinutes,
+            'createdAt': item.createdAt.millisecondsSinceEpoch,
+            'updatedAt': item.updatedAt.millisecondsSinceEpoch,
+          },
+        )
+        .toList(growable: false),
+  };
 
   @override
   Future<RoutineReconciliationResult> reconcileLocalDay(

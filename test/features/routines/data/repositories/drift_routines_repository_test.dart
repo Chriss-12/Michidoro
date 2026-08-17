@@ -10,6 +10,60 @@ import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.da
 
 void main() {
   group('DriftRoutinesRepository', () {
+    test('publishes routine aggregates and lifecycle changes', () async {
+      final database = MichiFocusDatabase(NativeDatabase.memory());
+      final operations = <Map<String, Object?>>[];
+      Future<T> synchronize<T>({
+        required String entityType,
+        required String entityId,
+        required String operationKind,
+        required Map<String, Object?> changedFields,
+        required Future<T> Function() mutate,
+      }) async {
+        operations.add({
+          'entityType': entityType,
+          'entityId': entityId,
+          'operationKind': operationKind,
+          'changedFields': changedFields,
+        });
+        return mutate();
+      }
+
+      final repository = DriftRoutinesRepository(
+        RoutinesDao(database),
+        sync: synchronize,
+      );
+      final now = DateTime(2026, 8, 15, 8);
+      addTearDown(database.close);
+
+      await repository.saveRoutine(
+        _routine(
+          now: now,
+          items: [
+            _item(
+              id: 'item-1',
+              position: 0,
+              title: 'Preparar café',
+              minute: 420,
+              now: now,
+            ),
+          ],
+        ),
+      );
+      await repository.pauseRoutine('routine-1');
+
+      expect(operations, hasLength(2));
+      expect(operations.first['entityType'], 'routine');
+      expect(operations.first['operationKind'], 'create');
+      final aggregate =
+          (operations.first['changedFields']!
+                  as Map<String, Object?>)['aggregate']!
+              as Map<String, Object?>;
+      expect(aggregate['weekdays'], [1, 2, 3, 4, 5]);
+      expect(aggregate['items'], hasLength(1));
+      expect(operations.last['operationKind'], 'update');
+    });
+
     test('persists and transactionally reorders a routine aggregate', () async {
       final directory = Directory.systemTemp.createTempSync(
         'michifocus_routines_repository',

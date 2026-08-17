@@ -20,6 +20,7 @@ import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/controllers/local_app_lock_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
@@ -93,7 +94,9 @@ void main() {
         ..typographyPreset.value = AppTypographyPreset.serio
         ..language.value = AppLanguage.english;
 
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(
+        MyApp(localAppLockController: LocalAppLockController()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('home-routine-today')), findsOneWidget);
@@ -132,7 +135,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       reportRepository.gate = Completer<void>();
 
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(
+        MyApp(localAppLockController: LocalAppLockController()),
+      );
       await tester.pump(const Duration(milliseconds: 1800));
       expect(
         find.byKey(const ValueKey('performance-loading')),
