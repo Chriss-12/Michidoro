@@ -85,9 +85,21 @@ class AppRouter {
       ),
       GoRoute(
         path: PomodoroFullscreenPage.routePath,
-        pageBuilder: (context, state) => _buildTransitionPage(
-          state: state,
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          transitionDuration: const Duration(milliseconds: 180),
+          reverseTransitionDuration: const Duration(milliseconds: 220),
           child: const PomodoroFullscreenPage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+              child: child,
+            );
+          },
         ),
       ),
       GoRoute(

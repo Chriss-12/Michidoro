@@ -235,3 +235,47 @@ Notes:
 - Reactive updates are implemented for create, edit, complete, delete, filter, and initial repository load.
 - Drift loading verified through `TasksController.loadTasks` and repository-backed startup wiring.
 
+
+### REQ-TASK-009 - Universal temporal task filter
+
+Status: Verified
+
+Objective:
+Keep large task histories usable by applying one temporal selection consistently
+to all, active, and completed task views.
+
+Checklist:
+- [x] Requirement approved by the user on 2026-08-24.
+- [x] UI and reactive-state responsibilities planned.
+- [x] Controller filtering implemented and tested.
+- [x] Day, month, year, and custom-range selection implemented and tested.
+- [x] Quality checks passed and traceability updated with final evidence.
+- [x] Default-today and persistence follow-up approved on 2026-08-24.
+- [x] First use defaults to the current local day.
+- [x] The selected temporal filter survives an application restart.
+- [x] Missing or malformed preference data falls back safely to the current day.
+
+Acceptance criteria:
+- [x] One temporal filter remains active while switching between all, active,
+      and completed task categories.
+- [x] The user can select all time, one day, one month, one year, or an inclusive
+      custom date range.
+- [x] Status counts are recalculated within the selected temporal period.
+- [x] Planned tasks use their scheduled date; quick tasks use their creation date.
+- [x] Filtering never mutates or removes persisted task data.
+- [x] Empty filtered results explain that no tasks match the selected period.
+- [x] A previously saved all-time, day, month, year, or range selection is
+      restored on the next application start.
+
+Notes:
+- Approved directly by the user for immediate implementation on 2026-08-24.
+- This is an in-memory presentation filter over repository-loaded tasks; no Drift
+  schema or package change is required.
+- Verified with formatting, clean `lib`/`test` analysis, 25 focused Tasks tests,
+  a narrow-phone widget interaction, and all 411 project tests on 2026-08-24.
+- The persistence follow-up defaults new installs to the current local day and
+  saves explicit selections in a dedicated offline preference file. Missing,
+  malformed, or future values fail safely to the current day.
+- The follow-up passes clean analysis, 29 focused Tasks tests, and all 415
+  project tests on 2026-08-24.
+

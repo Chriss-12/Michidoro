@@ -7,6 +7,7 @@ import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_r
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/widgets/routines_view.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/entities/task_temporal_filter.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
@@ -73,7 +74,10 @@ class _TasksPageState extends State<TasksPage> {
       builder: (context) {
         final tasks = _tasksController.tasks.value;
         final visibleTasks = _tasksController.filteredTasks.value;
+        final temporallyFilteredTasks =
+            _tasksController.temporallyFilteredTasks.value;
         final filter = _tasksController.filter.value;
+        final temporalFilter = _tasksController.temporalFilter.value;
         final validationMessage = _tasksController.validationMessage.value;
 
         return ListView(
@@ -176,9 +180,14 @@ class _TasksPageState extends State<TasksPage> {
               if (tasks.isNotEmpty) ...[
                 _TaskFilterBar(
                   selectedFilter: filter,
-                  tasks: tasks,
+                  tasks: temporallyFilteredTasks,
                   onFilterChanged: (value) =>
                       _tasksController.selectedFilter = value,
+                ),
+                const SizedBox(height: 10),
+                _TaskTemporalFilterButton(
+                  filter: temporalFilter,
+                  onPressed: _showTemporalFilterPicker,
                 ),
                 const SizedBox(height: 18),
               ],
@@ -187,6 +196,7 @@ class _TasksPageState extends State<TasksPage> {
                     ? const _EmptyTasksState()
                     : _TaskList(
                         filter: filter,
+                        temporalFilter: temporalFilter,
                         tasks: visibleTasks,
                         onToggleCompleted:
                             _tasksController.toggleTaskCompletion,
@@ -210,6 +220,29 @@ class _TasksPageState extends State<TasksPage> {
   }
 }
 
+class _TaskTemporalFilterButton extends StatelessWidget {
+  const _TaskTemporalFilterButton({
+    required this.filter,
+    required this.onPressed,
+  });
+
+  final TaskTemporalFilter filter;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        key: const ValueKey('task-temporal-filter-button'),
+        onPressed: onPressed,
+        icon: const Icon(Icons.date_range_rounded),
+        label: Text(_temporalFilterLabel(context, filter)),
+      ),
+    );
+  }
+}
+
 enum _PlanningView { tasks, routines }
 
 class _TaskFilterBar extends StatelessWidget {
@@ -229,6 +262,7 @@ class _TaskFilterBar extends StatelessWidget {
     final completedCount = tasks.length - activeCount;
 
     return SingleChildScrollView(
+      key: const ValueKey('task-status-filter-scroll'),
       scrollDirection: Axis.horizontal,
       child: SegmentedButton<TaskFilter>(
         segments: [
@@ -301,6 +335,7 @@ class _EmptyTasksState extends StatelessWidget {
 class _TaskList extends StatelessWidget {
   const _TaskList({
     required this.filter,
+    required this.temporalFilter,
     required this.tasks,
     required this.onToggleCompleted,
     required this.onStartFocus,
@@ -309,6 +344,7 @@ class _TaskList extends StatelessWidget {
   });
 
   final TaskFilter filter;
+  final TaskTemporalFilter temporalFilter;
   final List<Task> tasks;
   final Future<void> Function(String id) onToggleCompleted;
   final ValueChanged<Task> onStartFocus;
@@ -318,7 +354,11 @@ class _TaskList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tasks.isEmpty) {
-      return _FilteredEmptyState(filter: filter);
+      return _FilteredEmptyState(
+        filter: filter,
+        hasTemporalFilter:
+            temporalFilter.kind != TaskTemporalFilterKind.allTime,
+      );
     }
 
     return Column(
@@ -327,7 +367,9 @@ class _TaskList extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                context.tr('Tareas de hoy', "Today's tasks"),
+                temporalFilter.kind == TaskTemporalFilterKind.allTime
+                    ? context.tr('Tareas', 'Tasks')
+                    : context.tr('Tareas filtradas', 'Filtered tasks'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontSize: AppDesignTokens.sectionTitleFontSize,
                   fontWeight: FontWeight.w800,
@@ -360,27 +402,36 @@ class _TaskList extends StatelessWidget {
 }
 
 class _FilteredEmptyState extends StatelessWidget {
-  const _FilteredEmptyState({required this.filter});
+  const _FilteredEmptyState({
+    required this.filter,
+    required this.hasTemporalFilter,
+  });
 
   final TaskFilter filter;
+  final bool hasTemporalFilter;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final label = switch (filter) {
-      TaskFilter.all => context.tr(
-        'No hay tareas para mostrar.',
-        'There are no tasks to show.',
-      ),
-      TaskFilter.active => context.tr(
-        'No quedan tareas activas.',
-        'There are no active tasks left.',
-      ),
-      TaskFilter.completed => context.tr(
-        'Todavía no completaste tareas.',
-        "You haven't completed any tasks yet.",
-      ),
-    };
+    final label = hasTemporalFilter
+        ? context.tr(
+            'No hay tareas en el período seleccionado.',
+            'There are no tasks in the selected period.',
+          )
+        : switch (filter) {
+            TaskFilter.all => context.tr(
+              'No hay tareas para mostrar.',
+              'There are no tasks to show.',
+            ),
+            TaskFilter.active => context.tr(
+              'No quedan tareas activas.',
+              'There are no active tasks left.',
+            ),
+            TaskFilter.completed => context.tr(
+              'Todavía no completaste tareas.',
+              "You haven't completed any tasks yet.",
+            ),
+          };
 
     return Column(
       children: [
@@ -392,6 +443,131 @@ class _FilteredEmptyState extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: palette.textSecondary,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MonthPickerDialog extends StatefulWidget {
+  const _MonthPickerDialog({required this.initialMonth});
+
+  final DateTime initialMonth;
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _year;
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.initialMonth.year;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.tr('Seleccionar mes', 'Select month')),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: context.tr('Año anterior', 'Previous year'),
+                  onPressed: _year > 1900
+                      ? () => setState(() => _year -= 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+                Expanded(
+                  child: Text(
+                    '$_year',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: context.tr('Año siguiente', 'Next year'),
+                  onPressed: _year < 2100
+                      ? () => setState(() => _year += 1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 2.15,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: 12,
+              itemBuilder: (context, index) {
+                final month = index + 1;
+                final selected =
+                    widget.initialMonth.year == _year &&
+                    widget.initialMonth.month == month;
+                return OutlinedButton(
+                  key: ValueKey('task-filter-month-$month'),
+                  onPressed: () => Navigator.pop(
+                    context,
+                    DateTime(_year, month),
+                  ),
+                  style: selected
+                      ? OutlinedButton.styleFrom(
+                          backgroundColor: context.palette.primaryMuted,
+                        )
+                      : null,
+                  child: Text(_monthName(context, month, short: true)),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.tr('Cancelar', 'Cancel')),
+        ),
+      ],
+    );
+  }
+}
+
+class _YearPickerDialog extends StatelessWidget {
+  const _YearPickerDialog({required this.initialYear});
+
+  final int initialYear;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.tr('Seleccionar año', 'Select year')),
+      content: SizedBox(
+        width: 320,
+        height: 360,
+        child: YearPicker(
+          firstDate: DateTime(1900),
+          lastDate: DateTime(2100, 12, 31),
+          selectedDate: DateTime(initialYear),
+          onChanged: (date) => Navigator.pop(context, date.year),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.tr('Cancelar', 'Cancel')),
         ),
       ],
     );
@@ -474,6 +650,134 @@ class _TaskTile extends StatelessWidget {
 }
 
 extension on _TasksPageState {
+  Future<void> _showTemporalFilterPicker() async {
+    final current = _tasksController.temporalFilter.value;
+    final kind = await showModalBottomSheet<TaskTemporalFilterKind>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const ValueKey('task-filter-all-time'),
+              leading: const Icon(Icons.all_inclusive_rounded),
+              title: Text(sheetContext.tr('Todo el tiempo', 'All time')),
+              trailing: current.kind == TaskTemporalFilterKind.allTime
+                  ? const Icon(Icons.check_rounded)
+                  : null,
+              onTap: () => Navigator.pop(
+                sheetContext,
+                TaskTemporalFilterKind.allTime,
+              ),
+            ),
+            ListTile(
+              key: const ValueKey('task-filter-day'),
+              leading: const Icon(Icons.today_rounded),
+              title: Text(sheetContext.tr('Un día', 'One day')),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                TaskTemporalFilterKind.day,
+              ),
+            ),
+            ListTile(
+              key: const ValueKey('task-filter-month'),
+              leading: const Icon(Icons.calendar_view_month_rounded),
+              title: Text(sheetContext.tr('Un mes', 'One month')),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                TaskTemporalFilterKind.month,
+              ),
+            ),
+            ListTile(
+              key: const ValueKey('task-filter-year'),
+              leading: const Icon(Icons.calendar_today_rounded),
+              title: Text(sheetContext.tr('Un año', 'One year')),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                TaskTemporalFilterKind.year,
+              ),
+            ),
+            ListTile(
+              key: const ValueKey('task-filter-range'),
+              leading: const Icon(Icons.date_range_rounded),
+              title: Text(
+                sheetContext.tr('Rango personalizado', 'Custom range'),
+              ),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                TaskTemporalFilterKind.range,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || kind == null) return;
+
+    switch (kind) {
+      case TaskTemporalFilterKind.allTime:
+        await _tasksController.selectTemporalFilter(
+          const TaskTemporalFilter.allTime(),
+        );
+      case TaskTemporalFilterKind.day:
+        final selected = await showDatePicker(
+          context: context,
+          initialDate: current.start ?? DateTime.now(),
+          firstDate: DateTime(1900),
+          lastDate: DateTime(2100, 12, 31),
+          helpText: context.tr('Filtrar por día', 'Filter by day'),
+        );
+        if (selected != null) {
+          await _tasksController.selectTemporalFilter(
+            TaskTemporalFilter.day(selected),
+          );
+        }
+      case TaskTemporalFilterKind.month:
+        final selected = await showDialog<DateTime>(
+          context: context,
+          builder: (context) => _MonthPickerDialog(
+            initialMonth: current.start ?? DateTime.now(),
+          ),
+        );
+        if (selected != null) {
+          await _tasksController.selectTemporalFilter(
+            TaskTemporalFilter.month(selected),
+          );
+        }
+      case TaskTemporalFilterKind.year:
+        final selected = await showDialog<int>(
+          context: context,
+          builder: (context) => _YearPickerDialog(
+            initialYear: current.start?.year ?? DateTime.now().year,
+          ),
+        );
+        if (selected != null) {
+          await _tasksController.selectTemporalFilter(
+            TaskTemporalFilter.year(selected),
+          );
+        }
+      case TaskTemporalFilterKind.range:
+        final selected = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(1900),
+          lastDate: DateTime(2100, 12, 31),
+          initialDateRange: current.kind == TaskTemporalFilterKind.range
+              ? DateTimeRange(start: current.start!, end: current.end!)
+              : null,
+          helpText: context.tr(
+            'Filtrar por rango de fechas',
+            'Filter by date range',
+          ),
+        );
+        if (selected != null) {
+          await _tasksController.selectTemporalFilter(
+            TaskTemporalFilter.range(selected.start, selected.end),
+          );
+        }
+    }
+  }
+
   Future<void> _showEditTaskDialog(Task task) async {
     final title = await showDialog<String>(
       context: context,
@@ -669,4 +973,73 @@ String? _localizedValidationMessage(BuildContext context, String? message) {
     ),
     _ => message,
   };
+}
+
+String _temporalFilterLabel(
+  BuildContext context,
+  TaskTemporalFilter filter,
+) {
+  return switch (filter.kind) {
+    TaskTemporalFilterKind.allTime => context.tr(
+      'Todo el tiempo',
+      'All time',
+    ),
+    TaskTemporalFilterKind.day => _fullDate(context, filter.start!),
+    TaskTemporalFilterKind.month =>
+      '${_monthName(context, filter.start!.month)} ${filter.start!.year}',
+    TaskTemporalFilterKind.year => '${filter.start!.year}',
+    TaskTemporalFilterKind.range =>
+      '${_shortDate(context, filter.start!)} – '
+          '${_shortDate(context, filter.end!)}',
+  };
+}
+
+String _fullDate(BuildContext context, DateTime date) {
+  return '${date.day} ${_monthName(context, date.month)} ${date.year}';
+}
+
+String _shortDate(BuildContext context, DateTime date) {
+  final separator = Localizations.localeOf(context).languageCode == 'es'
+      ? '/'
+      : '/';
+  return Localizations.localeOf(context).languageCode == 'es'
+      ? '${date.day.toString().padLeft(2, '0')}$separator'
+            '${date.month.toString().padLeft(2, '0')}$separator${date.year}'
+      : '${date.month.toString().padLeft(2, '0')}$separator'
+            '${date.day.toString().padLeft(2, '0')}$separator${date.year}';
+}
+
+String _monthName(BuildContext context, int month, {bool short = false}) {
+  const spanish = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+  const english = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  final isSpanish = Localizations.localeOf(context).languageCode == 'es';
+  final name = (isSpanish ? spanish : english)[month - 1];
+  if (!short) return name;
+  return name.substring(0, name.length < 3 ? name.length : 3);
 }

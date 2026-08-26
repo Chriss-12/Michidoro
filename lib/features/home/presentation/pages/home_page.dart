@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
@@ -12,11 +11,7 @@ import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
-import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
-import 'package:pomodoro_app_v1/features/routines/presentation/models/routine_schedule_projection.dart';
-import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
-import 'package:pomodoro_app_v1/features/routines/presentation/start_routine_focus_flow.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
@@ -50,8 +45,9 @@ class HomePage extends StatelessWidget {
           context.tr('Listo para enfocarte hoy', 'Ready to focus today'),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        const SizedBox(height: 36),
-        const _RoutineTodayCard(),
+        const SizedBox(height: 18),
+        const _EnergyCard(),
+        const SizedBox(height: 18),
         const _TaskStatusOverviewCard(),
         const SizedBox(height: 18),
         const _PerformanceDashboardCard(),
@@ -60,220 +56,11 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 18),
         const _DailyGoalCard(),
         const SizedBox(height: 18),
-        const _EnergyCard(),
-        const SizedBox(height: 18),
         const _WeeklyProgressCardV2(),
       ],
     );
   }
 }
-
-class _RoutineTodayCard extends StatelessWidget {
-  const _RoutineTodayCard();
-
-  @override
-  Widget build(BuildContext context) {
-    if (!serviceLocator.isRegistered<RoutinesController>()) {
-      return const SizedBox.shrink();
-    }
-    final routinesController = serviceLocator<RoutinesController>();
-    final tasksController = serviceLocator<TasksController>();
-    return SignalBuilder(
-      builder: (context) {
-        final summary = projectRoutineTodayFocus(
-          routines: routinesController.routines.value,
-          runs: routinesController.todayRuns.value,
-          itemRuns: routinesController.todayItemRuns.value,
-          tasks: tasksController.tasks.value,
-        );
-        if (summary == null) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 18),
-          child: _RoutineTodayContent(summary: summary),
-        );
-      },
-    );
-  }
-}
-
-class _RoutineTodayContent extends StatelessWidget {
-  const _RoutineTodayContent({required this.summary});
-
-  final RoutineTodayFocus summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final nextItem = summary.nextItem;
-    final completed =
-        summary.run.status == RoutineRunStatus.completed ||
-        summary.completedRequiredItems >= summary.totalRequiredItems;
-    final inProgress = nextItem?.status == RoutineRunStatus.inProgress;
-    final progress = summary.totalRequiredItems == 0
-        ? 0.0
-        : (summary.completedRequiredItems / summary.totalRequiredItems).clamp(
-            0.0,
-            1.0,
-          );
-    return GlassCard(
-      key: const ValueKey('home-routine-today'),
-      padding: AppCardPaddings.compact,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _SoftIcon(
-                icon: Icons.event_repeat_rounded,
-                color: palette.secondary,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.tr('Rutina de hoy', "Today's routine"),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      summary.routine.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: context.tr('Ver rutina', 'View routine'),
-                onPressed: () => context.push(
-                  '${RoutineEditorPage.routePath}?id=${summary.routine.id}',
-                ),
-                icon: const Icon(Icons.arrow_forward_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  completed
-                      ? context.tr('Completada', 'Completed')
-                      : inProgress
-                      ? context.tr('En progreso', 'In progress')
-                      : context.tr('Pendiente', 'Pending'),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: completed ? palette.primary : palette.secondary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Text(
-                '${summary.completedRequiredItems}/${summary.totalRequiredItems}',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: palette.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              color: palette.primary,
-              backgroundColor: palette.neutralSoft.withValues(alpha: 0.5),
-            ),
-          ),
-          if (nextItem != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              nextItem.titleSnapshot,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              '${_homeClock(context, nextItem.scheduledAtSnapshot)} · '
-              '${nextItem.durationMinutesSnapshot} min',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: palette.textSecondary,
-              ),
-            ),
-          ],
-          if (inProgress && summary.followingItem != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 18,
-                  color: palette.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    context.tr(
-                      'Después: ${summary.followingItem!.titleSnapshot} · '
-                          '${_homeClock(context, summary.followingItem!.scheduledAtSnapshot)}',
-                      'Next: ${summary.followingItem!.titleSnapshot} · '
-                          '${_homeClock(context, summary.followingItem!.scheduledAtSnapshot)}',
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          if (summary.canStart) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const ValueKey('home-routine-start'),
-                onPressed: () => startRoutineTaskFocusFlow(
-                  context: context,
-                  task: summary.task!,
-                  run: summary.run,
-                  item: summary.nextItem!,
-                  controller: serviceLocator<RoutinesController>(),
-                ),
-                icon: Icon(
-                  inProgress ? Icons.play_arrow_rounded : Icons.timer_outlined,
-                ),
-                label: Text(
-                  inProgress
-                      ? context.tr('Continuar actividad', 'Continue activity')
-                      : context.tr('Iniciar actividad', 'Start activity'),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-String _homeClock(BuildContext context, DateTime value) =>
-    MaterialLocalizations.of(context).formatTimeOfDay(
-      TimeOfDay(hour: value.hour, minute: value.minute),
-    );
 
 enum _PerformanceRange { day, week, month, year }
 
@@ -2044,6 +1831,7 @@ class _TaskStatusOverviewCardState extends State<_TaskStatusOverviewCard> {
         final summaryFuture = _summaryFor(tasksController.tasks.value);
 
         return GlassCard(
+          key: const ValueKey('home-task-status-card'),
           padding: AppCardPaddings.compact,
           child: FutureBuilder<TaskStatusSummary>(
             future: summaryFuture,
@@ -2638,6 +2426,7 @@ class _EnergyCard extends StatelessWidget {
     final palette = context.palette;
 
     return GlassCard(
+      key: const ValueKey('home-energy-card'),
       padding: AppCardPaddings.compact,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2645,10 +2434,15 @@ class _EnergyCard extends StatelessWidget {
           Row(
             children: [
               _SoftIcon(icon: Icons.bolt_outlined, color: palette.primary),
-              const Spacer(),
-              Text(
-                context.tr('Nivel de energía', 'Energy level'),
-                style: Theme.of(context).textTheme.labelMedium,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.tr('Nivel de energía', 'Energy level'),
+                  maxLines: 2,
+                  textAlign: TextAlign.end,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
               ),
             ],
           ),
@@ -2742,6 +2536,7 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
         final weekProgress = tasksController.progressForWeek(DateTime.now());
 
         return GlassCard(
+          key: const ValueKey('home-weekly-progress-card'),
           padding: AppCardPaddings.spacious,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2754,14 +2549,17 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   for (final progress in weekProgress)
-                    _WeeklyDayProgressV2(
-                      day: _weekdayShortLabel(context, progress.day),
-                      progress: progress.completionRatio,
-                      band: progress.band,
-                      isEnded: progress.isEnded,
+                    Expanded(
+                      child: _WeeklyDayProgressV2(
+                        day: _weekdayShortLabel(context, progress.day),
+                        date: progress.day,
+                        progress: progress.completionRatio,
+                        band: progress.band,
+                        isEnded: progress.isEnded,
+                        totalTasks: progress.summary.total,
+                      ),
                     ),
                 ],
               ),
@@ -2788,51 +2586,100 @@ class _WeeklyProgressCardV2 extends StatelessWidget {
 class _WeeklyDayProgressV2 extends StatelessWidget {
   const _WeeklyDayProgressV2({
     required this.day,
+    required this.date,
     required this.progress,
     required this.band,
     required this.isEnded,
+    required this.totalTasks,
   });
 
   final String day;
+  final DateTime date;
   final double progress;
   final TaskProgressBand band;
   final bool isEnded;
+  final int totalTasks;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final color = _progressColor(band);
+    final normalizedProgress = progress.clamp(0.0, 1.0);
+    final percentage = (normalizedProgress * 100).round();
 
-    return Column(
-      children: [
-        SizedBox(
-          width: 18,
-          height: 64,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: palette.primaryMuted.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: FractionallySizedBox(
-                heightFactor: progress.clamp(0.0, 1.0),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(999),
+    return Semantics(
+      label: context.tr(
+        '$day, $percentage por ciento, $totalTasks tareas',
+        '$day, $percentage percent, $totalTasks tasks',
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 68,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.primaryMuted.withValues(alpha: 0.58),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: color.withValues(alpha: 0.38)),
+              ),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: normalizedProgress),
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return FractionallySizedBox(
+                      key: ValueKey(
+                        'weekly-progress-fill-${date.weekday}',
+                      ),
+                      heightFactor: value,
+                      child: child,
+                    );
+                  },
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isEnded ? '$day*' : day,
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
-      ],
+          const SizedBox(height: 6),
+          SizedBox(
+            key: ValueKey('weekly-progress-percent-${date.weekday}'),
+            width: 30,
+            height: 18,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$percentage%',
+                maxLines: 1,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            width: 28,
+            height: 18,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                isEnded ? '$day*' : day,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

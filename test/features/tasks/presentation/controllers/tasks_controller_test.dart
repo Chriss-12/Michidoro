@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/entities/task_temporal_filter.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/repositories/task_temporal_filter_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 
@@ -234,6 +236,135 @@ void main() {
       expect(controller.tasks.value, hasLength(2));
     });
 
+    test('composes one temporal filter with every status filter', () async {
+      final controller = TasksController(repository: _MemoryTasksRepository());
+      controller.tasks.value = [
+        Task(
+          id: 'quick-july',
+          title: 'Rápida julio',
+          createdAt: DateTime(2026, 7, 10, 23, 45),
+        ),
+        Task(
+          id: 'planned-july-active',
+          title: 'Planificada julio activa',
+          createdAt: DateTime(2026),
+          scheduledDate: DateTime(2026, 7, 15),
+        ),
+        Task(
+          id: 'planned-july-done',
+          title: 'Planificada julio hecha',
+          createdAt: DateTime(2025, 12),
+          scheduledDate: DateTime(2026, 7, 20),
+          status: TaskStatus.completed,
+        ),
+        Task(
+          id: 'planned-august',
+          title: 'Planificada agosto',
+          createdAt: DateTime(2026),
+          scheduledDate: DateTime(2026, 8),
+        ),
+        Task(
+          id: 'planned-other-year',
+          title: 'Planificada otro año',
+          createdAt: DateTime(2025),
+          scheduledDate: DateTime(2025, 7, 15),
+          status: TaskStatus.completed,
+        ),
+      ];
+
+      await controller.selectTemporalFilter(
+        TaskTemporalFilter.month(DateTime(2026, 7)),
+      );
+      expect(controller.temporallyFilteredTasks.value, hasLength(3));
+      expect(controller.filteredTasks.value, hasLength(3));
+
+      controller.selectedFilter = TaskFilter.active;
+      expect(
+        controller.filteredTasks.value.map((task) => task.id),
+        containsAll(<String>['quick-july', 'planned-july-active']),
+      );
+      expect(controller.filteredTasks.value, hasLength(2));
+
+      controller.selectedFilter = TaskFilter.completed;
+      expect(controller.filteredTasks.value.single.id, 'planned-july-done');
+      expect(controller.tasks.value, hasLength(5));
+    });
+
+    test('supports inclusive day year and normalized range filters', () async {
+      final controller = TasksController(repository: _MemoryTasksRepository());
+      controller.tasks.value = [
+        Task(
+          id: 'first',
+          title: 'Primera',
+          createdAt: DateTime(2026, 3, 1, 8),
+        ),
+        Task(
+          id: 'middle',
+          title: 'Media',
+          createdAt: DateTime(2026, 3, 15, 12),
+        ),
+        Task(
+          id: 'last',
+          title: 'Última',
+          createdAt: DateTime(2026, 3, 31, 23, 59),
+        ),
+        Task(
+          id: 'other-year',
+          title: 'Otro año',
+          createdAt: DateTime(2025, 3, 15),
+        ),
+      ];
+
+      await controller.selectTemporalFilter(
+        TaskTemporalFilter.day(DateTime(2026, 3, 15)),
+      );
+      expect(controller.filteredTasks.value.single.id, 'middle');
+
+      await controller.selectTemporalFilter(TaskTemporalFilter.year(2026));
+      expect(controller.filteredTasks.value, hasLength(3));
+
+      await controller.selectTemporalFilter(
+        TaskTemporalFilter.range(DateTime(2026, 3, 31), DateTime(2026, 3)),
+      );
+      expect(
+        controller.filteredTasks.value.map((task) => task.id),
+        containsAll(<String>['first', 'middle', 'last']),
+      );
+      expect(controller.filteredTasks.value, hasLength(3));
+    });
+
+    test('defaults to today and restores an explicitly saved filter', () async {
+      final preferences = _MemoryTemporalFilterRepository(
+        TaskTemporalFilter.year(2025),
+      );
+      final controller = TasksController(
+        repository: _MemoryTasksRepository(),
+        temporalFilterRepository: preferences,
+        now: () => DateTime(2026, 8, 24, 18),
+      );
+
+      expect(controller.temporalFilter.value.kind, TaskTemporalFilterKind.day);
+      expect(controller.temporalFilter.value.start, DateTime(2026, 8, 24));
+
+      await controller.loadTasks();
+      expect(controller.temporalFilter.value.kind, TaskTemporalFilterKind.year);
+      expect(controller.temporalFilter.value.start, DateTime(2025));
+
+      await controller.selectTemporalFilter(
+        TaskTemporalFilter.range(DateTime(2026, 5, 2), DateTime(2026, 5, 9)),
+      );
+      final restarted = TasksController(
+        repository: _MemoryTasksRepository(),
+        temporalFilterRepository: preferences,
+        now: () => DateTime(2027),
+      );
+      await restarted.loadTasks();
+
+      expect(restarted.temporalFilter.value.kind, TaskTemporalFilterKind.range);
+      expect(restarted.temporalFilter.value.start, DateTime(2026, 5, 2));
+      expect(restarted.temporalFilter.value.end, DateTime(2026, 5, 9));
+    });
+
     test('summarizes task status totals by goal and unassigned work', () async {
       final controller = TasksController(repository: _MemoryTasksRepository());
       final scheduledDate = DateTime(2026, 7, 11);
@@ -461,5 +592,19 @@ class _MemoryTasksRepository implements TasksRepository {
     final updatedTask = update(_tasks[index]);
     _tasks[index] = updatedTask;
     return updatedTask;
+  }
+}
+
+class _MemoryTemporalFilterRepository implements TaskTemporalFilterRepository {
+  _MemoryTemporalFilterRepository(this.filter);
+
+  TaskTemporalFilter filter;
+
+  @override
+  Future<TaskTemporalFilter> load() async => filter;
+
+  @override
+  Future<void> save(TaskTemporalFilter filter) async {
+    this.filter = filter;
   }
 }

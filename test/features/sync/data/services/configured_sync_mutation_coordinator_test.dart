@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,7 @@ import 'package:pomodoro_app_v1/features/sync/domain/entities/device_bound_key_e
 import 'package:pomodoro_app_v1/features/sync/domain/entities/device_identity.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_group_enrollment.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_group_key_manifest.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_operation.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_storage_config.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/device_identity_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_group_enrollment_repository.dart';
@@ -19,7 +22,7 @@ import 'package:pomodoro_app_v1/features/sync/domain/services/sync_mutation_coor
 
 void main() {
   late MichiFocusDatabase database;
-  final now = DateTime.utc(2026, 8, 14, 12);
+  final now = DateTime.utc(2026, 8, 14, 12, 0, 0, 731);
 
   setUp(() {
     database = MichiFocusDatabase(NativeDatabase.memory());
@@ -68,6 +71,34 @@ void main() {
       expect(outbox.first.parentVersionJson, '{}');
       expect(outbox.last.parentVersionJson, contains('"$_installationId":1'));
       expect(outbox.every((row) => row.payloadSha256.length == 64), isTrue);
+      expect(outbox.first.createdAt.millisecond, 0);
+      final firstOperation = SyncOperation(
+        groupId: outbox.first.groupId,
+        operationId: outbox.first.operationId,
+        originDeviceId: outbox.first.originDeviceId,
+        originCounter: outbox.first.originCounter,
+        entityType: outbox.first.entityType,
+        entityId: outbox.first.entityId,
+        parentVersion: Map<String, Object?>.from(
+          jsonDecode(outbox.first.parentVersionJson) as Map,
+        ),
+        changedFields: Map<String, Object?>.from(
+          jsonDecode(outbox.first.changedFieldsJson) as Map,
+        ),
+        operationKind: outbox.first.operationKind,
+        createdAtEpochMillis: outbox.first.createdAt.millisecondsSinceEpoch,
+        originDeviceName: outbox.first.originDeviceName,
+        entitySnapshot: Map<String, Object?>.from(
+          jsonDecode(outbox.first.entitySnapshotJson!) as Map,
+        ),
+      );
+      final firstDigest = await Sha256().hash(firstOperation.canonicalBytes());
+      expect(
+        firstDigest.bytes
+            .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+            .join(),
+        outbox.first.payloadSha256,
+      );
 
       await coordinator<void>(
         entityType: 'goal',
@@ -85,6 +116,8 @@ void main() {
           .getSingle();
       expect(tombstone.entityId, goalId);
       expect(tombstone.causalVersionJson, contains('"$_installationId":3'));
+      expect(tombstone.entitySnapshotJson, contains('Read more'));
+      expect(outbox.every((row) => row.originDeviceName == 'Phone A'), isTrue);
     },
   );
 
@@ -132,6 +165,20 @@ SyncMutationCoordinator _coordinator(
     ),
     exchangeRepository: DriftSyncExchangeRepository(database),
     idGenerator: SecureSyncIdGenerator(random: Random(7)),
+    database: database,
+    readCurrentFields: (db, entityType, entityId) async {
+      if (entityType != 'goal') return null;
+      final goal = await GoalsDao(db).findById(entityId);
+      if (goal == null) return null;
+      return {
+        'title': goal.title,
+        'targetSessions': goal.targetSessions,
+        'completedSessions': goal.completedSessions,
+        'targetDate': goal.targetDate?.millisecondsSinceEpoch,
+        'createdAt': goal.createdAt.millisecondsSinceEpoch,
+        'updatedAt': goal.updatedAt.millisecondsSinceEpoch,
+      };
+    },
     clock: () => now,
   ).call;
 }

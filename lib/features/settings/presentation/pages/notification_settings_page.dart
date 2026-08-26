@@ -127,19 +127,77 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
           Padding(
             padding: AppCardPaddings.standard,
             child: GlassCard(
+              color: palette.surface,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    context.tr('Biblioteca de sonidos', 'Sound library'),
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: palette.primaryMuted,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: palette.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.music_note_rounded,
+                          color: palette.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          context.tr(
+                            'Biblioteca de sonidos',
+                            'Sound library',
+                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: palette.textPrimary),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<PomodoroCompletionSound>(
+                    key: const ValueKey('notification-sound-selector'),
                     isExpanded: true,
                     value: settings.completionSound,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.volume_up_outlined),
+                    dropdownColor: palette.surface,
+                    iconEnabledColor: palette.primary,
+                    iconDisabledColor: palette.textSecondary,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: palette.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: palette.primaryMuted,
+                      prefixIcon: Icon(
+                        Icons.volume_up_rounded,
+                        color: palette.primary,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: palette.primary.withValues(alpha: 0.42),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: palette.primary,
+                          width: 2,
+                        ),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: palette.neutralSoft),
+                      ),
                     ),
                     items: [
                       for (final sound in PomodoroCompletionSound.values)

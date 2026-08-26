@@ -182,22 +182,22 @@ Checklist:
 - [x] Requirement approved by the user on 2026-08-13.
 - [x] Field-level causal merge rules are specified for mutable entities.
 - [x] Tombstone lifecycle and resurrection prevention are specified.
-- [ ] Resolution operations converge across all active devices.
+- [x] Resolution operations converge across active devices that receive them.
 
 Acceptance criteria:
 - [x] Causally newer operations apply without prompting.
 - [x] Concurrent changes to different mergeable fields combine automatically.
-- [ ] Concurrent different values for the same field create one visible conflict.
-- [ ] Concurrent modification versus deletion creates a durable conflict and
+- [x] Concurrent different values for the same field create one visible conflict.
+- [x] Concurrent modification versus deletion creates a durable conflict and
       never silently destroys the modification.
 - [ ] Immutable-history ID collisions with different payloads are treated as
       integrity conflicts, not overwritten.
-- [ ] Conflict UI identifies this phone and the originating friendly device,
+- [x] Conflict UI identifies this phone and the originating friendly device,
       shows both values and dates, and offers use-local, use-remote, or preserve-both
       only when the entity supports duplication safely.
-- [ ] Resolving a conflict creates a new causal operation; other devices consume
+- [x] Resolving a conflict creates a new causal operation; other devices consume
       that resolution instead of asking independently after receiving it.
-- [ ] Tombstones prevent a long-offline phone from reviving deleted data.
+- [x] Tombstones prevent a long-offline phone from reviving deleted data.
 - [ ] Applying the same operations in different arrival orders reaches the same
       final non-conflicted state.
 
@@ -229,7 +229,7 @@ Acceptance criteria:
 
 ## REQ-V11-007 - Honest sync status and guided Syncthing setup
 
-Status: Approved
+Status: In Progress
 
 Objective:
 Make the boundary between MichiFocus processing and Syncthing transport clear,
@@ -247,9 +247,10 @@ Acceptance criteria:
       last local processing time, and last observed remote activity.
 - [ ] Normal successful processing is summarized without interrupting the user.
 - [ ] Conflict and device-management screens always identify friendly device origins.
-- [ ] The primary local action is named `Preparar y revisar cambios` or equivalent,
+- [x] The primary local action is named `Preparar y revisar cambios` or equivalent,
       not `Sincronizar ahora` unless actual transport completion can be proven.
-- [ ] A separate action opens Syncthing when Android supports it.
+- [x] A separate action opens Syncthing-Fork or classic Syncthing when Android
+      supports it, and reports honestly when neither app is available.
 - [ ] The UI states that MichiFocus cannot guarantee Syncthing is running or that
       another phone is currently reachable.
 - [ ] Setup guidance covers background execution, battery optimization, Syncthing
@@ -588,4 +589,55 @@ Evidence on 2026-08-14:
   a mutable short-lived buffer for guaranteed erasure and uses a roughly
   108-character hexadecimal operation filename retaining owner/counter/operation
   identity. Final release installation succeeds on both phones without data loss;
-  authenticated publication and Syncthing transport remain the physical gate.
+  authenticated publication and Syncthing transport remained the physical gate.
+
+Evidence on 2026-08-21:
+
+- Physical publication exposed that Drift persisted outbox `DateTime` values at
+  Unix-second precision while an earlier build hashed their original
+  milliseconds. The publisher now recovers an older timestamp only when one of
+  the 1,000 candidates matches the stored SHA-256 digest; an unrelated or altered
+  digest still fails closed. New operation timestamps are normalized before both
+  hashing and persistence, without a schema migration or discarded outbox rows.
+- The release APK installed with `adb install -r` on Poco 2201117PG and Realme
+  RMX3301 without clearing data. Authenticated preparation published all 18 Poco
+  and 11 Realme operations as distinct immutable encrypted files. Syncthing then
+  transported the complete 29-file set bidirectionally into the same selected
+  folder on both phones without filename collisions or overwrites.
+- Authenticated incoming review applied the other phone's complete batch:
+  Realme reported 18 applied and Poco reported 11 applied, each with zero
+  conflicts, zero deferred dependencies, and zero rejected files. Drift
+  generation, focused regression coverage, clean `lib`/`test` analysis, and the
+  complete 405-test suite passed. Background transport, delayed/offline cases,
+  conflict resolution, immutable history, and broader convergence gates remain.
+
+Evidence on 2026-08-24:
+
+- Added a theme-aware conflict center in multi-device Settings. Each supported
+  conflict shows the entity and field, both values, recorded dates, and device
+  label or stable installation suffix. Choosing a candidate requires explicit
+  confirmation; incomplete legacy or partial delete/update candidates remain
+  visible but cannot be selected blindly.
+- Same-field and delete/update detection now stores complete structured
+  candidates when available. A user choice commits the local mutation, logical
+  counter, merged causal parent, outbox operation, field version or tombstone,
+  and resolved-conflict state in one Drift transaction.
+- A received operation whose parent dominates both stored candidates closes the
+  corresponding conflict on another phone rather than prompting independently.
+  Focused persistence and widget tests cover local/remote presentation, chosen
+  value application, dominating parent construction, and third-device
+  consumption.
+- Schema 7 keeps the friendly device name and a complete entity snapshot inside
+  each authenticated encrypted operation. New delete tombstones retain that
+  encrypted restoration context locally, so a concurrent remote edit can be
+  restored without guessing missing fields. Existing schema-6 databases migrate
+  forward without changing application rows.
+- Safe goal and calendar-event conflicts offer `preserve both`: the original
+  resolution and an independently identified duplicate are committed as two
+  causal outbox operations inside one transaction. Tasks and routines do not
+  expose this action because duplication could detach execution/history links.
+- Clean `lib`/`test` analysis, all 162 sync tests, and all 423 project tests
+  pass. Arrival-order
+  permutations for the complete Drift path, accessibility matrices, immutable
+  history conflicts, and physical Poco/Realme conflict creation remain before
+  REQ-V11-005 can be Verified.

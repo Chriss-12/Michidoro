@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
@@ -15,7 +16,7 @@ void main() {
   late MichiFocusDatabase database;
   late DriftSyncExchangeRepository repository;
   late SyncGroupCrypto crypto;
-  final now = DateTime.utc(2026, 8, 14, 14);
+  final now = DateTime.utc(2026, 8, 14, 14, 0, 0, 731);
   final clearKey = List<int>.generate(32, (index) => index);
 
   setUp(() async {
@@ -96,6 +97,13 @@ void main() {
         )).changedFields,
         {'title': 'Private goal'},
       );
+      expect(
+        (await crypto.decryptOperation(
+          encrypted: encrypted,
+          clearKey: clearKey,
+        )).createdAtEpochMillis,
+        now.millisecondsSinceEpoch,
+      );
       final stored = await database
           .select(database.syncOutboxRecords)
           .getSingle();
@@ -103,7 +111,7 @@ void main() {
       expect(stored.publicationAttempts, 1);
       expect(
         stored.publishedAt?.toUtc(),
-        now.add(const Duration(minutes: 1)),
+        DateTime.utc(2026, 8, 14, 14, 1),
       );
     },
   );
@@ -129,6 +137,35 @@ void main() {
         .getSingle();
     expect(stored.publicationState, 'failed');
     expect(stored.publicationAttempts, 1);
+  });
+
+  test('rejects a digest that matches no legacy millisecond', () async {
+    await database
+        .update(database.syncOutboxRecords)
+        .write(
+          const SyncOutboxRecordsCompanion(
+            payloadSha256: Value(
+              'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+            ),
+          ),
+        );
+    final publisher = _Publisher();
+    final service = DriftSyncOutboxPublicationService(
+      repository: repository,
+      crypto: crypto,
+      publisher: publisher,
+    );
+
+    final report = await service(
+      folderUri: 'content://tree/michifocus',
+      groupId: _groupId,
+      installationId: _installationId,
+      clearKey: clearKey,
+    );
+
+    expect(report.failed, 1);
+    expect(report.remaining, 1);
+    expect(publisher.published, isEmpty);
   });
 }
 

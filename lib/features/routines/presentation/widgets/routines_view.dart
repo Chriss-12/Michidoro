@@ -119,12 +119,9 @@ class RoutinesView extends StatelessWidget {
               label: Text(context.tr('Crear rutina', 'Create routine')),
             ),
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: _RoutineFilterMenu(
-                value: controller.selectedFilter,
-                onChanged: (value) => controller.selectedFilter = value,
-              ),
+            _RoutineFilterMenu(
+              value: controller.selectedFilter,
+              onChanged: (value) => controller.selectedFilter = value,
             ),
             const SizedBox(height: 16),
             if (isLoading && controller.routines.value.isEmpty)
@@ -341,7 +338,7 @@ class _RoutineFilterMenu extends StatelessWidget {
           ),
       ],
       child: Container(
-        width: _menuWidth,
+        width: double.infinity,
         constraints: const BoxConstraints(minHeight: 52),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -501,27 +498,32 @@ class _RoutineCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (execution!.item.isOptionalSnapshot &&
-                execution!.item.status == RoutineRunStatus.scheduled) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => onSkipOptional(execution!),
-                  icon: const Icon(Icons.skip_next_rounded),
-                  label: Text(context.tr('Omitir', 'Skip')),
-                ),
-              ),
-            ],
           ],
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded),
-              label: Text(context.tr('Editar rutina', 'Edit routine')),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const ValueKey('routine-edit-button'),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_rounded),
+                  label: Text(context.tr('Editar', 'Edit')),
+                ),
+              ),
+              if (execution != null &&
+                  execution!.item.isOptionalSnapshot &&
+                  execution!.item.status == RoutineRunStatus.scheduled) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey('routine-skip-button-${execution!.item.id}'),
+                    onPressed: () => onSkipOptional(execution!),
+                    icon: const Icon(Icons.skip_next_rounded),
+                    label: Text(context.tr('Omitir', 'Skip')),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),

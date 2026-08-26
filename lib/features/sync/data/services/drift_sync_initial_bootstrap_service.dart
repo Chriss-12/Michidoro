@@ -6,6 +6,7 @@ import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/features/sync/data/repositories/drift_sync_exchange_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/secure_sync_id_generator.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_operation.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/repositories/device_identity_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/sync_initial_bootstrap_service.dart';
 
 class DriftSyncInitialBootstrapService {
@@ -13,15 +14,18 @@ class DriftSyncInitialBootstrapService {
     required MichiFocusDatabase database,
     required DriftSyncExchangeRepository exchangeRepository,
     required SecureSyncIdGenerator idGenerator,
+    DeviceIdentityRepository? identityRepository,
     DateTime Function()? clock,
   }) : _database = database,
        _exchangeRepository = exchangeRepository,
        _idGenerator = idGenerator,
+       _identityRepository = identityRepository,
        _clock = clock ?? DateTime.now;
 
   final MichiFocusDatabase _database;
   final DriftSyncExchangeRepository _exchangeRepository;
   final SecureSyncIdGenerator _idGenerator;
+  final DeviceIdentityRepository? _identityRepository;
   final DateTime Function() _clock;
 
   Future<SyncInitialBootstrapReport> call({
@@ -29,7 +33,11 @@ class DriftSyncInitialBootstrapService {
     required String installationId,
     required int protocolVersion,
   }) async {
-    final now = _clock().toUtc();
+    final identity = await _identityRepository?.load();
+    final deviceName = identity?.installationId == installationId
+        ? identity!.friendlyName
+        : '';
+    final now = _sqliteDateTime(_clock().toUtc());
     await _exchangeRepository.initializeLocalState(
       groupId: groupId,
       installationId: installationId,
@@ -60,6 +68,7 @@ class DriftSyncInitialBootstrapService {
           target: target,
           counter: counter,
           now: now,
+          deviceName: deviceName,
         ),
       );
       didQueue ? queued++ : skipped++;
@@ -74,6 +83,7 @@ class DriftSyncInitialBootstrapService {
     required _BootstrapTarget target,
     required int counter,
     required DateTime now,
+    required String deviceName,
   }) async {
     final changedFields = await _changedFields(database, target);
     if (changedFields == null) return null;
@@ -88,6 +98,8 @@ class DriftSyncInitialBootstrapService {
       changedFields: changedFields,
       operationKind: 'create',
       createdAtEpochMillis: now.millisecondsSinceEpoch,
+      originDeviceName: deviceName,
+      entitySnapshot: changedFields,
     );
     final digest = await Sha256().hash(operation.canonicalBytes());
     return LocalSyncOperationDraft(
@@ -100,6 +112,8 @@ class DriftSyncInitialBootstrapService {
       payloadSha256: digest.bytes
           .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
           .join(),
+      originDeviceName: deviceName,
+      entitySnapshotJson: _canonicalJson(changedFields),
     );
   }
 
@@ -255,6 +269,12 @@ class DriftSyncInitialBootstrapService {
     final keys = source.keys.toList()..sort();
     return jsonEncode({for (final key in keys) key: source[key]});
   }
+
+  DateTime _sqliteDateTime(DateTime value) =>
+      DateTime.fromMillisecondsSinceEpoch(
+        (value.millisecondsSinceEpoch ~/ 1000) * 1000,
+        isUtc: true,
+      );
 }
 
 class _BootstrapTarget {

@@ -12,15 +12,21 @@ class SyncOperation {
     required this.changedFields,
     required this.operationKind,
     required this.createdAtEpochMillis,
+    this.originDeviceName = '',
+    this.entitySnapshot = const {},
     this.protocolVersion = 1,
   });
 
   factory SyncOperation.fromJson(Map<String, dynamic> json) {
     final parentVersion = json['parentVersion'];
     final changedFields = json['changedFields'];
+    final originDeviceName = json['originDeviceName'];
+    final entitySnapshot = json['entitySnapshot'];
     if (json['protocolVersion'] != 1 ||
         parentVersion is! Map<String, dynamic> ||
-        changedFields is! Map<String, dynamic>) {
+        changedFields is! Map<String, dynamic> ||
+        (originDeviceName != null && originDeviceName is! String) ||
+        (entitySnapshot != null && entitySnapshot is! Map<String, dynamic>)) {
       throw const FormatException('Invalid synchronization operation.');
     }
     return SyncOperation(
@@ -37,6 +43,10 @@ class SyncOperation {
         json,
         'createdAtEpochMillis',
       ),
+      originDeviceName: originDeviceName is String ? originDeviceName : '',
+      entitySnapshot: entitySnapshot is Map<String, dynamic>
+          ? Map<String, Object?>.from(entitySnapshot)
+          : const {},
     )..validate();
   }
 
@@ -51,6 +61,8 @@ class SyncOperation {
   final Map<String, Object?> changedFields;
   final String operationKind;
   final int createdAtEpochMillis;
+  final String originDeviceName;
+  final Map<String, Object?> entitySnapshot;
 
   void validate() {
     if (!RegExp(r'^group_[a-f0-9]{32}$').hasMatch(groupId) ||
@@ -70,6 +82,11 @@ class SyncOperation {
         (operationKind == 'delete' && changedFields.isNotEmpty) ||
         (operationKind != 'delete' && changedFields.isEmpty)) {
       throw const FormatException('Invalid synchronization operation.');
+    }
+    final normalizedDeviceName = originDeviceName.trim();
+    if (normalizedDeviceName.length > 60 ||
+        (originDeviceName.isNotEmpty && normalizedDeviceName.isEmpty)) {
+      throw const FormatException('Invalid origin device name.');
     }
     for (final entry in parentVersion.entries) {
       if (!RegExp(r'^installation_[a-f0-9]{32}$').hasMatch(entry.key) ||
@@ -98,6 +115,10 @@ class SyncOperation {
       'changedFields': _sortedMap(changedFields),
       'operationKind': operationKind,
       'createdAtEpochMillis': createdAtEpochMillis,
+      if (originDeviceName.isNotEmpty)
+        'originDeviceName': originDeviceName.trim(),
+      if (entitySnapshot.isNotEmpty)
+        'entitySnapshot': _sortedMap(entitySnapshot),
     };
   }
 

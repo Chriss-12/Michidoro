@@ -459,6 +459,14 @@ review can retry them. Routine templates, weekdays, and ordered items use the
 existing aggregate transaction. A stale or concurrent update cannot remove a
 tombstone and revive deleted data silently.
 
+Schema version 7 adds `origin_device_name` and `entity_snapshot_json` to
+`sync_outbox`, `origin_device_name` to `sync_entity_versions`, and both context
+columns to `sync_tombstones`. The snapshot and
+friendly name are serialized only inside the authenticated encrypted operation;
+the private columns let pending publication and later delete/update resolution
+reconstruct the same canonical payload. Migration 6→7 adds nullable/defaulted
+columns without rebuilding application tables or changing user data.
+
 ## V11 initial mutable-data bootstrap
 
 Preparing encrypted changes now scans the existing mutable goals, routine
@@ -472,4 +480,13 @@ transaction. Repeating preparation is therefore idempotent and does not modify
 the application row. No schema change was required. Pomodoro sessions,
 completion events, and routine-run history remain excluded until their
 append-only synchronization contract is implemented.
+
+Outbox operation timestamps are normalized to Drift's Unix-second persistence
+precision before their canonical SHA-256 digest is created. For pending rows
+written by an earlier build with millisecond precision, publication searches the
+bounded millisecond range inside the persisted second and accepts only the
+canonical payload matching the already stored digest. No digest is rewritten and
+an unmatched row remains retryable and rejected. On 2026-08-21 this compatibility
+path recovered 29 existing operations across Poco and Realme; both phones applied
+the other phone's complete batch with zero rejected or deferred files.
 

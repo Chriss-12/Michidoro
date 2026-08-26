@@ -12,6 +12,8 @@ class LocalSyncOperationDraft {
     required this.changedFieldsJson,
     required this.operationKind,
     required this.payloadSha256,
+    this.originDeviceName = '',
+    this.entitySnapshotJson,
   });
 
   final String operationId;
@@ -21,6 +23,8 @@ class LocalSyncOperationDraft {
   final String changedFieldsJson;
   final String operationKind;
   final String payloadSha256;
+  final String originDeviceName;
+  final String? entitySnapshotJson;
 }
 
 class RemoteSyncOperationIdentity {
@@ -140,6 +144,8 @@ class DriftSyncExchangeRepository {
               entityId: operation.entityId,
               parentVersionJson: operation.parentVersionJson,
               changedFieldsJson: operation.changedFieldsJson,
+              originDeviceName: Value(operation.originDeviceName),
+              entitySnapshotJson: Value(operation.entitySnapshotJson),
               operationKind: operation.operationKind,
               protocolVersion: state.protocolVersion,
               payloadSha256: operation.payloadSha256.toLowerCase(),
@@ -171,6 +177,8 @@ class DriftSyncExchangeRepository {
                 causalVersionJson: resultingVersionJson,
                 operationId: operation.operationId,
                 originDeviceId: installationId,
+                originDeviceName: Value(operation.originDeviceName),
+                entitySnapshotJson: Value(operation.entitySnapshotJson),
                 deletedAt: now,
               ),
             );
@@ -188,6 +196,7 @@ class DriftSyncExchangeRepository {
                   causalVersionJson: resultingVersionJson,
                   operationId: operation.operationId,
                   originDeviceId: installationId,
+                  originDeviceName: Value(operation.originDeviceName),
                   updatedAt: now,
                 ),
               );
@@ -292,6 +301,8 @@ class DriftSyncExchangeRepository {
               entityId: entityId,
               parentVersionJson: operation.parentVersionJson,
               changedFieldsJson: operation.changedFieldsJson,
+              originDeviceName: Value(operation.originDeviceName),
+              entitySnapshotJson: Value(operation.entitySnapshotJson),
               operationKind: operation.operationKind,
               protocolVersion: state.protocolVersion,
               payloadSha256: operation.payloadSha256.toLowerCase(),
@@ -313,6 +324,7 @@ class DriftSyncExchangeRepository {
                 causalVersionJson: versionJson,
                 operationId: operation.operationId,
                 originDeviceId: installationId,
+                originDeviceName: Value(operation.originDeviceName),
                 updatedAt: now,
               ),
             );
@@ -391,6 +403,13 @@ class DriftSyncExchangeRepository {
       required bool applyDelete,
     })
     apply,
+    Map<String, Object?> remoteChangedFields = const {},
+    Map<String, Object?> remoteEntitySnapshot = const {},
+    String localDeviceName = '',
+    String remoteDeviceName = '',
+    DateTime? remoteCreatedAt,
+    Future<Map<String, Object?>?> Function(MichiFocusDatabase database)?
+    readCurrentFields,
   }) {
     _validateRemoteIdentity(identity);
     return _database.transaction(() async {
@@ -461,6 +480,27 @@ class DriftSyncExchangeRepository {
           _decodeVersion(tombstone.causalVersionJson),
         );
       }
+      final openEntityConflicts =
+          await (_database.select(
+                _database.syncConflictRecords,
+              )..where(
+                (row) =>
+                    row.groupId.equals(identity.groupId) &
+                    row.entityType.equals(entityType) &
+                    row.entityId.equals(entityId) &
+                    row.status.equals('open'),
+              ))
+              .get();
+      for (final conflict in openEntityConflicts) {
+        try {
+          final candidates = _conflictCandidates(conflict.candidatesJson);
+          _mergeVersionInto(knownVersion, candidates.localVersion);
+          _mergeVersionInto(knownVersion, candidates.remoteVersion);
+        } on FormatException {
+          // Legacy conflicts stay visible but cannot participate in a causal
+          // resolution because they did not persist complete candidates.
+        }
+      }
       if (!_dominates(knownVersion, parentVersion)) {
         return RemoteCausalApplyResult.deferred;
       }
@@ -474,10 +514,12 @@ class DriftSyncExchangeRepository {
       final resultingJson = _canonicalVersionJson(resultingVersion);
       final fieldsToApply = <String>{};
       final conflicts = <String>{};
+      var didApplyDelete = false;
 
       if (isDelete) {
         if (_dominates(parentVersion, knownVersion)) {
           await apply(_database, const {}, applyDelete: true);
+          didApplyDelete = true;
           await (_database.delete(
                 _database.syncEntityVersionRecords,
               )..where(
@@ -497,6 +539,12 @@ class DriftSyncExchangeRepository {
                   causalVersionJson: resultingJson,
                   operationId: identity.operationId,
                   originDeviceId: identity.originDeviceId,
+                  originDeviceName: Value(remoteDeviceName.trim()),
+                  entitySnapshotJson: Value(
+                    remoteEntitySnapshot.isEmpty
+                        ? null
+                        : jsonEncode(remoteEntitySnapshot),
+                  ),
                   deletedAt: appliedAt,
                 ),
               );
@@ -533,6 +581,7 @@ class DriftSyncExchangeRepository {
                     causalVersionJson: resultingJson,
                     operationId: identity.operationId,
                     originDeviceId: identity.originDeviceId,
+                    originDeviceName: Value(remoteDeviceName.trim()),
                     updatedAt: appliedAt,
                   ),
                 );
@@ -550,6 +599,46 @@ class DriftSyncExchangeRepository {
       }
 
       for (final field in conflicts) {
+        final storedField = field == '__delete__' ? null : field;
+        final localFields = await readCurrentFields?.call(_database);
+        final localSnapshot =
+            localFields ??
+            (tombstone?.entitySnapshotJson == null
+                ? null
+                : _jsonMap(tombstone!.entitySnapshotJson!));
+        final localVersionRecord = storedField == null
+            ? null
+            : await (_database.select(
+                    _database.syncEntityVersionRecords,
+                  )..where(
+                    (row) =>
+                        row.groupId.equals(identity.groupId) &
+                        row.entityType.equals(entityType) &
+                        row.entityId.equals(entityId) &
+                        row.fieldName.equals(storedField),
+                  ))
+                  .getSingleOrNull();
+        final localIsDeletion = tombstone != null;
+        final remoteIsDeletion = isDelete;
+        final localOriginDeviceId = localIsDeletion
+            ? tombstone.originDeviceId
+            : localVersionRecord?.originDeviceId ?? localState.installationId;
+        final localRecordedAt = localIsDeletion
+            ? tombstone.deletedAt
+            : localVersionRecord?.updatedAt ?? appliedAt;
+        final localDeviceLabel = localIsDeletion
+            ? tombstone.originDeviceName
+            : localVersionRecord?.originDeviceName ?? '';
+        final localValue = storedField == null
+            ? localSnapshot
+            : localSnapshot?[storedField];
+        final remoteValue = storedField == null
+            ? remoteChangedFields
+            : remoteChangedFields[storedField];
+        final remoteCanApply =
+            remoteIsDeletion ||
+            storedField != null ||
+            remoteEntitySnapshot.isNotEmpty;
         await _database
             .into(_database.syncConflictRecords)
             .insertOnConflictUpdate(
@@ -558,18 +647,72 @@ class DriftSyncExchangeRepository {
                 groupId: identity.groupId,
                 entityType: entityType,
                 entityId: entityId,
-                fieldName: Value(field == '__delete__' ? null : field),
+                fieldName: Value(storedField),
                 candidatesJson: jsonEncode({
-                  'remoteOperationId': identity.operationId,
-                  'remoteOriginDeviceId': identity.originDeviceId,
-                  'remoteVersion': resultingVersion,
-                  'currentVersion': field == '__delete__'
-                      ? knownVersion
-                      : currentVersions[field],
+                  'schemaVersion': 1,
+                  'local': {
+                    'originDeviceId': localOriginDeviceId,
+                    'deviceName': localDeviceLabel.trim().isNotEmpty
+                        ? localDeviceLabel.trim()
+                        : localOriginDeviceId == localState.installationId
+                        ? localDeviceName.trim()
+                        : '',
+                    'operationId': localIsDeletion
+                        ? tombstone.operationId
+                        : localVersionRecord?.operationId ?? '',
+                    'version': storedField == null
+                        ? knownVersion
+                        : currentVersions[field],
+                    'value': localValue,
+                    'snapshot': localSnapshot,
+                    'isDeletion': localIsDeletion,
+                    'recordedAt': localRecordedAt
+                        .toUtc()
+                        .millisecondsSinceEpoch,
+                    'canApply':
+                        localIsDeletion ||
+                        storedField != null ||
+                        localSnapshot != null,
+                  },
+                  'remote': {
+                    'originDeviceId': identity.originDeviceId,
+                    'deviceName': remoteDeviceName.trim(),
+                    'operationId': identity.operationId,
+                    'version': resultingVersion,
+                    'value': remoteValue,
+                    'snapshot': remoteEntitySnapshot,
+                    'isDeletion': remoteIsDeletion,
+                    'recordedAt': (remoteCreatedAt ?? appliedAt)
+                        .toUtc()
+                        .millisecondsSinceEpoch,
+                    'canApply': remoteCanApply,
+                  },
                 }),
                 createdAt: appliedAt,
               ),
             );
+      }
+      if (didApplyDelete) {
+        await _markDominatedConflictsResolved(
+          groupId: identity.groupId,
+          entityType: entityType,
+          entityId: entityId,
+          fieldName: null,
+          parentVersion: parentVersion,
+          resolutionOperationId: identity.operationId,
+          resolvedAt: appliedAt,
+        );
+      }
+      for (final field in fieldsToApply) {
+        await _markDominatedConflictsResolved(
+          groupId: identity.groupId,
+          entityType: entityType,
+          entityId: entityId,
+          fieldName: field,
+          parentVersion: parentVersion,
+          resolutionOperationId: identity.operationId,
+          resolvedAt: appliedAt,
+        );
       }
       await _database
           .into(_database.syncAppliedOperationRecords)
@@ -588,6 +731,184 @@ class DriftSyncExchangeRepository {
         return RemoteCausalApplyResult.applied;
       }
       return RemoteCausalApplyResult.obsolete;
+    });
+  }
+
+  Future<List<SyncConflictRecord>> openConflictRecords(String groupId) {
+    final query = _database.select(_database.syncConflictRecords)
+      ..where(
+        (row) => row.groupId.equals(groupId) & row.status.equals('open'),
+      )
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAt)]);
+    return query.get();
+  }
+
+  Future<SyncOutboxRecord> commitConflictResolution({
+    required String conflictId,
+    required String groupId,
+    required String installationId,
+    required String operationKind,
+    required Map<String, Object?> changedFields,
+    required DateTime now,
+    required Future<LocalSyncOperationDraft> Function(
+      int originCounter,
+      Map<String, int> parentVersion,
+    )
+    buildOperation,
+    required Future<void> Function(MichiFocusDatabase database) mutate,
+  }) {
+    return _database.transaction(() async {
+      final conflict = await (_database.select(
+        _database.syncConflictRecords,
+      )..where((row) => row.id.equals(conflictId))).getSingleOrNull();
+      if (conflict == null ||
+          conflict.groupId != groupId ||
+          conflict.status != 'open') {
+        throw StateError('Open synchronization conflict does not exist.');
+      }
+      final state = await (_database.select(
+        _database.syncLocalStateRecords,
+      )..where((row) => row.groupId.equals(groupId))).getSingleOrNull();
+      if (state == null || state.installationId != installationId) {
+        throw StateError('No matching local sync state is initialized.');
+      }
+      if (!const {'create', 'update', 'delete'}.contains(operationKind) ||
+          (operationKind == 'delete' && changedFields.isNotEmpty) ||
+          (operationKind != 'delete' && changedFields.isEmpty)) {
+        throw StateError('Conflict resolution operation is invalid.');
+      }
+
+      final parentVersion = await _entityVersion(
+        groupId: groupId,
+        entityType: conflict.entityType,
+        entityId: conflict.entityId,
+      );
+      final candidates = _conflictCandidates(conflict.candidatesJson);
+      _mergeVersionInto(parentVersion, candidates.localVersion);
+      _mergeVersionInto(parentVersion, candidates.remoteVersion);
+      final counter = state.logicalCounter + 1;
+      final operation = await buildOperation(counter, parentVersion);
+      _validateDraft(operation);
+      if (operation.entityType != conflict.entityType ||
+          operation.entityId != conflict.entityId ||
+          operation.operationKind != operationKind) {
+        throw StateError(
+          'Conflict resolution target changed while committing.',
+        );
+      }
+
+      await mutate(_database);
+      await (_database.update(
+        _database.syncLocalStateRecords,
+      )..where((row) => row.groupId.equals(groupId))).write(
+        SyncLocalStateRecordsCompanion(
+          logicalCounter: Value(counter),
+          updatedAt: Value(now),
+        ),
+      );
+      await _database
+          .into(_database.syncOutboxRecords)
+          .insert(
+            SyncOutboxRecordsCompanion.insert(
+              operationId: operation.operationId,
+              groupId: groupId,
+              originDeviceId: installationId,
+              originCounter: counter,
+              entityType: operation.entityType,
+              entityId: operation.entityId,
+              parentVersionJson: operation.parentVersionJson,
+              changedFieldsJson: operation.changedFieldsJson,
+              originDeviceName: Value(operation.originDeviceName),
+              entitySnapshotJson: Value(operation.entitySnapshotJson),
+              operationKind: operation.operationKind,
+              protocolVersion: state.protocolVersion,
+              payloadSha256: operation.payloadSha256.toLowerCase(),
+              createdAt: now,
+            ),
+          );
+
+      final resultingVersion = <String, int>{
+        ...parentVersion,
+        installationId: counter,
+      };
+      final resultingJson = _canonicalVersionJson(resultingVersion);
+      if (operationKind == 'delete') {
+        await (_database.delete(
+              _database.syncEntityVersionRecords,
+            )..where(
+              (row) =>
+                  row.groupId.equals(groupId) &
+                  row.entityType.equals(conflict.entityType) &
+                  row.entityId.equals(conflict.entityId),
+            ))
+            .go();
+        await _database
+            .into(_database.syncTombstoneRecords)
+            .insertOnConflictUpdate(
+              SyncTombstoneRecordsCompanion.insert(
+                groupId: groupId,
+                entityType: conflict.entityType,
+                entityId: conflict.entityId,
+                causalVersionJson: resultingJson,
+                operationId: operation.operationId,
+                originDeviceId: installationId,
+                originDeviceName: Value(operation.originDeviceName),
+                entitySnapshotJson: Value(operation.entitySnapshotJson),
+                deletedAt: now,
+              ),
+            );
+      } else {
+        for (final field in changedFields.keys) {
+          await _database
+              .into(_database.syncEntityVersionRecords)
+              .insertOnConflictUpdate(
+                SyncEntityVersionRecordsCompanion.insert(
+                  groupId: groupId,
+                  entityType: conflict.entityType,
+                  entityId: conflict.entityId,
+                  fieldName: field,
+                  causalVersionJson: resultingJson,
+                  operationId: operation.operationId,
+                  originDeviceId: installationId,
+                  originDeviceName: Value(operation.originDeviceName),
+                  updatedAt: now,
+                ),
+              );
+        }
+        await (_database.delete(
+              _database.syncTombstoneRecords,
+            )..where(
+              (row) =>
+                  row.groupId.equals(groupId) &
+                  row.entityType.equals(conflict.entityType) &
+                  row.entityId.equals(conflict.entityId),
+            ))
+            .go();
+      }
+
+      final field = conflict.fieldName;
+      await (_database.update(
+            _database.syncConflictRecords,
+          )..where(
+            (row) =>
+                row.groupId.equals(groupId) &
+                row.entityType.equals(conflict.entityType) &
+                row.entityId.equals(conflict.entityId) &
+                row.status.equals('open') &
+                (field == null
+                    ? row.fieldName.isNull()
+                    : row.fieldName.equals(field)),
+          ))
+          .write(
+            SyncConflictRecordsCompanion(
+              status: const Value('resolved'),
+              resolutionOperationId: Value(operation.operationId),
+              resolvedAt: Value(now),
+            ),
+          );
+      return (_database.select(_database.syncOutboxRecords)
+            ..where((row) => row.operationId.equals(operation.operationId)))
+          .getSingle();
     });
   }
 
@@ -655,6 +976,84 @@ class DriftSyncExchangeRepository {
               ),
             );
     if (changed > 1) throw StateError('Outbox identity is not unique.');
+  }
+
+  Future<void> _markDominatedConflictsResolved({
+    required String groupId,
+    required String entityType,
+    required String entityId,
+    required String? fieldName,
+    required Map<String, int> parentVersion,
+    required String resolutionOperationId,
+    required DateTime resolvedAt,
+  }) async {
+    final conflicts =
+        await (_database.select(
+              _database.syncConflictRecords,
+            )..where(
+              (row) =>
+                  row.groupId.equals(groupId) &
+                  row.entityType.equals(entityType) &
+                  row.entityId.equals(entityId) &
+                  row.status.equals('open') &
+                  (fieldName == null
+                      ? row.fieldName.isNull()
+                      : row.fieldName.equals(fieldName)),
+            ))
+            .get();
+    for (final conflict in conflicts) {
+      late final _StoredConflictCandidates candidates;
+      try {
+        candidates = _conflictCandidates(conflict.candidatesJson);
+      } on FormatException {
+        continue;
+      }
+      if (!_dominates(parentVersion, candidates.localVersion) ||
+          !_dominates(parentVersion, candidates.remoteVersion)) {
+        continue;
+      }
+      await (_database.update(
+        _database.syncConflictRecords,
+      )..where((row) => row.id.equals(conflict.id))).write(
+        SyncConflictRecordsCompanion(
+          status: const Value('resolved'),
+          resolutionOperationId: Value(resolutionOperationId),
+          resolvedAt: Value(resolvedAt),
+        ),
+      );
+    }
+  }
+
+  _StoredConflictCandidates _conflictCandidates(String source) {
+    final decoded = jsonDecode(source);
+    if (decoded is! Map<String, dynamic> || decoded['schemaVersion'] != 1) {
+      throw const FormatException(
+        'Stored synchronization conflict is unsupported.',
+      );
+    }
+    final local = decoded['local'];
+    final remote = decoded['remote'];
+    if (local is! Map<String, dynamic> || remote is! Map<String, dynamic>) {
+      throw const FormatException(
+        'Stored synchronization conflict is invalid.',
+      );
+    }
+    return _StoredConflictCandidates(
+      localVersion: _versionFromConflict(local['version']),
+      remoteVersion: _versionFromConflict(remote['version']),
+    );
+  }
+
+  Map<String, int> _versionFromConflict(Object? source) {
+    if (source is! Map<String, dynamic>) {
+      throw const FormatException('Stored conflict version is invalid.');
+    }
+    return source.map((key, value) {
+      if (value is! int || value < 1) {
+        throw const FormatException('Stored conflict counter is invalid.');
+      }
+      return MapEntry(key, value);
+    });
   }
 
   Future<SyncOutboxRecord> _outboxById(String operationId) async {
@@ -745,6 +1144,14 @@ class DriftSyncExchangeRepository {
     });
   }
 
+  Map<String, Object?> _jsonMap(String source) {
+    final decoded = jsonDecode(source);
+    if (decoded is! Map<String, dynamic>) {
+      throw StateError('Stored entity snapshot is invalid.');
+    }
+    return Map<String, Object?>.from(decoded);
+  }
+
   bool _dominates(Map<String, int> left, Map<String, int> right) {
     for (final entry in right.entries) {
       if ((left[entry.key] ?? 0) < entry.value) {
@@ -774,6 +1181,12 @@ class DriftSyncExchangeRepository {
     _requireText(draft.operationKind, 'operationKind');
     _requireJsonObject(draft.parentVersionJson, 'parentVersionJson');
     _requireJsonObject(draft.changedFieldsJson, 'changedFieldsJson');
+    if (draft.entitySnapshotJson != null) {
+      _requireJsonObject(draft.entitySnapshotJson!, 'entitySnapshotJson');
+    }
+    if (draft.originDeviceName.trim().length > 60) {
+      throw const FormatException('originDeviceName is too long.');
+    }
     _requireSha256(draft.payloadSha256);
   }
 
@@ -807,4 +1220,14 @@ class DriftSyncExchangeRepository {
       throw ArgumentError.value(value, name, 'Must not be empty.');
     }
   }
+}
+
+class _StoredConflictCandidates {
+  const _StoredConflictCandidates({
+    required this.localVersion,
+    required this.remoteVersion,
+  });
+
+  final Map<String, int> localVersion;
+  final Map<String, int> remoteVersion;
 }

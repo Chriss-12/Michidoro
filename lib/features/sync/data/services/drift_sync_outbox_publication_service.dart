@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:cryptography/cryptography.dart';
 import 'package:pomodoro_app_v1/features/sync/data/repositories/drift_sync_exchange_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/sync_group_crypto.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_operation.dart';
@@ -46,7 +47,7 @@ class DriftSyncOutboxPublicationService {
             record.originDeviceId != installationId) {
           throw const FormatException('Outbox identity is invalid.');
         }
-        final operation = SyncOperation(
+        final storedOperation = SyncOperation(
           groupId: record.groupId,
           operationId: record.operationId,
           originDeviceId: record.originDeviceId,
@@ -57,6 +58,14 @@ class DriftSyncOutboxPublicationService {
           changedFields: _jsonObject(record.changedFieldsJson),
           operationKind: record.operationKind,
           createdAtEpochMillis: record.createdAt.toUtc().millisecondsSinceEpoch,
+          originDeviceName: record.originDeviceName,
+          entitySnapshot: record.entitySnapshotJson == null
+              ? const {}
+              : _jsonObject(record.entitySnapshotJson!),
+        );
+        final operation = await _operationMatchingDigest(
+          storedOperation,
+          record.payloadSha256,
         );
         final encrypted = await _crypto.encryptOperation(
           operation: operation,
@@ -102,5 +111,49 @@ class DriftSyncOutboxPublicationService {
       throw const FormatException('Outbox JSON is invalid.');
     }
     return Map<String, Object?>.from(decoded);
+  }
+
+  Future<SyncOperation> _operationMatchingDigest(
+    SyncOperation storedOperation,
+    String expectedDigest,
+  ) async {
+    if (await _hasDigest(storedOperation, expectedDigest)) {
+      return storedOperation;
+    }
+
+    // Drift stores DateTime values as Unix seconds. Operations created by an
+    // earlier build hashed the milliseconds before that value was persisted.
+    // Recover only the timestamp whose canonical payload matches the durable
+    // digest; unrelated or altered rows remain rejected.
+    final storedSecond = storedOperation.createdAtEpochMillis;
+    for (var millisecond = 1; millisecond < 1000; millisecond++) {
+      final candidate = SyncOperation(
+        groupId: storedOperation.groupId,
+        operationId: storedOperation.operationId,
+        originDeviceId: storedOperation.originDeviceId,
+        originCounter: storedOperation.originCounter,
+        entityType: storedOperation.entityType,
+        entityId: storedOperation.entityId,
+        parentVersion: storedOperation.parentVersion,
+        changedFields: storedOperation.changedFields,
+        operationKind: storedOperation.operationKind,
+        createdAtEpochMillis: storedSecond + millisecond,
+        originDeviceName: storedOperation.originDeviceName,
+        entitySnapshot: storedOperation.entitySnapshot,
+      );
+      if (await _hasDigest(candidate, expectedDigest)) return candidate;
+    }
+    throw const FormatException('Outbox digest is invalid.');
+  }
+
+  Future<bool> _hasDigest(
+    SyncOperation operation,
+    String expectedDigest,
+  ) async {
+    final digest = await Sha256().hash(operation.canonicalBytes());
+    final actual = digest.bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return actual == expectedDigest;
   }
 }

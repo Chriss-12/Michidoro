@@ -193,6 +193,10 @@ Acceptance criteria:
       widths remain usable without clipping or overlap.
 - [x] Returning from a dirty new routine shows one discard confirmation and
       closes the editor without a deactivated-context or result-type error.
+- [x] The routine-status trigger uses the full available list width while its
+      anchored popup remains compact.
+- [x] When the current activity can be skipped, `Editar rutina` and `Omitir`
+      appear as balanced actions in one row below the primary start action.
 
 Visual refinement evidence on 2026-08-11:
 - The four-step editor now uses one stable segmented-progress header, consistent
@@ -222,6 +226,11 @@ Visual refinement evidence on 2026-08-11:
   circles. Scoped analysis and all 393 tests pass; an optimized release APK was
   built and installed preserving data. Final post-authentication device timing
   remains for the user-visible smoke check.
+- On 2026-08-24 the list filter trigger expanded to the full available width
+  while preserving the compact anchored popup. Optional current activities now
+  place `Editar rutina` on the left and `Omitir` on the right in one row below
+  the full-width start action. Nine focused Home/Routines tests, clean analysis,
+  and the complete 415-test suite pass.
 
 ## REQ-V9-004 - Daily materialization and ordinary task integration
 
@@ -381,29 +390,31 @@ Verification progress (2026-08-09):
   restored `America/La_Paz`. Final cleanup restored the routine to 08:00 with no
   reminder, zero active routine alarms, and granted notification permission.
 
-## REQ-V9-007 - Home and calendar routine presentation
+## REQ-V9-007 - Routine access and calendar presentation
 
 Status: Verified
 
 Objective:
-Make routines useful from daily planning surfaces without crowding navigation
-or duplicating the full editor.
+Keep routine execution centered in `Tareas -> Rutinas` while preserving useful
+calendar projection without crowding navigation or duplicating the editor in
+Home.
 
 Checklist:
-- [x] Home next-routine section implemented
+- [x] Duplicate Home routine section removed
 - [x] Calendar projection implemented
 - [x] Daily progress and conflict states implemented
 - [x] Existing-task presentation regression tests passed
 - [x] Android visual matrix passed
 
 Acceptance criteria:
-- [x] Home shows the next active routine, current item, next item/time, required
-      progress, and one clear start/continue action.
-- [x] Home does not become a second routine editor.
+- [x] Home does not show a routine card or become a second routine surface.
+- [x] `Tareas -> Rutinas` remains the primary place to inspect, start, continue,
+      edit, or skip routine work.
 - [x] Calendar combines ordinary tasks, materialized routine tasks, and future
       virtual routine occurrences without duplicate rows.
 - [x] Projected occurrences are visually distinguishable from persisted tasks.
-- [x] Users can open the routine or today's occurrence from Home and Calendar.
+- [x] Users can open the routine or dated occurrence from `Tareas -> Rutinas`
+      and Calendar.
 - [x] Routine progress distinguishes completed, optional skipped, intentional
       whole-run skipped, and missed outcomes.
 - [x] Existing Home charts, task planning, and calendar event behavior remain
@@ -426,6 +437,12 @@ Verification evidence on 2026-08-11:
   English/Graphite Night/Merriweather/125%.
 - Final device cleanup restored Spanish, Nature Focus light, 100%, Sora, routine
   progress `0/1`, six Pending tasks, zero In Progress tasks, and no timer change.
+- On 2026-08-24 the user replaced the earlier Home-summary decision. The Home
+  routine card and its direct execution path were removed; Calendar projection
+  and the complete `Tareas -> Rutinas` workflow remain intact. A regression test
+  proves populated routines stay absent from Home in Spanish/English and at
+  maximum typography. Nine focused tests, clean analysis, and all 415 project
+  tests pass.
 
 ## REQ-V9-008 - Routine statistics, mood, and PDF reporting
 

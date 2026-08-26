@@ -260,6 +260,7 @@ void main() {
     final encoded = jsonEncode(encrypted.toJson());
 
     expect(encoded, isNot(contains('Private objective')));
+    expect(encoded, isNot(contains('Realme personal')));
     expect(encrypted.payloadSha256, hasLength(64));
     final decrypted = await crypto.decryptOperation(
       encrypted: encrypted,
@@ -328,4 +329,13 @@ SyncOperation _operation() => const SyncOperation(
   changedFields: {'title': 'Private objective', 'targetSessions': 4},
   operationKind: 'create',
   createdAtEpochMillis: 1_700_000_000_000,
+  originDeviceName: 'Realme personal',
+  entitySnapshot: {
+    'title': 'Private objective',
+    'targetSessions': 4,
+    'completedSessions': 0,
+    'targetDate': null,
+    'createdAt': 1_700_000_000_000,
+    'updatedAt': 1_700_000_000_000,
+  },
 );

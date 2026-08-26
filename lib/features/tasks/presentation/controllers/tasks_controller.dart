@@ -1,4 +1,6 @@
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/entities/task_temporal_filter.dart';
+import 'package:pomodoro_app_v1/features/tasks/domain/repositories/task_temporal_filter_repository.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/repositories/tasks_repository.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -76,17 +78,31 @@ TaskProgressBand taskProgressBandForRatio(double ratio) {
 }
 
 class TasksController {
-  TasksController({required TasksRepository repository})
-    : _repository = repository;
+  TasksController({
+    required TasksRepository repository,
+    TaskTemporalFilterRepository? temporalFilterRepository,
+    DateTime Function()? now,
+  }) : _repository = repository,
+       _temporalFilterRepository = temporalFilterRepository,
+       temporalFilter = signal(TaskTemporalFilter.day((now ?? DateTime.now)()));
 
   final TasksRepository _repository;
+  final TaskTemporalFilterRepository? _temporalFilterRepository;
+  Future<void>? _temporalFilterLoad;
   final FlutterSignal<List<Task>> tasks = signal(const []);
   final FlutterSignal<TaskFilter> filter = signal(TaskFilter.all);
+  final FlutterSignal<TaskTemporalFilter> temporalFilter;
   final FlutterSignal<Set<String>> endedDayKeys = signal(const {});
   final FlutterSignal<String?> validationMessage = signal(null);
   final FlutterSignal<bool> isLoading = signal(false);
+  late final Computed<List<Task>> temporallyFilteredTasks =
+      computed<List<Task>>(
+        () => tasks.value
+            .where(temporalFilter.value.includes)
+            .toList(growable: false),
+      );
   late final Computed<List<Task>> filteredTasks = computed<List<Task>>(() {
-    final currentTasks = tasks.value;
+    final currentTasks = temporallyFilteredTasks.value;
 
     return switch (filter.value) {
       TaskFilter.all => currentTasks,
@@ -102,9 +118,11 @@ class TasksController {
       );
 
   TaskFilter get selectedFilter => filter.value;
+  TaskTemporalFilter get selectedTemporalFilter => temporalFilter.value;
 
   Future<void> loadTasks() async {
     isLoading.value = true;
+    await (_temporalFilterLoad ??= _loadTemporalFilter());
     tasks.value = await _repository.loadTasks();
     isLoading.value = false;
   }
@@ -362,6 +380,12 @@ class TasksController {
     filter.value = value;
   }
 
+  Future<void> selectTemporalFilter(TaskTemporalFilter value) async {
+    await (_temporalFilterLoad ??= _loadTemporalFilter());
+    temporalFilter.value = value;
+    await _temporalFilterRepository?.save(value);
+  }
+
   void clearValidationMessage() {
     if (validationMessage.value == null) {
       return;
@@ -375,6 +399,11 @@ class TasksController {
       for (final task in tasks.value)
         if (task.id == updatedTask.id) updatedTask else task,
     ];
+  }
+
+  Future<void> _loadTemporalFilter() async {
+    final stored = await _temporalFilterRepository?.load();
+    if (stored != null) temporalFilter.value = stored;
   }
 }
 

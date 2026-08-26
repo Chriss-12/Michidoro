@@ -2,12 +2,15 @@ import 'dart:developer' as developer;
 
 import 'package:pomodoro_app_v1/features/sync/data/services/secure_sync_id_generator.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/sync_group_crypto.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_conflict.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_group_enrollment.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_local_data_summary.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/device_identity_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_group_enrollment_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/device_bound_key_protector.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/external_sync_app_launcher.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_conflict_resolution_service.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/sync_group_manifest_discovery.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/sync_group_manifest_publisher.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/sync_incoming_application_service.dart';
@@ -39,6 +42,7 @@ enum SyncGroupEnrollmentFailure {
   localDataCheckFailed,
   bootstrapChoiceRequired,
   recoverySnapshotFailed,
+  externalSyncAppUnavailable,
   alreadyEnrolled,
   unexpected,
 }
@@ -68,6 +72,8 @@ enum SyncOutboxPublicationState { idle, publishing, complete, failed }
 
 enum SyncIncomingApplicationState { idle, processing, complete, failed }
 
+enum SyncConflictCenterState { idle, loading, ready, resolving, failed }
+
 class SyncGroupEnrollmentController {
   SyncGroupEnrollmentController({
     SyncGroupEnrollmentRepository? repository,
@@ -83,6 +89,8 @@ class SyncGroupEnrollmentController {
     SyncIncomingApplicationService? incomingApplicationService,
     SyncInitialBootstrapService? initialBootstrapService,
     DeviceIdentityRepository? identityRepository,
+    ExternalSyncAppLauncher? externalSyncAppLauncher,
+    SyncConflictResolutionService? conflictResolutionService,
     Future<void> Function()? refreshApplicationData,
   }) : _repository = repository,
        _crypto = crypto ?? SyncGroupCrypto(),
@@ -97,6 +105,8 @@ class SyncGroupEnrollmentController {
        _incomingApplicationService = incomingApplicationService,
        _initialBootstrapService = initialBootstrapService,
        _identityRepository = identityRepository,
+       _externalSyncAppLauncher = externalSyncAppLauncher,
+       _conflictResolutionService = conflictResolutionService,
        _refreshApplicationData = refreshApplicationData;
 
   final SyncGroupEnrollmentRepository? _repository;
@@ -112,6 +122,8 @@ class SyncGroupEnrollmentController {
   final SyncIncomingApplicationService? _incomingApplicationService;
   final SyncInitialBootstrapService? _initialBootstrapService;
   final DeviceIdentityRepository? _identityRepository;
+  final ExternalSyncAppLauncher? _externalSyncAppLauncher;
+  final SyncConflictResolutionService? _conflictResolutionService;
   final Future<void> Function()? _refreshApplicationData;
 
   SyncGroupEnrollment? _pendingEnrollment;
@@ -158,6 +170,10 @@ class SyncGroupEnrollmentController {
   final FlutterSignal<int> incomingConflictCount = signal(0);
   final FlutterSignal<int> deferredOperationCount = signal(0);
   final FlutterSignal<int> rejectedOperationCount = signal(0);
+  final FlutterSignal<SyncConflictCenterState> conflictCenterState = signal(
+    SyncConflictCenterState.idle,
+  );
+  final FlutterSignal<List<SyncConflict>> openConflicts = signal(const []);
 
   bool get isBusy =>
       state.value == SyncGroupEnrollmentState.preparing ||
@@ -167,7 +183,9 @@ class SyncGroupEnrollmentController {
       localDataState.value == SyncLocalDataInspectionState.checking ||
       recoverySnapshotState.value == SyncRecoverySnapshotState.creating ||
       outboxPublicationState.value == SyncOutboxPublicationState.publishing ||
-      incomingApplicationState.value == SyncIncomingApplicationState.processing;
+      incomingApplicationState.value ==
+          SyncIncomingApplicationState.processing ||
+      conflictCenterState.value == SyncConflictCenterState.resolving;
 
   Future<void> load() async {
     final stored = await _repository?.load();
@@ -191,6 +209,82 @@ class SyncGroupEnrollmentController {
         : localDataSummary.value.hasUserData
         ? SyncRecoverySnapshotState.pending
         : SyncRecoverySnapshotState.notRequired;
+    await loadOpenConflicts();
+  }
+
+  Future<void> loadOpenConflicts() async {
+    final enrollment = _enrollment;
+    final service = _conflictResolutionService;
+    final identities = _identityRepository;
+    if (enrollment == null || service == null || identities == null) {
+      batch(() {
+        openConflicts.value = const [];
+        conflictCenterState.value = SyncConflictCenterState.idle;
+      });
+      return;
+    }
+    conflictCenterState.value = SyncConflictCenterState.loading;
+    try {
+      final identity = await identities.load();
+      if (!identity.isInitialized) throw StateError('Missing device identity.');
+      final conflicts = await service.loadOpen(
+        groupId: enrollment.groupId,
+        localInstallationId: identity.installationId,
+        localDeviceName: identity.friendlyName,
+      );
+      batch(() {
+        openConflicts.value = conflicts;
+        incomingConflictCount.value = conflicts.length;
+        conflictCenterState.value = SyncConflictCenterState.ready;
+      });
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'No se pudieron cargar los conflictos: $error',
+        name: 'MichiFocusSync',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      conflictCenterState.value = SyncConflictCenterState.failed;
+    }
+  }
+
+  Future<bool> resolveConflict(
+    String conflictId,
+    SyncConflictChoice choice,
+  ) async {
+    final enrollment = _enrollment;
+    final service = _conflictResolutionService;
+    final identities = _identityRepository;
+    if (enrollment == null ||
+        service == null ||
+        identities == null ||
+        conflictCenterState.value == SyncConflictCenterState.resolving) {
+      return false;
+    }
+    conflictCenterState.value = SyncConflictCenterState.resolving;
+    try {
+      final identity = await identities.load();
+      if (!identity.isInitialized) throw StateError('Missing device identity.');
+      await service.resolve(
+        conflictId: conflictId,
+        groupId: enrollment.groupId,
+        localInstallationId: identity.installationId,
+        localDeviceName: identity.friendlyName,
+        choice: choice,
+      );
+      await _refreshApplicationData?.call();
+      await loadOpenConflicts();
+      return true;
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'No se pudo resolver el conflicto: $error',
+        name: 'MichiFocusSync',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      conflictCenterState.value = SyncConflictCenterState.failed;
+      return false;
+    }
   }
 
   Future<bool> prepareNewGroup({
@@ -558,6 +652,7 @@ class SyncGroupEnrollmentController {
       rejectedOperationCount.value = report.rejected;
       if (report.applied > 0) await _refreshApplicationData?.call();
       incomingApplicationState.value = SyncIncomingApplicationState.complete;
+      await loadOpenConflicts();
       return true;
     } on DeviceAuthenticationRequiredException {
       failure.value = SyncGroupEnrollmentFailure.authenticationCancelled;
@@ -574,6 +669,151 @@ class SyncGroupEnrollmentController {
     }
     incomingApplicationState.value = SyncIncomingApplicationState.failed;
     return false;
+  }
+
+  Future<bool> prepareAndReviewChanges(String folderUri) async {
+    final enrollment = _enrollment;
+    final publicationService = _outboxPublicationService;
+    final incomingService = _incomingApplicationService;
+    final identityRepository = _identityRepository;
+    final authenticator = _authenticator;
+    final keyProtector = _keyProtector;
+    if (enrollment == null ||
+        publicationService == null ||
+        incomingService == null ||
+        identityRepository == null ||
+        authenticator == null ||
+        keyProtector == null ||
+        folderUri.trim().isEmpty ||
+        isBusy) {
+      batch(() {
+        outboxPublicationState.value = SyncOutboxPublicationState.failed;
+        incomingApplicationState.value = SyncIncomingApplicationState.failed;
+      });
+      return false;
+    }
+
+    if (localDataSummary.value.hasUserData &&
+        enrollment.recoverySnapshotPath.isEmpty) {
+      final protected = await ensureRecoverySnapshot(folderUri);
+      if (!protected) {
+        batch(() {
+          outboxPublicationState.value = SyncOutboxPublicationState.failed;
+          incomingApplicationState.value = SyncIncomingApplicationState.failed;
+        });
+        return false;
+      }
+    }
+
+    batch(() {
+      outboxPublicationState.value = SyncOutboxPublicationState.publishing;
+      incomingApplicationState.value = SyncIncomingApplicationState.processing;
+      failure.value = null;
+    });
+    var clearKey = <int>[];
+    try {
+      final identity = await identityRepository.load();
+      if (!identity.isInitialized ||
+          !await authenticator.isAvailable() ||
+          !await keyProtector.isAvailable()) {
+        throw const DeviceKeyUnavailableException();
+      }
+      if (!await authenticator.authenticate()) {
+        throw const DeviceAuthenticationRequiredException();
+      }
+      clearKey = List<int>.from(
+        await keyProtector.unwrap(
+          groupId: enrollment.groupId,
+          envelope: enrollment.deviceBoundDek,
+        ),
+      );
+
+      final bootstrap = _initialBootstrapService;
+      if (bootstrap != null &&
+          enrollment.bootstrapPreference !=
+              SyncGroupBootstrapPreference.replaceLocal) {
+        await bootstrap(
+          groupId: enrollment.groupId,
+          installationId: identity.installationId,
+          protocolVersion: enrollment.manifest.protocolVersion,
+        );
+      }
+      final publication = await publicationService(
+        folderUri: folderUri,
+        groupId: enrollment.groupId,
+        installationId: identity.installationId,
+        clearKey: clearKey,
+      );
+      final incoming = await incomingService(
+        folderUri: folderUri,
+        groupId: enrollment.groupId,
+        localInstallationId: identity.installationId,
+        clearKey: clearKey,
+      );
+      if (incoming.applied > 0) await _refreshApplicationData?.call();
+      batch(() {
+        publishedOperationCount.value = publication.published;
+        remainingOperationCount.value = publication.remaining;
+        outboxPublicationState.value = publication.failed == 0
+            ? SyncOutboxPublicationState.complete
+            : SyncOutboxPublicationState.failed;
+        receivedOperationCount.value = incoming.applied;
+        incomingConflictCount.value = incoming.conflicts;
+        deferredOperationCount.value = incoming.deferred;
+        rejectedOperationCount.value = incoming.rejected;
+        incomingApplicationState.value = SyncIncomingApplicationState.complete;
+      });
+      await loadOpenConflicts();
+      return publication.failed == 0;
+    } on DeviceAuthenticationRequiredException {
+      failure.value = SyncGroupEnrollmentFailure.authenticationCancelled;
+    } on DeviceKeyInvalidatedException {
+      failure.value = SyncGroupEnrollmentFailure.keyInvalidated;
+    } on DeviceKeyIntegrityException {
+      failure.value = SyncGroupEnrollmentFailure.integrityFailure;
+    } on DeviceKeyUnavailableException {
+      failure.value = SyncGroupEnrollmentFailure.deviceSecurityUnavailable;
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'No se pudieron preparar y revisar los cambios: $error',
+        name: 'MichiFocusSync',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      failure.value = SyncGroupEnrollmentFailure.unexpected;
+    } finally {
+      _erase(clearKey);
+    }
+    batch(() {
+      outboxPublicationState.value = SyncOutboxPublicationState.failed;
+      incomingApplicationState.value = SyncIncomingApplicationState.failed;
+    });
+    return false;
+  }
+
+  Future<bool> openSyncthing() async {
+    final launcher = _externalSyncAppLauncher;
+    if (launcher == null) {
+      failure.value = SyncGroupEnrollmentFailure.externalSyncAppUnavailable;
+      return false;
+    }
+    failure.value = null;
+    try {
+      final opened = await launcher();
+      if (!opened) {
+        failure.value = SyncGroupEnrollmentFailure.externalSyncAppUnavailable;
+      }
+      return opened;
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'No se pudo abrir Syncthing: $error',
+        name: 'MichiFocusSync',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      failure.value = SyncGroupEnrollmentFailure.externalSyncAppUnavailable;
+      return false;
+    }
   }
 
   Future<bool> discoverGroups(String folderUri) async {

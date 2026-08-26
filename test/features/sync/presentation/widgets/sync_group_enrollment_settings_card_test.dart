@@ -155,9 +155,12 @@ void main() {
     expect(repository.created, isNotNull);
     expect(enrollment.state.value, SyncGroupEnrollmentState.enrolled);
     expect(
-      find.byKey(const ValueKey('publish-pending-sync-changes')),
+      find.byKey(const ValueKey('prepare-and-review-sync-changes')),
       findsOneWidget,
     );
+    expect(find.text('Preparar y revisar cambios'), findsOneWidget);
+    expect(find.byKey(const ValueKey('open-syncthing')), findsOneWidget);
+    expect(find.text('Abrir Syncthing'), findsOneWidget);
     expect(find.textContaining('envío cifrado'), findsOneWidget);
     expect(find.textContaining('todavía no está activa'), findsNothing);
   });

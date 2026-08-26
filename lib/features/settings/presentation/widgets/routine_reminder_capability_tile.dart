@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
+import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class RoutineReminderCapabilityTile extends StatelessWidget {
@@ -15,6 +16,7 @@ class RoutineReminderCapabilityTile extends StatelessWidget {
     final permissionGranted = capability.notificationPermissionGranted;
     final exactAvailable = capability.exactSchedulingAvailable;
     final colorScheme = Theme.of(context).colorScheme;
+    final palette = context.palette;
     final title = !permissionGranted
         ? context.tr(
             'Recordatorios del sistema desactivados',
@@ -40,17 +42,35 @@ class RoutineReminderCapabilityTile extends StatelessWidget {
             'Android puede retrasar algunos avisos para ahorrar batería. Tus rutinas no se modifican.',
             'Android may delay some alerts to save battery. Your routines are not changed.',
           );
-    final foreground = !permissionGranted
-        ? colorScheme.onErrorContainer
-        : colorScheme.onSurface;
-    final background = !permissionGranted
-        ? colorScheme.errorContainer
-        : colorScheme.surfaceContainerHighest;
+    final (background, border, iconColor) = !permissionGranted
+        ? (
+            Color.lerp(palette.surface, colorScheme.error, 0.16)!,
+            Color.lerp(palette.neutralSoft, colorScheme.error, 0.55)!,
+            colorScheme.error,
+          )
+        : exactAvailable
+        ? (
+            palette.primaryMuted,
+            palette.primary.withValues(alpha: 0.42),
+            palette.primary,
+          )
+        : (
+            palette.secondarySoft,
+            palette.secondary.withValues(alpha: 0.42),
+            palette.secondary,
+          );
+    final statusKey = !permissionGranted
+        ? 'denied'
+        : exactAvailable
+        ? 'exact'
+        : 'flexible';
 
     return DecoratedBox(
+      key: ValueKey('routine-reminder-capability-$statusKey'),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
       ),
       child: Column(
         children: [
@@ -59,10 +79,21 @@ class RoutineReminderCapabilityTile extends StatelessWidget {
               permissionGranted
                   ? Icons.notifications_active_outlined
                   : Icons.notifications_off_outlined,
-              color: foreground,
+              color: iconColor,
             ),
-            title: Text(title, style: TextStyle(color: foreground)),
-            subtitle: Text(subtitle, style: TextStyle(color: foreground)),
+            title: Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
           ),
           if (!permissionGranted)
             Padding(
@@ -78,7 +109,7 @@ class RoutineReminderCapabilityTile extends StatelessWidget {
                       'Open Android settings',
                     ),
                   ),
-                  style: TextButton.styleFrom(foregroundColor: foreground),
+                  style: TextButton.styleFrom(foregroundColor: iconColor),
                 ),
               ),
             ),

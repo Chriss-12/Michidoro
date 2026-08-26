@@ -350,6 +350,13 @@ void main() {
     await tester.tap(exitArea);
     await tester.pump(const Duration(milliseconds: 50));
     await tester.tap(exitArea);
+    await tester.pump();
+    expect(pomodoroController.maximumConcentrationEnabled.value, isFalse);
+    expect(
+      find.byKey(const Key('maximumConcentrationSurface')),
+      findsOneWidget,
+      reason: 'La salida debe conservar el fondo negro mientras se desvanece.',
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(pomodoroController.maximumConcentrationEnabled.value, isFalse);
@@ -404,11 +411,38 @@ void main() {
       find.byType(BottomSheet),
       matchesGoldenFile('goldens/task_plan_details_sheet.png'),
     );
-    await tester.tapAt(const Offset(12, 12));
+    Navigator.of(tester.element(find.byType(BottomSheet))).pop();
     await tester.pumpAndSettle();
     pomodoroController.pendingReflectionSessionId.value = 'test-reflection';
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Cierre de enfoque'));
+    expect(
+      tester.getTopLeft(find.text('Cierre de enfoque')).dy,
+      greaterThan(tester.getTopLeft(find.text('Terminar')).dy),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('focus-reflection-card'))).width,
+      greaterThan(300),
+    );
+    expect(
+      find.byIcon(Icons.sentiment_very_dissatisfied_rounded),
+      findsNothing,
+    );
+    final reflectionToggle = find.byKey(
+      const ValueKey('focus-reflection-toggle'),
+    );
+    await tester.scrollUntilVisible(
+      reflectionToggle,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(
+      find.byType(Scrollable).first,
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(reflectionToggle);
+    await tester.pumpAndSettle();
     expect(
       find.byIcon(Icons.sentiment_very_dissatisfied_rounded),
       findsOneWidget,
@@ -418,6 +452,7 @@ void main() {
     expect(find.byIcon(Icons.sentiment_satisfied_rounded), findsOneWidget);
     expect(find.byIcon(Icons.sentiment_very_satisfied_rounded), findsOneWidget);
     expect(find.text('1'), findsNothing);
+    expect(find.text('Este Pomodoro suma a'), findsNothing);
     pomodoroController.pendingReflectionSessionId.value = null;
     await tester.pumpAndSettle();
     await tester.binding.setSurfaceSize(const Size(480, 1800));
@@ -519,9 +554,94 @@ void main() {
 
     AppRouter.router.go(NotificationSettingsPage.routePath);
     await tester.pumpAndSettle();
+    final soundSelectorFinder = find.byKey(
+      const ValueKey('notification-sound-selector'),
+    );
+    var soundSelector = tester
+        .widget<DropdownButtonFormField<PomodoroCompletionSound>>(
+          soundSelectorFinder,
+        );
+    var expectedPalette = AppPalette.fromPreset(
+      appSettingsController.themePreset.value,
+      isDark: appSettingsController.isDarkMode.value,
+    );
+    expect(soundSelector.decoration.fillColor, expectedPalette.primaryMuted);
+    final previousPreset = appSettingsController.themePreset.value;
+    final comparisonPreset = previousPreset == AppThemePreset.sunsetTide
+        ? AppThemePreset.natureFocus
+        : AppThemePreset.sunsetTide;
+    appSettingsController.themePreset.value = comparisonPreset;
+    await tester.pumpAndSettle();
+    soundSelector = tester
+        .widget<DropdownButtonFormField<PomodoroCompletionSound>>(
+          soundSelectorFinder,
+        );
+    expectedPalette = AppPalette.fromPreset(
+      comparisonPreset,
+      isDark: appSettingsController.isDarkMode.value,
+    );
+    expect(soundSelector.decoration.fillColor, expectedPalette.primaryMuted);
+    appSettingsController.themePreset.value = previousPreset;
+    await tester.pumpAndSettle();
+    appSettingsController
+      ..addNotification(
+        title: 'Tarea programada para hoy',
+        body: 'Tienes 3 tareas pendientes. Empieza por: Preparar informe.',
+        routePath: '/tasks',
+      )
+      ..addNotification(
+        title: 'Rutina lista',
+        body: 'Rutina: Mañana productiva',
+        routePath: '/tasks',
+      );
+    await tester.pumpAndSettle();
     expect(find.text('Notificaciones'), findsWidgets);
     expect(find.text('Chriss'), findsOneWidget);
     expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('notification-kind-task')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notification-kind-routine')),
+      findsOneWidget,
+    );
+    expect(find.text('Tareas pendientes'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-task-count')),
+      findsOneWidget,
+    );
+    expect(find.text('3'), findsOneWidget);
+    expect(find.textContaining('Empieza por:'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            RegExp(r'^\d{2}:\d{2}$').hasMatch(widget.data ?? ''),
+      ),
+      findsNWidgets(2),
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(widget.data ?? ''),
+      ),
+      findsNWidgets(2),
+    );
+    final taskIcon = find.byKey(const ValueKey('notification-kind-task'));
+    final taskTime = find.byKey(const ValueKey('notification-time-task'));
+    final taskDate = find.byKey(const ValueKey('notification-date-task'));
+    final taskCard = find.byKey(const ValueKey('notification-card-task'));
+    expect(tester.getTopLeft(taskTime).dx, tester.getTopLeft(taskIcon).dx);
+    expect(
+      tester.getBottomRight(taskDate).dx,
+      closeTo(tester.getBottomRight(taskCard).dx - 12, 1.1),
+    );
+    await tester.tapAt(const Offset(12, 700));
+    await tester.pumpAndSettle();
     AppRouter.router.go(SettingsPage.routePath);
     await tester.pumpAndSettle();
 

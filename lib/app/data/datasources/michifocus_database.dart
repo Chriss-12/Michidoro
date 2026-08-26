@@ -416,6 +416,8 @@ class SyncOutboxRecords extends Table {
   TextColumn get entityId => text()();
   TextColumn get parentVersionJson => text()();
   TextColumn get changedFieldsJson => text()();
+  TextColumn get originDeviceName => text().withDefault(const Constant(''))();
+  TextColumn get entitySnapshotJson => text().nullable()();
   TextColumn get operationKind => text()();
   IntColumn get protocolVersion => integer()();
   TextColumn get payloadSha256 => text()();
@@ -466,6 +468,7 @@ class SyncEntityVersionRecords extends Table {
   TextColumn get causalVersionJson => text()();
   TextColumn get operationId => text()();
   TextColumn get originDeviceId => text()();
+  TextColumn get originDeviceName => text().withDefault(const Constant(''))();
   DateTimeColumn get updatedAt => dateTime()();
   @override
   Set<Column<Object>> get primaryKey => {
@@ -485,6 +488,8 @@ class SyncTombstoneRecords extends Table {
   TextColumn get causalVersionJson => text()();
   TextColumn get operationId => text()();
   TextColumn get originDeviceId => text()();
+  TextColumn get originDeviceName => text().withDefault(const Constant(''))();
+  TextColumn get entitySnapshotJson => text().nullable()();
   DateTimeColumn get deletedAt => dateTime()();
   @override
   Set<Column<Object>> get primaryKey => {groupId, entityType, entityId};
@@ -2326,7 +2331,7 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
   MichiFocusDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'michifocus'));
 
-  static const currentSchemaVersion = 6;
+  static const currentSchemaVersion = 7;
   @override
   int get schemaVersion => currentSchemaVersion;
   @override
@@ -2413,6 +2418,28 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
         await migrator.createIndex(syncOutboxStateCreatedIdx);
         await migrator.createIndex(syncAppliedOriginCounterUq);
         await migrator.createIndex(syncConflictsEntityStatusIdx);
+      }
+      if (from >= 6 && from < 7) {
+        await migrator.addColumn(
+          syncOutboxRecords,
+          syncOutboxRecords.originDeviceName,
+        );
+        await migrator.addColumn(
+          syncOutboxRecords,
+          syncOutboxRecords.entitySnapshotJson,
+        );
+        await migrator.addColumn(
+          syncTombstoneRecords,
+          syncTombstoneRecords.entitySnapshotJson,
+        );
+        await migrator.addColumn(
+          syncEntityVersionRecords,
+          syncEntityVersionRecords.originDeviceName,
+        );
+        await migrator.addColumn(
+          syncTombstoneRecords,
+          syncTombstoneRecords.originDeviceName,
+        );
       }
     },
     beforeOpen: (details) async {

@@ -776,6 +776,13 @@ class _NotificationCenter extends StatelessWidget {
     return PopupMenuButton<Object>(
       tooltip: context.tr('Centro de notificaciones', 'Notification center'),
       offset: const Offset(0, 36),
+      color: palette.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: palette.neutralSoft),
+      ),
       onSelected: (value) {
         if (value == _clearAction) {
           settings.onClearNotifications();
@@ -806,36 +813,8 @@ class _NotificationCenter extends StatelessWidget {
           for (final notification in notifications)
             PopupMenuItem<Object>(
               value: notification,
-              child: SizedBox(
-                width: 260,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _localizedNotificationTitle(context, notification.title),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _localizedNotificationBody(context, notification.body),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatNotificationTime(notification.createdAt),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              child: _NotificationCard(notification: notification),
             ),
           const PopupMenuDivider(),
           PopupMenuItem<Object>(
@@ -844,8 +823,15 @@ class _NotificationCenter extends StatelessWidget {
               children: [
                 const Icon(Icons.done_all_rounded, size: 18),
                 const SizedBox(width: 10),
-                Text(
-                  context.tr('Limpiar notificaciones', 'Clear notifications'),
+                Expanded(
+                  child: Text(
+                    context.tr(
+                      'Limpiar notificaciones',
+                      'Clear notifications',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -869,13 +855,281 @@ class _NotificationCenter extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _formatNotificationTime(DateTime date) {
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
+enum _NotificationKind { task, routine, general }
 
-    return '$hour:$minute';
+class _NotificationCard extends StatelessWidget {
+  const _NotificationCard({required this.notification});
+
+  final AppNotification notification;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final kind = _notificationKind(notification);
+    final accent = switch (kind) {
+      _NotificationKind.task => palette.primary,
+      _NotificationKind.routine => palette.secondary,
+      _NotificationKind.general => palette.tertiary,
+    };
+    final softBackground = switch (kind) {
+      _NotificationKind.task => palette.primaryMuted,
+      _NotificationKind.routine => palette.secondarySoft,
+      _NotificationKind.general => palette.neutralSoft,
+    };
+    final taskCount = kind == _NotificationKind.task
+        ? _pendingTaskCount(notification)
+        : null;
+    final body = kind == _NotificationKind.task
+        ? null
+        : _localizedNotificationBody(context, notification.body);
+
+    return Container(
+      key: ValueKey('notification-card-${kind.name}'),
+      width: 276,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: softBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _NotificationKindIcon(notification: notification),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            kind == _NotificationKind.task
+                                ? context.tr(
+                                    'Tareas pendientes',
+                                    'Pending tasks',
+                                  )
+                                : _localizedNotificationTitle(
+                                    context,
+                                    notification.title,
+                                  ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: palette.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                        if (taskCount != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            key: const ValueKey('notification-task-count'),
+                            constraints: const BoxConstraints(minWidth: 30),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: palette.primary,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$taskCount',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (body != null && body.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        body,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _NotificationMetaCapsule(
+                    key: ValueKey('notification-time-${kind.name}'),
+                    icon: Icons.schedule_rounded,
+                    label: _formatNotificationTime(notification.createdAt),
+                    accent: accent,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _NotificationMetaCapsule(
+                    key: ValueKey('notification-date-${kind.name}'),
+                    icon: Icons.calendar_today_rounded,
+                    label: _formatNotificationDate(notification.createdAt),
+                    accent: accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
+}
+
+class _NotificationMetaCapsule extends StatelessWidget {
+  const _NotificationMetaCapsule({
+    required this.icon,
+    required this.label,
+    required this.accent,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      decoration: BoxDecoration(
+        color: palette.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: accent),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: palette.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationKindIcon extends StatelessWidget {
+  const _NotificationKindIcon({required this.notification});
+
+  final AppNotification notification;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final kind = _notificationKind(notification);
+    final (icon, color, label) = switch (kind) {
+      _NotificationKind.task => (
+        Icons.task_alt_rounded,
+        palette.primary,
+        context.tr('Tarea', 'Task'),
+      ),
+      _NotificationKind.routine => (
+        Icons.event_repeat_rounded,
+        palette.secondary,
+        context.tr('Rutina', 'Routine'),
+      ),
+      _NotificationKind.general => (
+        Icons.notifications_active_outlined,
+        palette.tertiary,
+        context.tr('Notificación', 'Notification'),
+      ),
+    };
+
+    return Container(
+      key: ValueKey('notification-kind-${kind.name}'),
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, size: 21, color: color, semanticLabel: label),
+    );
+  }
+}
+
+_NotificationKind _notificationKind(AppNotification notification) {
+  final searchable =
+      '${notification.title} ${notification.body} '
+              '${notification.routePath ?? ''}'
+          .toLowerCase();
+  if (searchable.contains('rutina') || searchable.contains('routine')) {
+    return _NotificationKind.routine;
+  }
+  if (searchable.contains('tarea') ||
+      searchable.contains('task') ||
+      searchable.contains('/tasks') ||
+      searchable.contains('/calendar')) {
+    return _NotificationKind.task;
+  }
+  return _NotificationKind.general;
+}
+
+int _pendingTaskCount(AppNotification notification) {
+  final countMatch = RegExp(
+    r'(?:Tienes|You have) (\d+) (?:tareas pendientes|pending tasks)',
+    caseSensitive: false,
+  ).firstMatch(notification.body);
+
+  return int.tryParse(countMatch?.group(1) ?? '') ?? 1;
+}
+
+String _formatNotificationTime(DateTime date) {
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+
+  return '$hour:$minute';
+}
+
+String _formatNotificationDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+
+  return '$day/$month/${date.year}';
 }
 
 String _localizedNotificationTitle(BuildContext context, String title) {

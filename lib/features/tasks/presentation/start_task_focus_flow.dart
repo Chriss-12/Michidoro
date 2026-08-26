@@ -205,39 +205,46 @@ Future<_ConflictAction?> _showOwnershipConflict({
           'There is an active Pomodoro',
         ),
       ),
-      content: Text(
-        activeTaskTitle == null
-            ? dialogContext.tr(
-                'El cronómetro ya está siendo utilizado.',
-                'The timer is already in use.',
-              )
-            : dialogContext.tr(
-                'El cronómetro pertenece a “$activeTaskTitle”.',
-                'The timer belongs to “$activeTaskTitle”.',
-              ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            activeTaskTitle == null
+                ? dialogContext.tr(
+                    'El cronómetro ya está siendo utilizado.',
+                    'The timer is already in use.',
+                  )
+                : dialogContext.tr(
+                    'El cronómetro pertenece a “$activeTaskTitle”.',
+                    'The timer belongs to “$activeTaskTitle”.',
+                  ),
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton(
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_ConflictAction.stopAndSwitch),
+            child: Text(
+              dialogContext.tr('Finalizar y cambiar', 'Stop and switch'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => Navigator.of(
+              dialogContext,
+            ).pop(_ConflictAction.returnToTimer),
+            child: Text(
+              dialogContext.tr('Volver al Pomodoro', 'Return to Pomodoro'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(dialogContext.tr('Cancelar', 'Cancel')),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: Text(dialogContext.tr('Cancelar', 'Cancel')),
-        ),
-        OutlinedButton(
-          onPressed: () => Navigator.of(
-            dialogContext,
-          ).pop(_ConflictAction.stopAndSwitch),
-          child: Text(
-            dialogContext.tr('Finalizar y cambiar', 'Stop and switch'),
-          ),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(
-            dialogContext,
-          ).pop(_ConflictAction.returnToTimer),
-          child: Text(
-            dialogContext.tr('Volver al Pomodoro', 'Return to Pomodoro'),
-          ),
-        ),
-      ],
     ),
   );
 }

@@ -73,7 +73,7 @@ void main() {
   });
 
   testWidgets(
-    'keeps a long routine usable across language theme and large typography',
+    'keeps routines out of Home across language theme and large typography',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -99,10 +99,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('home-routine-today')), findsOneWidget);
-      expect(find.text("Today's routine"), findsOneWidget);
-      expect(find.text('Continue activity'), findsOneWidget);
-      expect(find.textContaining('Next:'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-routine-today')), findsNothing);
+      expect(find.text("Today's routine"), findsNothing);
+      expect(find.text('Continue activity'), findsNothing);
       final settingsParagraph = tester.renderObject<RenderParagraph>(
         find.text('Settings'),
       );
@@ -121,9 +120,8 @@ void main() {
         ..language.value = AppLanguage.spanish;
       await tester.pumpAndSettle();
 
-      expect(find.text('Rutina de hoy'), findsOneWidget);
-      expect(find.text('Continuar actividad'), findsOneWidget);
-      expect(find.textContaining('Despu'), findsOneWidget);
+      expect(find.text('Rutina de hoy'), findsNothing);
+      expect(find.text('Continuar actividad'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -219,6 +217,85 @@ void main() {
         find.byKey(const ValueKey('performance-empty')),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'places energy first and fills weekly progress from planned tasks',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(480, 2600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final today = DateTime.now();
+      final monday = DateTime(
+        today.year,
+        today.month,
+        today.day - today.weekday + 1,
+      );
+      tasksController.tasks.value = [
+        Task(
+          id: 'monday-pending',
+          title: 'Pendiente del lunes',
+          createdAt: monday,
+          scheduledDate: monday,
+        ),
+        Task(
+          id: 'monday-completed',
+          title: 'Completada del lunes',
+          createdAt: monday,
+          scheduledDate: monday,
+          status: TaskStatus.completed,
+        ),
+        Task(
+          id: 'tuesday-completed',
+          title: 'Completada del martes',
+          createdAt: monday.add(const Duration(days: 1)),
+          scheduledDate: monday.add(const Duration(days: 1)),
+          status: TaskStatus.completed,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MyApp(localAppLockController: LocalAppLockController()),
+      );
+      await tester.pumpAndSettle();
+
+      final energyCard = find.byKey(const ValueKey('home-energy-card'));
+      final taskStatusCard = find.byKey(
+        const ValueKey('home-task-status-card'),
+      );
+      expect(
+        tester.getTopLeft(energyCard).dy,
+        lessThan(tester.getTopLeft(taskStatusCard).dy),
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('home-weekly-progress-card')),
+      );
+      await tester.pumpAndSettle();
+      var mondayFill = tester.widget<FractionallySizedBox>(
+        find.byKey(const ValueKey('weekly-progress-fill-1')),
+      );
+      final tuesdayFill = tester.widget<FractionallySizedBox>(
+        find.byKey(const ValueKey('weekly-progress-fill-2')),
+      );
+      expect(mondayFill.heightFactor, 0.5);
+      expect(tuesdayFill.heightFactor, 1);
+      expect(find.text('50%'), findsOneWidget);
+      expect(find.text('100%'), findsOneWidget);
+
+      tasksController.tasks.value = [
+        for (final task in tasksController.tasks.value)
+          task.id == 'monday-pending'
+              ? task.copyWith(status: TaskStatus.completed)
+              : task,
+      ];
+      await tester.pumpAndSettle();
+      mondayFill = tester.widget<FractionallySizedBox>(
+        find.byKey(const ValueKey('weekly-progress-fill-1')),
+      );
+      expect(mondayFill.heightFactor, 1);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 }

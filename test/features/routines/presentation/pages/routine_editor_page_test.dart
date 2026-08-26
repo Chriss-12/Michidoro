@@ -202,7 +202,7 @@ void main() {
     expect(find.text('Mostrar'), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('routine-filter'))).width,
-      220,
+      tester.getSize(find.byKey(const ValueKey('create-routine'))).width,
     );
     await expectLater(
       find.byType(Scaffold),
@@ -260,7 +260,7 @@ void main() {
           titleSnapshot: 'Actividad',
           scheduledAtSnapshot: now,
           durationMinutesSnapshot: 30,
-          isOptionalSnapshot: false,
+          isOptionalSnapshot: true,
           pomodoroModeSnapshot: RoutinePomodoroMode.recommended,
           status: RoutineRunStatus.scheduled,
           createdAt: now,
@@ -288,6 +288,17 @@ void main() {
     expect(
       find.byKey(const ValueKey('start-routine-item-item-run-active')),
       findsOneWidget,
+    );
+    final editButton = find.byKey(const ValueKey('routine-edit-button'));
+    final skipButton = find.byKey(
+      const ValueKey('routine-skip-button-item-run-active'),
+    );
+    expect(editButton, findsOneWidget);
+    expect(skipButton, findsOneWidget);
+    expect(tester.getCenter(editButton).dy, tester.getCenter(skipButton).dy);
+    expect(
+      tester.getCenter(editButton).dx,
+      lessThan(tester.getCenter(skipButton).dx),
     );
   });
 

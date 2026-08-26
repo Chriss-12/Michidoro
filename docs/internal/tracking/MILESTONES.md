@@ -1461,6 +1461,18 @@ Verification evidence:
 
 ## M2 - Tasks Feature
 
+2026-08-24 verified follow-up: `REQ-TASK-009` adds one universal temporal
+filter for all, active, and completed tasks, with day, month, year, and
+inclusive custom-range options. Counts are scoped to the selected period;
+planned tasks use their scheduled date and quick tasks use their creation date.
+Formatting, clean analysis, 25 focused Tasks tests, and all 411 project tests
+pass. No persistence change was required.
+- 2026-08-24 persistence follow-up: first use now defaults to the current local
+  day. Every explicit all-time/day/month/year/range selection is stored in a
+  dedicated offline preference and restored after process restart; invalid
+  preference data falls back to today. Clean analysis, 29 focused Tasks tests,
+  and all 415 project tests pass. No Drift schema or package change was needed.
+
 Status: Verified
 
 Objective:
@@ -2536,9 +2548,11 @@ Verification evidence:
   singular `1 paso`, and review. The temporary routine was discarded and the
   original stored routine remained present.
 - The routine filter was refined on 2026-08-11: redundant `Mostrar` / `Show`
-  text was removed and the full-width form field became a 220 px anchored menu.
-  Widget dimensions, clean analysis, the 237-test suite, release update, and
-  direct RMX3301 closed/open-menu inspection passed without changing data.
+  text was removed and the form field became a compact anchored menu. On
+  2026-08-24 its visible trigger returned to the full available width while the
+  popup remained 220 px; optional activity cards also gained one balanced
+  Edit/Skip row. Widget dimensions, nine focused tests, clean analysis, and all
+  415 project tests pass without changing data.
 - Routine creation was refined on 2026-08-11 to open the existing four-step
   editor as a centered, keyboard-safe modal over the blurred Routines view.
   Existing-routine editing keeps its full-screen route. Golden inspection,
@@ -2718,7 +2732,7 @@ Verification progress (2026-08-09):
 Tracks:
 - `REQ-V9-006`
 
-### V9-M6 - Home and Calendar Integration
+### V9-M6 - Routine Access and Calendar Integration
 
 Priority: 6
 
@@ -2729,16 +2743,19 @@ Depends on:
 - `V9-M4`
 
 Objective:
-Expose today's routine context and future schedule where users already plan and
-act, without duplicating the full editor or overcrowding navigation.
+Keep routine execution in `Tareas -> Rutinas` and expose future schedules in
+Calendar without duplicating a routine surface in Home or overcrowding
+navigation.
 
 Deliverables:
-- [x] Home shows next routine, current/next item, local time, required progress,
-      and one start/continue action.
+- [x] Home does not duplicate routine summary or execution controls.
+- [x] `Tareas -> Rutinas` owns routine summary, current activity, start/continue,
+      edit, and optional-skip actions.
 - [x] Calendar merges ordinary tasks, materialized items, and virtual future
       occurrences without duplicate rows.
 - [x] Visually distinguish projections from persisted tasks and completed history.
-- [x] Open the relevant routine or dated run from Home and Calendar.
+- [x] Open the relevant routine or dated run from `Tareas -> Rutinas` and
+      Calendar.
 - [x] Represent completed, optional skipped, whole-run skipped, and missed states
       consistently.
 - [x] Warn about overlaps without silently moving user data.
@@ -2768,6 +2785,11 @@ Verification evidence (2026-08-11):
 - The device was restored to Spanish, Nature Focus light, 100%, Sora, routine
   progress `0/1`, six Pending tasks, zero In Progress tasks, and unchanged timer
   state.
+- On 2026-08-24 the user explicitly consolidated routine access under
+  `Tareas -> Rutinas`. The Home card was removed, the routine-list filter now
+  spans the available width, and Edit/Skip share one row when skipping is
+  available. Nine focused tests, clean analysis, and all 415 tests pass; the
+  existing Calendar projection remains unchanged.
 
 Tracks:
 - `REQ-V9-007`
@@ -3455,7 +3477,21 @@ Incoming progress on 2026-08-15:
   retaining owner, counter, and operation identity. This addresses document
   providers whose practical filename limit is shorter than the filesystem's
   nominal limit. Release APK installation succeeds on Poco and Realme without
-  clearing data; authenticated two-phone publication and transport remain open.
+  clearing data; authenticated two-phone publication and transport remained open.
+- On 2026-08-21, physical publication identified one final compatibility issue:
+  older outbox digests included milliseconds that Drift had stored at Unix-second
+  precision. Publication now recovers only the legacy millisecond whose canonical
+  payload matches the durable SHA-256 digest, while new operation timestamps are
+  normalized before hashing and persistence. Invalid digests remain rejected.
+- The corrected release installed preserving data on Poco 2201117PG and Realme
+  RMX3301. Authenticated preparation published 18 and 11 distinct operations;
+  Syncthing transported all 29 files to both selected folders without overwrite.
+  Incoming review then applied 18 operations on Realme and 11 on Poco, with zero
+  conflicts, deferred dependencies, or rejected files on either phone. Drift
+  generation, focused tests, clean `lib`/`test` analysis, and all 405 tests pass.
+  This closes the first bidirectional physical publication/transport/application
+  gate; delayed, offline, background, conflict-resolution, history, and broader
+  convergence matrices remain open.
 
 Tracks:
 - `REQ-V11-004`
@@ -3503,7 +3539,7 @@ Tracks:
 
 Priority: 7
 
-Status: Proposed
+Status: In Progress
 
 Objective:
 Make unavoidable concurrent intent visible and ensure one resolution converges
@@ -3512,16 +3548,34 @@ on every active phone.
 Deliverables:
 - [ ] Add a conflict center grouped by entity and origin device.
 - [ ] Show local, remote, and relevant merged context with friendly device names.
-- [ ] Offer use-local, use-remote, and safe preserve-both actions where applicable.
-- [ ] Publish every resolution as a causally newer operation.
-- [ ] Implement delete/update resolution and resurrection prevention.
+- [x] Offer use-local, use-remote, and safe preserve-both actions where applicable.
+- [x] Publish every resolution as a causally newer operation.
+- [x] Implement delete/update resolution and resurrection prevention.
 - [ ] Distinguish user conflicts from quarantined integrity/protocol failures.
 
 Quality gates:
 - [ ] Concurrent same-field, delete/update, duplicate resolution, delayed
       resolution, and third-device arrival cases converge.
-- [ ] No conflict is silently resolved by wall-clock ordering.
+- [x] No conflict is silently resolved by wall-clock ordering.
 - [ ] Spanish, English, 320 px, large text, light/dark, and accessibility checks pass.
+
+Implementation evidence:
+- 2026-08-24: Settings gained a themed, bilingual conflict sheet with explicit
+  confirmation, local/remote values, dates, device labels or stable suffixes,
+  and safe disabled states for incomplete candidates.
+- Resolution now commits the chosen application value and a causally dominating
+  outbox operation atomically. A later phone consumes that operation and closes
+  its matching conflict when both candidate versions are dominated.
+- Schema 7 adds backward-compatible encrypted operation context: the originating
+  friendly name and a full entity snapshot. Delete/update restoration no longer
+  guesses missing fields, and existing schema-6 databases migrate in place.
+- Safe goal and calendar-event conflicts can preserve both versions atomically;
+  task and routine duplication remains intentionally unavailable because it can
+  detach execution or historical links.
+- Clean `lib`/`test` analysis, all 162 sync tests, and all 423 project tests
+  pass. Complete arrival-order
+  permutations, accessibility matrices, immutable-history integrity conflicts,
+  and physical two-phone conflict creation remain.
 
 Tracks:
 - `REQ-V11-005`
@@ -3558,7 +3612,7 @@ Tracks:
 
 Priority: 9
 
-Status: Proposed
+Status: In Progress
 
 Objective:
 Make the feature understandable and keep its files bounded without abandoning
@@ -3567,12 +3621,34 @@ offline devices silently.
 Deliverables:
 - [ ] Show device, folder, local publication, remote observation, conflict, and
       last-processing status without claiming unobservable transport completion.
-- [ ] Add `Preparar y revisar cambios` and `Abrir Syncthing` actions.
+- [x] Add `Preparar y revisar cambios` as the primary authenticated local action.
+- [x] Add a separate `Abrir Syncthing` action.
 - [ ] Add bilingual Syncthing background, battery, run-condition, folder, and
       overlap-online instructions.
 - [ ] Add acknowledgement watermarks, safe snapshot compaction, and retention.
 - [ ] Add rename, disconnect, retire, stale-device, lost-folder, and recovery flows.
 - [ ] Preserve the selected folder and other phones' files when leaving the group.
+
+Progress on 2026-08-24:
+- The user's explicit authorization to continue starts this bounded M7 slice.
+- Multi-device Settings now uses one primary `Preparar y revisar cambios`
+  action instead of separate publication and incoming-review buttons. It
+  authenticates once, opens one short-lived clear-key window, bootstraps and
+  publishes local operations first, then reviews already transported remote
+  operations and refreshes application data.
+- Publication and incoming counts remain separate, so the UI still does not
+  claim that Syncthing transported a file or that another phone is online.
+  Existing separate controller operations remain available for compatibility
+  and diagnosis.
+- A separate `Abrir Syncthing` action now launches Syncthing-Fork first or
+  classic Syncthing second through the existing Android bridge. If neither is
+  installed, MichiFocus reports that condition without claiming transport.
+- Drift generation, formatting, 29 focused sync tests, clean `lib`/`test`
+  analysis, and the complete 408-test suite pass. The release APK builds with
+  Java 17 and is installed on the wireless Realme while preserving its data.
+  The phone is waiting for the owner's fingerprint, so the physical button tap
+  and the remaining status, guidance, retention, and device-lifecycle work
+  remain open.
 
 Quality gates:
 - [ ] File growth remains within the approved bound after high-volume compaction.
@@ -3624,3 +3700,188 @@ Tracks:
 - `REQ-V11-008`
 - `REQ-V11-009`
 - `REQ-V11-010`
+
+## Proposed roadmap - Productivity V12
+
+Status:
+Proposed on 2026-08-26. The user authorized creating this milestone from the
+reviewed product concept. That authorization does not approve implementation;
+every V12 requirement remains `Proposed` until explicitly approved.
+
+Objective:
+Add persistent custom routine colors and validity dates, a responsive weekly
+schedule for routine activities and objectives, and a separate database-backed
+`Notas rápidas` checklist without changing the meaning of existing tasks.
+
+Priority rule:
+Complete or explicitly defer the affected V11 synchronization gates before V12
+schema and exchange implementation. Implement V12-M0 through V12-M5 in order
+unless the user explicitly reprioritizes.
+
+### V12-M0 - Contract, schema, migration, and synchronization design
+
+Priority: 1
+
+Status: Proposed
+
+Objective:
+Freeze the routine-color, validity-range, quick-note, history, backup, and sync
+contracts before changing production persistence.
+
+Deliverables:
+- [ ] Approve all `REQ-V12` requirements for implementation.
+- [ ] Finalize canonical local-date and color-value storage.
+- [ ] Preserve existing routine `color_key` compatibility.
+- [ ] Design forward-only routine additions, historical color snapshots, and
+      the dedicated quick-note table and indexes.
+- [ ] Define V11 operation, conflict, recovery, import, export, and reset rules.
+- [ ] Define migration defaults for existing routines without inventing history.
+
+Quality gates:
+- [ ] Architecture and migration review pass.
+- [ ] Old-schema fixtures and sync-operation compatibility matrix are planned.
+- [ ] No implementation starts while requirements remain `Proposed`.
+
+Tracks:
+- `REQ-V12-001`
+- `REQ-V12-004`
+- `REQ-V12-006`
+
+### V12-M1 - Routine custom color and validity editor
+
+Priority: 2
+
+Status: Proposed
+
+Objective:
+Persist routine custom colors and editable start/end validity, then expose them
+through the existing creation and editing workflow.
+
+Deliverables:
+- [ ] Add routine custom color and local validity fields through Drift.
+- [ ] Preserve historical execution snapshots and future-only edit semantics.
+- [ ] Add broad color selection and contrast-safe previews.
+- [ ] Add start date and optional end date to creation, editing, and review.
+- [ ] Recalculate future projections and reminders after valid edits.
+
+Quality gates:
+- [ ] Migration, repository, reminder, projection, and history tests pass.
+- [ ] Spanish/English, light/dark, large-text, keyboard, and narrow-phone checks pass.
+- [ ] Drift generation, formatting, clean analysis, and full tests pass.
+
+Tracks:
+- `REQ-V12-001`
+- `REQ-V12-002`
+
+### V12-M2 - Responsive weekly schedule
+
+Priority: 3
+
+Status: Proposed
+
+Objective:
+Add a school-timetable-style weekly planning view for routine activities and
+dated objectives while preserving the existing monthly view and actions.
+
+Deliverables:
+- [ ] Add `Mes | Semana` inside `Objetivos/Planificación`.
+- [ ] Project only valid routine occurrences into time-positioned colored blocks.
+- [ ] Show objective task progress in an all-day area.
+- [ ] Show activity state and routine-level progress without redundant counts.
+- [ ] Preserve overlap visibility and existing routine/objective actions.
+- [ ] Provide responsive day navigation for phones and wider layouts.
+
+Quality gates:
+- [ ] Boundary, indefinite-range, overlap, local-midnight, and edit tests pass.
+- [ ] Dense bilingual and accessibility widget checks pass.
+- [ ] Scrolling, projection, and repaint performance remain bounded.
+- [ ] Physical portrait inspection passes on a representative Android phone.
+
+Tracks:
+- `REQ-V12-003`
+
+### V12-M3 - Quick-note persistence and checklist core
+
+Priority: 4
+
+Status: Proposed
+
+Objective:
+Create the independent offline-first quick-note entity and reliable checkbox
+workflow without reusing or changing ordinary tasks.
+
+Deliverables:
+- [ ] Add the dedicated quick-note Drift table, DAO, repository, domain entity,
+      controller, DI, and forward migration.
+- [ ] Persist text, completion, color, optional date, optional priority, order,
+      and timestamps.
+- [ ] Add create, edit, check, uncheck, delete, and reorder behavior.
+- [ ] Include quick notes in reset, backup, import validation, recovery, and sync.
+- [ ] Prove quick notes do not affect Pomodoro, task statistics, or reports.
+
+Quality gates:
+- [ ] Migration, persistence, ordering, validation, and restart tests pass.
+- [ ] Sync create/update/delete/completion idempotency tests pass.
+- [ ] Drift generation, formatting, clean analysis, and full tests pass.
+
+Tracks:
+- `REQ-V12-004`
+- `REQ-V12-006`
+
+### V12-M4 - Quick-note organization and planning visibility
+
+Priority: 5
+
+Status: Proposed
+
+Objective:
+Expose `Notas rápidas` with personalized colors, optional priority, flexible
+sorting, and compact selected-day visibility.
+
+Deliverables:
+- [ ] Add `Notas rápidas` inside the existing Tasks feature navigation.
+- [ ] Add native checkbox presentation with reversible completed treatment.
+- [ ] Add broad custom-color selection independent of priority.
+- [ ] Add optional high/medium/low priority and
+      manual/priority/date/recent/color sorting.
+- [ ] Keep undated notes discoverable and show dated notes in the day agenda.
+
+Quality gates:
+- [ ] Spanish/English, theme, large-text, keyboard, semantics, and narrow-phone checks pass.
+- [ ] Sorting remains stable after restart and synchronization.
+- [ ] Existing Tasks and Routines workflows have no regression.
+
+Tracks:
+- `REQ-V12-005`
+
+### V12-M5 - Integrated compatibility and release verification
+
+Priority: 6
+
+Status: Proposed
+
+Objective:
+Verify V12 end to end before changing any requirement to `Verified`.
+
+Deliverables:
+- [ ] Run supported-schema migration and populated-database preservation tests.
+- [ ] Run backup/import/reset/recovery round trips with all new fields.
+- [ ] Run two-device convergence and conflict cases for routine and quick-note changes.
+- [ ] Verify weekly schedule, routine editing, and quick notes on physical Android.
+- [ ] Update database, UI, routine, sync, requirement, traceability, and client docs.
+
+Definition of done:
+- [ ] Every `REQ-V12` acceptance criterion has direct evidence.
+- [ ] Historical routine data remains unchanged after template color/date edits.
+- [ ] Quick notes remain separate from task and focus statistics.
+- [ ] Drift generation, formatting, clean analysis, focused tests, and full suite pass.
+- [ ] Release build and representative physical Android flows pass.
+- [ ] Backup, recovery, and synchronized convergence retain an immediate safe path.
+
+Tracks:
+- `REQ-V12-001`
+- `REQ-V12-002`
+- `REQ-V12-003`
+- `REQ-V12-004`
+- `REQ-V12-005`
+- `REQ-V12-006`

@@ -8957,6 +8957,29 @@ class $SyncOutboxRecordsTable extends SyncOutboxRecords
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _originDeviceNameMeta = const VerificationMeta(
+    'originDeviceName',
+  );
+  @override
+  late final GeneratedColumn<String> originDeviceName = GeneratedColumn<String>(
+    'origin_device_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _entitySnapshotJsonMeta =
+      const VerificationMeta('entitySnapshotJson');
+  @override
+  late final GeneratedColumn<String> entitySnapshotJson =
+      GeneratedColumn<String>(
+        'entity_snapshot_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _operationKindMeta = const VerificationMeta(
     'operationKind',
   );
@@ -9045,6 +9068,8 @@ class $SyncOutboxRecordsTable extends SyncOutboxRecords
     entityId,
     parentVersionJson,
     changedFieldsJson,
+    originDeviceName,
+    entitySnapshotJson,
     operationKind,
     protocolVersion,
     payloadSha256,
@@ -9143,6 +9168,24 @@ class $SyncOutboxRecordsTable extends SyncOutboxRecords
       );
     } else if (isInserting) {
       context.missing(_changedFieldsJsonMeta);
+    }
+    if (data.containsKey('origin_device_name')) {
+      context.handle(
+        _originDeviceNameMeta,
+        originDeviceName.isAcceptableOrUnknown(
+          data['origin_device_name']!,
+          _originDeviceNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('entity_snapshot_json')) {
+      context.handle(
+        _entitySnapshotJsonMeta,
+        entitySnapshotJson.isAcceptableOrUnknown(
+          data['entity_snapshot_json']!,
+          _entitySnapshotJsonMeta,
+        ),
+      );
     }
     if (data.containsKey('operation_kind')) {
       context.handle(
@@ -9253,6 +9296,14 @@ class $SyncOutboxRecordsTable extends SyncOutboxRecords
         DriftSqlType.string,
         data['${effectivePrefix}changed_fields_json'],
       )!,
+      originDeviceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_device_name'],
+      )!,
+      entitySnapshotJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_snapshot_json'],
+      ),
       operationKind: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}operation_kind'],
@@ -9300,6 +9351,8 @@ class SyncOutboxRecord extends DataClass
   final String entityId;
   final String parentVersionJson;
   final String changedFieldsJson;
+  final String originDeviceName;
+  final String? entitySnapshotJson;
   final String operationKind;
   final int protocolVersion;
   final String payloadSha256;
@@ -9316,6 +9369,8 @@ class SyncOutboxRecord extends DataClass
     required this.entityId,
     required this.parentVersionJson,
     required this.changedFieldsJson,
+    required this.originDeviceName,
+    this.entitySnapshotJson,
     required this.operationKind,
     required this.protocolVersion,
     required this.payloadSha256,
@@ -9335,6 +9390,10 @@ class SyncOutboxRecord extends DataClass
     map['entity_id'] = Variable<String>(entityId);
     map['parent_version_json'] = Variable<String>(parentVersionJson);
     map['changed_fields_json'] = Variable<String>(changedFieldsJson);
+    map['origin_device_name'] = Variable<String>(originDeviceName);
+    if (!nullToAbsent || entitySnapshotJson != null) {
+      map['entity_snapshot_json'] = Variable<String>(entitySnapshotJson);
+    }
     map['operation_kind'] = Variable<String>(operationKind);
     map['protocol_version'] = Variable<int>(protocolVersion);
     map['payload_sha256'] = Variable<String>(payloadSha256);
@@ -9357,6 +9416,10 @@ class SyncOutboxRecord extends DataClass
       entityId: Value(entityId),
       parentVersionJson: Value(parentVersionJson),
       changedFieldsJson: Value(changedFieldsJson),
+      originDeviceName: Value(originDeviceName),
+      entitySnapshotJson: entitySnapshotJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entitySnapshotJson),
       operationKind: Value(operationKind),
       protocolVersion: Value(protocolVersion),
       payloadSha256: Value(payloadSha256),
@@ -9383,6 +9446,10 @@ class SyncOutboxRecord extends DataClass
       entityId: serializer.fromJson<String>(json['entityId']),
       parentVersionJson: serializer.fromJson<String>(json['parentVersionJson']),
       changedFieldsJson: serializer.fromJson<String>(json['changedFieldsJson']),
+      originDeviceName: serializer.fromJson<String>(json['originDeviceName']),
+      entitySnapshotJson: serializer.fromJson<String?>(
+        json['entitySnapshotJson'],
+      ),
       operationKind: serializer.fromJson<String>(json['operationKind']),
       protocolVersion: serializer.fromJson<int>(json['protocolVersion']),
       payloadSha256: serializer.fromJson<String>(json['payloadSha256']),
@@ -9406,6 +9473,8 @@ class SyncOutboxRecord extends DataClass
       'entityId': serializer.toJson<String>(entityId),
       'parentVersionJson': serializer.toJson<String>(parentVersionJson),
       'changedFieldsJson': serializer.toJson<String>(changedFieldsJson),
+      'originDeviceName': serializer.toJson<String>(originDeviceName),
+      'entitySnapshotJson': serializer.toJson<String?>(entitySnapshotJson),
       'operationKind': serializer.toJson<String>(operationKind),
       'protocolVersion': serializer.toJson<int>(protocolVersion),
       'payloadSha256': serializer.toJson<String>(payloadSha256),
@@ -9425,6 +9494,8 @@ class SyncOutboxRecord extends DataClass
     String? entityId,
     String? parentVersionJson,
     String? changedFieldsJson,
+    String? originDeviceName,
+    Value<String?> entitySnapshotJson = const Value.absent(),
     String? operationKind,
     int? protocolVersion,
     String? payloadSha256,
@@ -9441,6 +9512,10 @@ class SyncOutboxRecord extends DataClass
     entityId: entityId ?? this.entityId,
     parentVersionJson: parentVersionJson ?? this.parentVersionJson,
     changedFieldsJson: changedFieldsJson ?? this.changedFieldsJson,
+    originDeviceName: originDeviceName ?? this.originDeviceName,
+    entitySnapshotJson: entitySnapshotJson.present
+        ? entitySnapshotJson.value
+        : this.entitySnapshotJson,
     operationKind: operationKind ?? this.operationKind,
     protocolVersion: protocolVersion ?? this.protocolVersion,
     payloadSha256: payloadSha256 ?? this.payloadSha256,
@@ -9471,6 +9546,12 @@ class SyncOutboxRecord extends DataClass
       changedFieldsJson: data.changedFieldsJson.present
           ? data.changedFieldsJson.value
           : this.changedFieldsJson,
+      originDeviceName: data.originDeviceName.present
+          ? data.originDeviceName.value
+          : this.originDeviceName,
+      entitySnapshotJson: data.entitySnapshotJson.present
+          ? data.entitySnapshotJson.value
+          : this.entitySnapshotJson,
       operationKind: data.operationKind.present
           ? data.operationKind.value
           : this.operationKind,
@@ -9504,6 +9585,8 @@ class SyncOutboxRecord extends DataClass
           ..write('entityId: $entityId, ')
           ..write('parentVersionJson: $parentVersionJson, ')
           ..write('changedFieldsJson: $changedFieldsJson, ')
+          ..write('originDeviceName: $originDeviceName, ')
+          ..write('entitySnapshotJson: $entitySnapshotJson, ')
           ..write('operationKind: $operationKind, ')
           ..write('protocolVersion: $protocolVersion, ')
           ..write('payloadSha256: $payloadSha256, ')
@@ -9525,6 +9608,8 @@ class SyncOutboxRecord extends DataClass
     entityId,
     parentVersionJson,
     changedFieldsJson,
+    originDeviceName,
+    entitySnapshotJson,
     operationKind,
     protocolVersion,
     payloadSha256,
@@ -9545,6 +9630,8 @@ class SyncOutboxRecord extends DataClass
           other.entityId == this.entityId &&
           other.parentVersionJson == this.parentVersionJson &&
           other.changedFieldsJson == this.changedFieldsJson &&
+          other.originDeviceName == this.originDeviceName &&
+          other.entitySnapshotJson == this.entitySnapshotJson &&
           other.operationKind == this.operationKind &&
           other.protocolVersion == this.protocolVersion &&
           other.payloadSha256 == this.payloadSha256 &&
@@ -9563,6 +9650,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
   final Value<String> entityId;
   final Value<String> parentVersionJson;
   final Value<String> changedFieldsJson;
+  final Value<String> originDeviceName;
+  final Value<String?> entitySnapshotJson;
   final Value<String> operationKind;
   final Value<int> protocolVersion;
   final Value<String> payloadSha256;
@@ -9580,6 +9669,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
     this.entityId = const Value.absent(),
     this.parentVersionJson = const Value.absent(),
     this.changedFieldsJson = const Value.absent(),
+    this.originDeviceName = const Value.absent(),
+    this.entitySnapshotJson = const Value.absent(),
     this.operationKind = const Value.absent(),
     this.protocolVersion = const Value.absent(),
     this.payloadSha256 = const Value.absent(),
@@ -9598,6 +9689,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
     required String entityId,
     required String parentVersionJson,
     required String changedFieldsJson,
+    this.originDeviceName = const Value.absent(),
+    this.entitySnapshotJson = const Value.absent(),
     required String operationKind,
     required int protocolVersion,
     required String payloadSha256,
@@ -9627,6 +9720,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
     Expression<String>? entityId,
     Expression<String>? parentVersionJson,
     Expression<String>? changedFieldsJson,
+    Expression<String>? originDeviceName,
+    Expression<String>? entitySnapshotJson,
     Expression<String>? operationKind,
     Expression<int>? protocolVersion,
     Expression<String>? payloadSha256,
@@ -9645,6 +9740,9 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
       if (entityId != null) 'entity_id': entityId,
       if (parentVersionJson != null) 'parent_version_json': parentVersionJson,
       if (changedFieldsJson != null) 'changed_fields_json': changedFieldsJson,
+      if (originDeviceName != null) 'origin_device_name': originDeviceName,
+      if (entitySnapshotJson != null)
+        'entity_snapshot_json': entitySnapshotJson,
       if (operationKind != null) 'operation_kind': operationKind,
       if (protocolVersion != null) 'protocol_version': protocolVersion,
       if (payloadSha256 != null) 'payload_sha256': payloadSha256,
@@ -9666,6 +9764,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
     Value<String>? entityId,
     Value<String>? parentVersionJson,
     Value<String>? changedFieldsJson,
+    Value<String>? originDeviceName,
+    Value<String?>? entitySnapshotJson,
     Value<String>? operationKind,
     Value<int>? protocolVersion,
     Value<String>? payloadSha256,
@@ -9684,6 +9784,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
       entityId: entityId ?? this.entityId,
       parentVersionJson: parentVersionJson ?? this.parentVersionJson,
       changedFieldsJson: changedFieldsJson ?? this.changedFieldsJson,
+      originDeviceName: originDeviceName ?? this.originDeviceName,
+      entitySnapshotJson: entitySnapshotJson ?? this.entitySnapshotJson,
       operationKind: operationKind ?? this.operationKind,
       protocolVersion: protocolVersion ?? this.protocolVersion,
       payloadSha256: payloadSha256 ?? this.payloadSha256,
@@ -9721,6 +9823,12 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
     }
     if (changedFieldsJson.present) {
       map['changed_fields_json'] = Variable<String>(changedFieldsJson.value);
+    }
+    if (originDeviceName.present) {
+      map['origin_device_name'] = Variable<String>(originDeviceName.value);
+    }
+    if (entitySnapshotJson.present) {
+      map['entity_snapshot_json'] = Variable<String>(entitySnapshotJson.value);
     }
     if (operationKind.present) {
       map['operation_kind'] = Variable<String>(operationKind.value);
@@ -9760,6 +9868,8 @@ class SyncOutboxRecordsCompanion extends UpdateCompanion<SyncOutboxRecord> {
           ..write('entityId: $entityId, ')
           ..write('parentVersionJson: $parentVersionJson, ')
           ..write('changedFieldsJson: $changedFieldsJson, ')
+          ..write('originDeviceName: $originDeviceName, ')
+          ..write('entitySnapshotJson: $entitySnapshotJson, ')
           ..write('operationKind: $operationKind, ')
           ..write('protocolVersion: $protocolVersion, ')
           ..write('payloadSha256: $payloadSha256, ')
@@ -10309,6 +10419,18 @@ class $SyncEntityVersionRecordsTable extends SyncEntityVersionRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _originDeviceNameMeta = const VerificationMeta(
+    'originDeviceName',
+  );
+  @override
+  late final GeneratedColumn<String> originDeviceName = GeneratedColumn<String>(
+    'origin_device_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -10329,6 +10451,7 @@ class $SyncEntityVersionRecordsTable extends SyncEntityVersionRecords
     causalVersionJson,
     operationId,
     originDeviceId,
+    originDeviceName,
     updatedAt,
   ];
   @override
@@ -10408,6 +10531,15 @@ class $SyncEntityVersionRecordsTable extends SyncEntityVersionRecords
     } else if (isInserting) {
       context.missing(_originDeviceIdMeta);
     }
+    if (data.containsKey('origin_device_name')) {
+      context.handle(
+        _originDeviceNameMeta,
+        originDeviceName.isAcceptableOrUnknown(
+          data['origin_device_name']!,
+          _originDeviceNameMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -10461,6 +10593,10 @@ class $SyncEntityVersionRecordsTable extends SyncEntityVersionRecords
         DriftSqlType.string,
         data['${effectivePrefix}origin_device_id'],
       )!,
+      originDeviceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_device_name'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -10483,6 +10619,7 @@ class SyncEntityVersionRecord extends DataClass
   final String causalVersionJson;
   final String operationId;
   final String originDeviceId;
+  final String originDeviceName;
   final DateTime updatedAt;
   const SyncEntityVersionRecord({
     required this.groupId,
@@ -10492,6 +10629,7 @@ class SyncEntityVersionRecord extends DataClass
     required this.causalVersionJson,
     required this.operationId,
     required this.originDeviceId,
+    required this.originDeviceName,
     required this.updatedAt,
   });
   @override
@@ -10504,6 +10642,7 @@ class SyncEntityVersionRecord extends DataClass
     map['causal_version_json'] = Variable<String>(causalVersionJson);
     map['operation_id'] = Variable<String>(operationId);
     map['origin_device_id'] = Variable<String>(originDeviceId);
+    map['origin_device_name'] = Variable<String>(originDeviceName);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -10517,6 +10656,7 @@ class SyncEntityVersionRecord extends DataClass
       causalVersionJson: Value(causalVersionJson),
       operationId: Value(operationId),
       originDeviceId: Value(originDeviceId),
+      originDeviceName: Value(originDeviceName),
       updatedAt: Value(updatedAt),
     );
   }
@@ -10534,6 +10674,7 @@ class SyncEntityVersionRecord extends DataClass
       causalVersionJson: serializer.fromJson<String>(json['causalVersionJson']),
       operationId: serializer.fromJson<String>(json['operationId']),
       originDeviceId: serializer.fromJson<String>(json['originDeviceId']),
+      originDeviceName: serializer.fromJson<String>(json['originDeviceName']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -10548,6 +10689,7 @@ class SyncEntityVersionRecord extends DataClass
       'causalVersionJson': serializer.toJson<String>(causalVersionJson),
       'operationId': serializer.toJson<String>(operationId),
       'originDeviceId': serializer.toJson<String>(originDeviceId),
+      'originDeviceName': serializer.toJson<String>(originDeviceName),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -10560,6 +10702,7 @@ class SyncEntityVersionRecord extends DataClass
     String? causalVersionJson,
     String? operationId,
     String? originDeviceId,
+    String? originDeviceName,
     DateTime? updatedAt,
   }) => SyncEntityVersionRecord(
     groupId: groupId ?? this.groupId,
@@ -10569,6 +10712,7 @@ class SyncEntityVersionRecord extends DataClass
     causalVersionJson: causalVersionJson ?? this.causalVersionJson,
     operationId: operationId ?? this.operationId,
     originDeviceId: originDeviceId ?? this.originDeviceId,
+    originDeviceName: originDeviceName ?? this.originDeviceName,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   SyncEntityVersionRecord copyWithCompanion(
@@ -10590,6 +10734,9 @@ class SyncEntityVersionRecord extends DataClass
       originDeviceId: data.originDeviceId.present
           ? data.originDeviceId.value
           : this.originDeviceId,
+      originDeviceName: data.originDeviceName.present
+          ? data.originDeviceName.value
+          : this.originDeviceName,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -10604,6 +10751,7 @@ class SyncEntityVersionRecord extends DataClass
           ..write('causalVersionJson: $causalVersionJson, ')
           ..write('operationId: $operationId, ')
           ..write('originDeviceId: $originDeviceId, ')
+          ..write('originDeviceName: $originDeviceName, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -10618,6 +10766,7 @@ class SyncEntityVersionRecord extends DataClass
     causalVersionJson,
     operationId,
     originDeviceId,
+    originDeviceName,
     updatedAt,
   );
   @override
@@ -10631,6 +10780,7 @@ class SyncEntityVersionRecord extends DataClass
           other.causalVersionJson == this.causalVersionJson &&
           other.operationId == this.operationId &&
           other.originDeviceId == this.originDeviceId &&
+          other.originDeviceName == this.originDeviceName &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -10643,6 +10793,7 @@ class SyncEntityVersionRecordsCompanion
   final Value<String> causalVersionJson;
   final Value<String> operationId;
   final Value<String> originDeviceId;
+  final Value<String> originDeviceName;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const SyncEntityVersionRecordsCompanion({
@@ -10653,6 +10804,7 @@ class SyncEntityVersionRecordsCompanion
     this.causalVersionJson = const Value.absent(),
     this.operationId = const Value.absent(),
     this.originDeviceId = const Value.absent(),
+    this.originDeviceName = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -10664,6 +10816,7 @@ class SyncEntityVersionRecordsCompanion
     required String causalVersionJson,
     required String operationId,
     required String originDeviceId,
+    this.originDeviceName = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : groupId = Value(groupId),
@@ -10682,6 +10835,7 @@ class SyncEntityVersionRecordsCompanion
     Expression<String>? causalVersionJson,
     Expression<String>? operationId,
     Expression<String>? originDeviceId,
+    Expression<String>? originDeviceName,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -10693,6 +10847,7 @@ class SyncEntityVersionRecordsCompanion
       if (causalVersionJson != null) 'causal_version_json': causalVersionJson,
       if (operationId != null) 'operation_id': operationId,
       if (originDeviceId != null) 'origin_device_id': originDeviceId,
+      if (originDeviceName != null) 'origin_device_name': originDeviceName,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -10706,6 +10861,7 @@ class SyncEntityVersionRecordsCompanion
     Value<String>? causalVersionJson,
     Value<String>? operationId,
     Value<String>? originDeviceId,
+    Value<String>? originDeviceName,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -10717,6 +10873,7 @@ class SyncEntityVersionRecordsCompanion
       causalVersionJson: causalVersionJson ?? this.causalVersionJson,
       operationId: operationId ?? this.operationId,
       originDeviceId: originDeviceId ?? this.originDeviceId,
+      originDeviceName: originDeviceName ?? this.originDeviceName,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -10746,6 +10903,9 @@ class SyncEntityVersionRecordsCompanion
     if (originDeviceId.present) {
       map['origin_device_id'] = Variable<String>(originDeviceId.value);
     }
+    if (originDeviceName.present) {
+      map['origin_device_name'] = Variable<String>(originDeviceName.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -10765,6 +10925,7 @@ class SyncEntityVersionRecordsCompanion
           ..write('causalVersionJson: $causalVersionJson, ')
           ..write('operationId: $operationId, ')
           ..write('originDeviceId: $originDeviceId, ')
+          ..write('originDeviceName: $originDeviceName, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -10845,6 +11006,29 @@ class $SyncTombstoneRecordsTable extends SyncTombstoneRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _originDeviceNameMeta = const VerificationMeta(
+    'originDeviceName',
+  );
+  @override
+  late final GeneratedColumn<String> originDeviceName = GeneratedColumn<String>(
+    'origin_device_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _entitySnapshotJsonMeta =
+      const VerificationMeta('entitySnapshotJson');
+  @override
+  late final GeneratedColumn<String> entitySnapshotJson =
+      GeneratedColumn<String>(
+        'entity_snapshot_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _deletedAtMeta = const VerificationMeta(
     'deletedAt',
   );
@@ -10864,6 +11048,8 @@ class $SyncTombstoneRecordsTable extends SyncTombstoneRecords
     causalVersionJson,
     operationId,
     originDeviceId,
+    originDeviceName,
+    entitySnapshotJson,
     deletedAt,
   ];
   @override
@@ -10935,6 +11121,24 @@ class $SyncTombstoneRecordsTable extends SyncTombstoneRecords
     } else if (isInserting) {
       context.missing(_originDeviceIdMeta);
     }
+    if (data.containsKey('origin_device_name')) {
+      context.handle(
+        _originDeviceNameMeta,
+        originDeviceName.isAcceptableOrUnknown(
+          data['origin_device_name']!,
+          _originDeviceNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('entity_snapshot_json')) {
+      context.handle(
+        _entitySnapshotJsonMeta,
+        entitySnapshotJson.isAcceptableOrUnknown(
+          data['entity_snapshot_json']!,
+          _entitySnapshotJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('deleted_at')) {
       context.handle(
         _deletedAtMeta,
@@ -10976,6 +11180,14 @@ class $SyncTombstoneRecordsTable extends SyncTombstoneRecords
         DriftSqlType.string,
         data['${effectivePrefix}origin_device_id'],
       )!,
+      originDeviceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_device_name'],
+      )!,
+      entitySnapshotJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_snapshot_json'],
+      ),
       deletedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
@@ -10997,6 +11209,8 @@ class SyncTombstoneRecord extends DataClass
   final String causalVersionJson;
   final String operationId;
   final String originDeviceId;
+  final String originDeviceName;
+  final String? entitySnapshotJson;
   final DateTime deletedAt;
   const SyncTombstoneRecord({
     required this.groupId,
@@ -11005,6 +11219,8 @@ class SyncTombstoneRecord extends DataClass
     required this.causalVersionJson,
     required this.operationId,
     required this.originDeviceId,
+    required this.originDeviceName,
+    this.entitySnapshotJson,
     required this.deletedAt,
   });
   @override
@@ -11016,6 +11232,10 @@ class SyncTombstoneRecord extends DataClass
     map['causal_version_json'] = Variable<String>(causalVersionJson);
     map['operation_id'] = Variable<String>(operationId);
     map['origin_device_id'] = Variable<String>(originDeviceId);
+    map['origin_device_name'] = Variable<String>(originDeviceName);
+    if (!nullToAbsent || entitySnapshotJson != null) {
+      map['entity_snapshot_json'] = Variable<String>(entitySnapshotJson);
+    }
     map['deleted_at'] = Variable<DateTime>(deletedAt);
     return map;
   }
@@ -11028,6 +11248,10 @@ class SyncTombstoneRecord extends DataClass
       causalVersionJson: Value(causalVersionJson),
       operationId: Value(operationId),
       originDeviceId: Value(originDeviceId),
+      originDeviceName: Value(originDeviceName),
+      entitySnapshotJson: entitySnapshotJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entitySnapshotJson),
       deletedAt: Value(deletedAt),
     );
   }
@@ -11044,6 +11268,10 @@ class SyncTombstoneRecord extends DataClass
       causalVersionJson: serializer.fromJson<String>(json['causalVersionJson']),
       operationId: serializer.fromJson<String>(json['operationId']),
       originDeviceId: serializer.fromJson<String>(json['originDeviceId']),
+      originDeviceName: serializer.fromJson<String>(json['originDeviceName']),
+      entitySnapshotJson: serializer.fromJson<String?>(
+        json['entitySnapshotJson'],
+      ),
       deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
     );
   }
@@ -11057,6 +11285,8 @@ class SyncTombstoneRecord extends DataClass
       'causalVersionJson': serializer.toJson<String>(causalVersionJson),
       'operationId': serializer.toJson<String>(operationId),
       'originDeviceId': serializer.toJson<String>(originDeviceId),
+      'originDeviceName': serializer.toJson<String>(originDeviceName),
+      'entitySnapshotJson': serializer.toJson<String?>(entitySnapshotJson),
       'deletedAt': serializer.toJson<DateTime>(deletedAt),
     };
   }
@@ -11068,6 +11298,8 @@ class SyncTombstoneRecord extends DataClass
     String? causalVersionJson,
     String? operationId,
     String? originDeviceId,
+    String? originDeviceName,
+    Value<String?> entitySnapshotJson = const Value.absent(),
     DateTime? deletedAt,
   }) => SyncTombstoneRecord(
     groupId: groupId ?? this.groupId,
@@ -11076,6 +11308,10 @@ class SyncTombstoneRecord extends DataClass
     causalVersionJson: causalVersionJson ?? this.causalVersionJson,
     operationId: operationId ?? this.operationId,
     originDeviceId: originDeviceId ?? this.originDeviceId,
+    originDeviceName: originDeviceName ?? this.originDeviceName,
+    entitySnapshotJson: entitySnapshotJson.present
+        ? entitySnapshotJson.value
+        : this.entitySnapshotJson,
     deletedAt: deletedAt ?? this.deletedAt,
   );
   SyncTombstoneRecord copyWithCompanion(SyncTombstoneRecordsCompanion data) {
@@ -11094,6 +11330,12 @@ class SyncTombstoneRecord extends DataClass
       originDeviceId: data.originDeviceId.present
           ? data.originDeviceId.value
           : this.originDeviceId,
+      originDeviceName: data.originDeviceName.present
+          ? data.originDeviceName.value
+          : this.originDeviceName,
+      entitySnapshotJson: data.entitySnapshotJson.present
+          ? data.entitySnapshotJson.value
+          : this.entitySnapshotJson,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
@@ -11107,6 +11349,8 @@ class SyncTombstoneRecord extends DataClass
           ..write('causalVersionJson: $causalVersionJson, ')
           ..write('operationId: $operationId, ')
           ..write('originDeviceId: $originDeviceId, ')
+          ..write('originDeviceName: $originDeviceName, ')
+          ..write('entitySnapshotJson: $entitySnapshotJson, ')
           ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
@@ -11120,6 +11364,8 @@ class SyncTombstoneRecord extends DataClass
     causalVersionJson,
     operationId,
     originDeviceId,
+    originDeviceName,
+    entitySnapshotJson,
     deletedAt,
   );
   @override
@@ -11132,6 +11378,8 @@ class SyncTombstoneRecord extends DataClass
           other.causalVersionJson == this.causalVersionJson &&
           other.operationId == this.operationId &&
           other.originDeviceId == this.originDeviceId &&
+          other.originDeviceName == this.originDeviceName &&
+          other.entitySnapshotJson == this.entitySnapshotJson &&
           other.deletedAt == this.deletedAt);
 }
 
@@ -11143,6 +11391,8 @@ class SyncTombstoneRecordsCompanion
   final Value<String> causalVersionJson;
   final Value<String> operationId;
   final Value<String> originDeviceId;
+  final Value<String> originDeviceName;
+  final Value<String?> entitySnapshotJson;
   final Value<DateTime> deletedAt;
   final Value<int> rowid;
   const SyncTombstoneRecordsCompanion({
@@ -11152,6 +11402,8 @@ class SyncTombstoneRecordsCompanion
     this.causalVersionJson = const Value.absent(),
     this.operationId = const Value.absent(),
     this.originDeviceId = const Value.absent(),
+    this.originDeviceName = const Value.absent(),
+    this.entitySnapshotJson = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -11162,6 +11414,8 @@ class SyncTombstoneRecordsCompanion
     required String causalVersionJson,
     required String operationId,
     required String originDeviceId,
+    this.originDeviceName = const Value.absent(),
+    this.entitySnapshotJson = const Value.absent(),
     required DateTime deletedAt,
     this.rowid = const Value.absent(),
   }) : groupId = Value(groupId),
@@ -11178,6 +11432,8 @@ class SyncTombstoneRecordsCompanion
     Expression<String>? causalVersionJson,
     Expression<String>? operationId,
     Expression<String>? originDeviceId,
+    Expression<String>? originDeviceName,
+    Expression<String>? entitySnapshotJson,
     Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
@@ -11188,6 +11444,9 @@ class SyncTombstoneRecordsCompanion
       if (causalVersionJson != null) 'causal_version_json': causalVersionJson,
       if (operationId != null) 'operation_id': operationId,
       if (originDeviceId != null) 'origin_device_id': originDeviceId,
+      if (originDeviceName != null) 'origin_device_name': originDeviceName,
+      if (entitySnapshotJson != null)
+        'entity_snapshot_json': entitySnapshotJson,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -11200,6 +11459,8 @@ class SyncTombstoneRecordsCompanion
     Value<String>? causalVersionJson,
     Value<String>? operationId,
     Value<String>? originDeviceId,
+    Value<String>? originDeviceName,
+    Value<String?>? entitySnapshotJson,
     Value<DateTime>? deletedAt,
     Value<int>? rowid,
   }) {
@@ -11210,6 +11471,8 @@ class SyncTombstoneRecordsCompanion
       causalVersionJson: causalVersionJson ?? this.causalVersionJson,
       operationId: operationId ?? this.operationId,
       originDeviceId: originDeviceId ?? this.originDeviceId,
+      originDeviceName: originDeviceName ?? this.originDeviceName,
+      entitySnapshotJson: entitySnapshotJson ?? this.entitySnapshotJson,
       deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -11236,6 +11499,12 @@ class SyncTombstoneRecordsCompanion
     if (originDeviceId.present) {
       map['origin_device_id'] = Variable<String>(originDeviceId.value);
     }
+    if (originDeviceName.present) {
+      map['origin_device_name'] = Variable<String>(originDeviceName.value);
+    }
+    if (entitySnapshotJson.present) {
+      map['entity_snapshot_json'] = Variable<String>(entitySnapshotJson.value);
+    }
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
@@ -11254,6 +11523,8 @@ class SyncTombstoneRecordsCompanion
           ..write('causalVersionJson: $causalVersionJson, ')
           ..write('operationId: $operationId, ')
           ..write('originDeviceId: $originDeviceId, ')
+          ..write('originDeviceName: $originDeviceName, ')
+          ..write('entitySnapshotJson: $entitySnapshotJson, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -19719,6 +19990,8 @@ typedef $$SyncOutboxRecordsTableCreateCompanionBuilder =
       required String entityId,
       required String parentVersionJson,
       required String changedFieldsJson,
+      Value<String> originDeviceName,
+      Value<String?> entitySnapshotJson,
       required String operationKind,
       required int protocolVersion,
       required String payloadSha256,
@@ -19738,6 +20011,8 @@ typedef $$SyncOutboxRecordsTableUpdateCompanionBuilder =
       Value<String> entityId,
       Value<String> parentVersionJson,
       Value<String> changedFieldsJson,
+      Value<String> originDeviceName,
+      Value<String?> entitySnapshotJson,
       Value<String> operationKind,
       Value<int> protocolVersion,
       Value<String> payloadSha256,
@@ -19794,6 +20069,16 @@ class $$SyncOutboxRecordsTableFilterComposer
 
   ColumnFilters<String> get changedFieldsJson => $composableBuilder(
     column: $table.changedFieldsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -19882,6 +20167,16 @@ class $$SyncOutboxRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get operationKind => $composableBuilder(
     column: $table.operationKind,
     builder: (column) => ColumnOrderings(column),
@@ -19960,6 +20255,16 @@ class $$SyncOutboxRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get changedFieldsJson => $composableBuilder(
     column: $table.changedFieldsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
     builder: (column) => column,
   );
 
@@ -20045,6 +20350,8 @@ class $$SyncOutboxRecordsTableTableManager
                 Value<String> entityId = const Value.absent(),
                 Value<String> parentVersionJson = const Value.absent(),
                 Value<String> changedFieldsJson = const Value.absent(),
+                Value<String> originDeviceName = const Value.absent(),
+                Value<String?> entitySnapshotJson = const Value.absent(),
                 Value<String> operationKind = const Value.absent(),
                 Value<int> protocolVersion = const Value.absent(),
                 Value<String> payloadSha256 = const Value.absent(),
@@ -20062,6 +20369,8 @@ class $$SyncOutboxRecordsTableTableManager
                 entityId: entityId,
                 parentVersionJson: parentVersionJson,
                 changedFieldsJson: changedFieldsJson,
+                originDeviceName: originDeviceName,
+                entitySnapshotJson: entitySnapshotJson,
                 operationKind: operationKind,
                 protocolVersion: protocolVersion,
                 payloadSha256: payloadSha256,
@@ -20081,6 +20390,8 @@ class $$SyncOutboxRecordsTableTableManager
                 required String entityId,
                 required String parentVersionJson,
                 required String changedFieldsJson,
+                Value<String> originDeviceName = const Value.absent(),
+                Value<String?> entitySnapshotJson = const Value.absent(),
                 required String operationKind,
                 required int protocolVersion,
                 required String payloadSha256,
@@ -20098,6 +20409,8 @@ class $$SyncOutboxRecordsTableTableManager
                 entityId: entityId,
                 parentVersionJson: parentVersionJson,
                 changedFieldsJson: changedFieldsJson,
+                originDeviceName: originDeviceName,
+                entitySnapshotJson: entitySnapshotJson,
                 operationKind: operationKind,
                 protocolVersion: protocolVersion,
                 payloadSha256: payloadSha256,
@@ -20391,6 +20704,7 @@ typedef $$SyncEntityVersionRecordsTableCreateCompanionBuilder =
       required String causalVersionJson,
       required String operationId,
       required String originDeviceId,
+      Value<String> originDeviceName,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -20403,6 +20717,7 @@ typedef $$SyncEntityVersionRecordsTableUpdateCompanionBuilder =
       Value<String> causalVersionJson,
       Value<String> operationId,
       Value<String> originDeviceId,
+      Value<String> originDeviceName,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -20448,6 +20763,11 @@ class $$SyncEntityVersionRecordsTableFilterComposer
 
   ColumnFilters<String> get originDeviceId => $composableBuilder(
     column: $table.originDeviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20501,6 +20821,11 @@ class $$SyncEntityVersionRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -20542,6 +20867,11 @@ class $$SyncEntityVersionRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get originDeviceId => $composableBuilder(
     column: $table.originDeviceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
     builder: (column) => column,
   );
 
@@ -20602,6 +20932,7 @@ class $$SyncEntityVersionRecordsTableTableManager
                 Value<String> causalVersionJson = const Value.absent(),
                 Value<String> operationId = const Value.absent(),
                 Value<String> originDeviceId = const Value.absent(),
+                Value<String> originDeviceName = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncEntityVersionRecordsCompanion(
@@ -20612,6 +20943,7 @@ class $$SyncEntityVersionRecordsTableTableManager
                 causalVersionJson: causalVersionJson,
                 operationId: operationId,
                 originDeviceId: originDeviceId,
+                originDeviceName: originDeviceName,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -20624,6 +20956,7 @@ class $$SyncEntityVersionRecordsTableTableManager
                 required String causalVersionJson,
                 required String operationId,
                 required String originDeviceId,
+                Value<String> originDeviceName = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => SyncEntityVersionRecordsCompanion.insert(
@@ -20634,6 +20967,7 @@ class $$SyncEntityVersionRecordsTableTableManager
                 causalVersionJson: causalVersionJson,
                 operationId: operationId,
                 originDeviceId: originDeviceId,
+                originDeviceName: originDeviceName,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -20674,6 +21008,8 @@ typedef $$SyncTombstoneRecordsTableCreateCompanionBuilder =
       required String causalVersionJson,
       required String operationId,
       required String originDeviceId,
+      Value<String> originDeviceName,
+      Value<String?> entitySnapshotJson,
       required DateTime deletedAt,
       Value<int> rowid,
     });
@@ -20685,6 +21021,8 @@ typedef $$SyncTombstoneRecordsTableUpdateCompanionBuilder =
       Value<String> causalVersionJson,
       Value<String> operationId,
       Value<String> originDeviceId,
+      Value<String> originDeviceName,
+      Value<String?> entitySnapshotJson,
       Value<DateTime> deletedAt,
       Value<int> rowid,
     });
@@ -20725,6 +21063,16 @@ class $$SyncTombstoneRecordsTableFilterComposer
 
   ColumnFilters<String> get originDeviceId => $composableBuilder(
     column: $table.originDeviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20773,6 +21121,16 @@ class $$SyncTombstoneRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
     builder: (column) => ColumnOrderings(column),
@@ -20811,6 +21169,16 @@ class $$SyncTombstoneRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get originDeviceId => $composableBuilder(
     column: $table.originDeviceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originDeviceName => $composableBuilder(
+    column: $table.originDeviceName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get entitySnapshotJson => $composableBuilder(
+    column: $table.entitySnapshotJson,
     builder: (column) => column,
   );
 
@@ -20867,6 +21235,8 @@ class $$SyncTombstoneRecordsTableTableManager
                 Value<String> causalVersionJson = const Value.absent(),
                 Value<String> operationId = const Value.absent(),
                 Value<String> originDeviceId = const Value.absent(),
+                Value<String> originDeviceName = const Value.absent(),
+                Value<String?> entitySnapshotJson = const Value.absent(),
                 Value<DateTime> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SyncTombstoneRecordsCompanion(
@@ -20876,6 +21246,8 @@ class $$SyncTombstoneRecordsTableTableManager
                 causalVersionJson: causalVersionJson,
                 operationId: operationId,
                 originDeviceId: originDeviceId,
+                originDeviceName: originDeviceName,
+                entitySnapshotJson: entitySnapshotJson,
                 deletedAt: deletedAt,
                 rowid: rowid,
               ),
@@ -20887,6 +21259,8 @@ class $$SyncTombstoneRecordsTableTableManager
                 required String causalVersionJson,
                 required String operationId,
                 required String originDeviceId,
+                Value<String> originDeviceName = const Value.absent(),
+                Value<String?> entitySnapshotJson = const Value.absent(),
                 required DateTime deletedAt,
                 Value<int> rowid = const Value.absent(),
               }) => SyncTombstoneRecordsCompanion.insert(
@@ -20896,6 +21270,8 @@ class $$SyncTombstoneRecordsTableTableManager
                 causalVersionJson: causalVersionJson,
                 operationId: operationId,
                 originDeviceId: originDeviceId,
+                originDeviceName: originDeviceName,
+                entitySnapshotJson: entitySnapshotJson,
                 deletedAt: deletedAt,
                 rowid: rowid,
               ),

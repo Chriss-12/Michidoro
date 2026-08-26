@@ -8,6 +8,7 @@ import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_storage_confi
 import 'package:pomodoro_app_v1/features/sync/domain/services/sync_group_manifest_discovery.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_group_enrollment_controller.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/controllers/sync_storage_controller.dart';
+import 'package:pomodoro_app_v1/features/sync/presentation/widgets/sync_conflict_center_sheet.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
@@ -160,12 +161,16 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      key: const ValueKey('publish-pending-sync-changes'),
+                    child: FilledButton.icon(
+                      key: const ValueKey('prepare-and-review-sync-changes'),
                       onPressed: hasFolder && !controller.isBusy
-                          ? () => _publishPendingChanges(context)
+                          ? () => _prepareAndReviewChanges(context)
                           : null,
-                      icon: outboxState == SyncOutboxPublicationState.publishing
+                      icon:
+                          outboxState ==
+                                  SyncOutboxPublicationState.publishing ||
+                              incomingState ==
+                                  SyncIncomingApplicationState.processing
                           ? const SizedBox.square(
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
@@ -173,9 +178,23 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
                           : const Icon(Icons.sync_rounded),
                       label: Text(
                         context.tr(
-                          'Preparar cambios para Syncthing',
-                          'Prepare changes for Syncthing',
+                          'Preparar y revisar cambios',
+                          'Prepare and review changes',
                         ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('open-syncthing'),
+                      onPressed: controller.isBusy
+                          ? null
+                          : () => _openSyncthing(context),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: Text(
+                        context.tr('Abrir Syncthing', 'Open Syncthing'),
                       ),
                     ),
                   ),
@@ -186,30 +205,6 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
                     remaining: controller.remainingOperationCount.value,
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      key: const ValueKey('process-incoming-sync-changes'),
-                      onPressed: hasFolder && !controller.isBusy
-                          ? () => _processIncomingChanges(context)
-                          : null,
-                      icon:
-                          incomingState ==
-                              SyncIncomingApplicationState.processing
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.download_done_rounded),
-                      label: Text(
-                        context.tr(
-                          'Revisar cambios recibidos',
-                          'Review received changes',
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   _IncomingApplicationStatus(
                     state: incomingState,
                     applied: controller.receivedOperationCount.value,
@@ -217,6 +212,28 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
                     deferred: controller.deferredOperationCount.value,
                     rejected: controller.rejectedOperationCount.value,
                   ),
+                  if (controller.openConflicts.value.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey('open-sync-conflict-center'),
+                        onPressed: controller.isBusy
+                            ? null
+                            : () => showSyncConflictCenter(
+                                context,
+                                controller,
+                              ),
+                        icon: const Icon(Icons.merge_type_rounded),
+                        label: Text(
+                          context.tr(
+                            'Resolver conflictos (${controller.openConflicts.value.length})',
+                            'Resolve conflicts (${controller.openConflicts.value.length})',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ] else ...[
                   const SizedBox(height: 16),
                   SizedBox(
@@ -316,11 +333,11 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
     );
   }
 
-  Future<void> _publishPendingChanges(BuildContext context) async {
-    final published = await controller.publishPendingChanges(
+  Future<void> _prepareAndReviewChanges(BuildContext context) async {
+    final completed = await controller.prepareAndReviewChanges(
       storageController.folderUri.value,
     );
-    if (!context.mounted || published) return;
+    if (!context.mounted || completed) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_failureMessage(context, controller.failure.value)),
@@ -328,11 +345,9 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
     );
   }
 
-  Future<void> _processIncomingChanges(BuildContext context) async {
-    final processed = await controller.processIncomingChanges(
-      storageController.folderUri.value,
-    );
-    if (!context.mounted || processed) return;
+  Future<void> _openSyncthing(BuildContext context) async {
+    final opened = await controller.openSyncthing();
+    if (!context.mounted || opened) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_failureMessage(context, controller.failure.value)),
@@ -821,6 +836,10 @@ class SyncGroupEnrollmentSettingsCard extends StatelessWidget {
       SyncGroupEnrollmentFailure.recoverySnapshotFailed => context.tr(
         'No se pudo crear y verificar la copia cifrada. No se modificó ningún dato.',
         'The encrypted recovery copy could not be created and verified. No data was changed.',
+      ),
+      SyncGroupEnrollmentFailure.externalSyncAppUnavailable => context.tr(
+        'No se encontró Syncthing en este teléfono. Instálalo o ábrelo manualmente.',
+        'Syncthing was not found on this phone. Install it or open it manually.',
       ),
       _ => context.tr(
         'No se pudo preparar el grupo de forma segura.',

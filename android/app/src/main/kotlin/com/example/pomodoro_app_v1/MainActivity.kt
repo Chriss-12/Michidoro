@@ -389,11 +389,34 @@ class MainActivity : FlutterActivity() {
             "publishSyncOperation" -> publishSyncOperation(call, result)
             "discoverSyncOperations" -> discoverSyncOperations(call, result)
             "discoverSyncGroupManifests" -> discoverSyncGroupManifests(call, result)
+            "openSyncthing" -> openSyncthing(result)
             "exportBackupToExternalFolder" -> exportBackupToExternalFolder(call, result)
             "openFile" -> openFile(call, result)
             "playCompletionSound" -> playCompletionSound(call, result)
             "playCompletionVibration" -> playCompletionVibration(call, result)
             else -> result.notImplemented()
+        }
+    }
+
+    private fun openSyncthing(result: MethodChannel.Result) {
+        val supportedPackages = listOf(
+            "com.github.catfriend1.syncthingandroid",
+            "com.nutomic.syncthingandroid",
+        )
+        try {
+            for (supportedPackage in supportedPackages) {
+                val launchIntent = packageManager.getLaunchIntentForPackage(supportedPackage)
+                if (launchIntent != null) {
+                    startActivity(launchIntent)
+                    result.success(true)
+                    return
+                }
+            }
+            result.success(false)
+        } catch (_: ActivityNotFoundException) {
+            result.success(false)
+        } catch (error: Exception) {
+            result.error("syncthing_launch_failed", error.message, null)
         }
     }
 

@@ -714,6 +714,94 @@ void main() {
     },
   );
 
+  test(
+    'prepares then reviews with one authentication and one clear-key window',
+    () async {
+      final existing = await _createdEnrollment();
+      final authenticator = _FakeAuthenticator();
+      final order = <String>[];
+      List<int>? publicationKey;
+      List<int>? incomingKey;
+      var refreshCalls = 0;
+      final controller = buildController(
+        repository: _MemoryEnrollmentRepository(existing: existing),
+        authenticator: authenticator,
+        initialBootstrapService:
+            ({
+              required groupId,
+              required installationId,
+              required protocolVersion,
+            }) async {
+              order.add('bootstrap');
+              return const SyncInitialBootstrapReport(queued: 1, skipped: 2);
+            },
+        outboxPublicationService:
+            ({
+              required folderUri,
+              required groupId,
+              required installationId,
+              required clearKey,
+            }) async {
+              order.add('publish');
+              publicationKey = clearKey;
+              return const SyncOutboxPublicationReport(
+                published: 2,
+                failed: 0,
+                remaining: 0,
+              );
+            },
+        incomingApplicationService:
+            ({
+              required folderUri,
+              required groupId,
+              required localInstallationId,
+              required clearKey,
+            }) async {
+              order.add('review');
+              incomingKey = clearKey;
+              return const SyncIncomingApplicationReport(
+                applied: 3,
+                duplicates: 1,
+                conflicts: 1,
+                deferred: 2,
+                rejected: 0,
+              );
+            },
+        refreshApplicationData: () async {
+          order.add('refresh');
+          refreshCalls++;
+        },
+      );
+      await controller.load();
+
+      expect(
+        await controller.prepareAndReviewChanges(
+          'content://tree/michifocus',
+        ),
+        isTrue,
+      );
+
+      expect(authenticator.authenticationCalls, 1);
+      expect(order, ['bootstrap', 'publish', 'review', 'refresh']);
+      expect(publicationKey, everyElement(0));
+      expect(incomingKey, everyElement(0));
+      expect(refreshCalls, 1);
+      expect(controller.publishedOperationCount.value, 2);
+      expect(controller.remainingOperationCount.value, 0);
+      expect(controller.receivedOperationCount.value, 3);
+      expect(controller.incomingConflictCount.value, 1);
+      expect(controller.deferredOperationCount.value, 2);
+      expect(
+        controller.outboxPublicationState.value,
+        SyncOutboxPublicationState.complete,
+      );
+      expect(
+        controller.incomingApplicationState.value,
+        SyncIncomingApplicationState.complete,
+      );
+    },
+  );
+
   test('failed persistence deletes the provisional device key', () async {
     final repository = _MemoryEnrollmentRepository(shouldFail: true);
     final protector = _FakeKeyProtector();

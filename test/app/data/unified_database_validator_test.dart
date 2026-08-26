@@ -63,7 +63,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      6,
+      7,
     );
     expect(await database.select(database.routineRecords).get(), isEmpty);
   });

@@ -11,15 +11,28 @@ class DriftSyncIncomingApplicationService {
     required DriftSyncExchangeRepository exchangeRepository,
     required SyncOperationDiscovery discovery,
     required SyncGroupCrypto crypto,
+    Future<Map<String, Object?>?> Function(
+      MichiFocusDatabase database,
+      String entityType,
+      String entityId,
+    )?
+    readCurrentFields,
     DateTime Function()? clock,
   }) : _exchangeRepository = exchangeRepository,
        _discovery = discovery,
        _crypto = crypto,
+       _readCurrentFields = readCurrentFields,
        _clock = clock ?? DateTime.now;
 
   final DriftSyncExchangeRepository _exchangeRepository;
   final SyncOperationDiscovery _discovery;
   final SyncGroupCrypto _crypto;
+  final Future<Map<String, Object?>?> Function(
+    MichiFocusDatabase database,
+    String entityType,
+    String entityId,
+  )?
+  _readCurrentFields;
   final DateTime Function() _clock;
 
   Future<SyncIncomingApplicationReport> call({
@@ -116,6 +129,20 @@ class DriftSyncIncomingApplicationService {
       isDelete: operation.operationKind == 'delete',
       isCreate: operation.operationKind == 'create',
       appliedAt: _clock().toUtc(),
+      remoteChangedFields: operation.changedFields,
+      remoteEntitySnapshot: operation.entitySnapshot,
+      remoteDeviceName: operation.originDeviceName,
+      remoteCreatedAt: DateTime.fromMillisecondsSinceEpoch(
+        operation.createdAtEpochMillis,
+        isUtc: true,
+      ),
+      readCurrentFields: _readCurrentFields == null
+          ? null
+          : (database) => _readCurrentFields(
+              database,
+              operation.entityType,
+              operation.entityId,
+            ),
       apply: (database, fields, {required applyDelete}) =>
           _applyApplicationData(
             database,

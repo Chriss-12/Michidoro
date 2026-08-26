@@ -173,15 +173,19 @@ schema design should evaluate at least device/group state, durable outbox,
 applied-operation ledger, per-entity or per-field causal versions, conflicts,
 tombstones, and acknowledgement watermarks.
 
-Schema version 6 implements those boundaries as seven private tables:
+Schema version 7 keeps those seven private tables and extends their operation
+context without changing application entity IDs:
 
 - `sync_local_state` owns one monotonically increasing counter per enrolled
   group/installation pair and rejects a mismatched installation or protocol;
-- `sync_outbox` keeps the complete validated local operation description and a
+- `sync_outbox` keeps the complete validated local operation description,
+  originating friendly name, encrypted-payload entity snapshot, and a
   unique `(group, origin device, origin counter)` identity until publication;
 - `sync_applied_operations` deduplicates remote input by both operation ID and
   the unique origin counter, including its SHA-256 payload identity;
-- `sync_entity_versions`, `sync_tombstones`, `sync_conflicts`, and
+- `sync_entity_versions` retains the friendly origin of each winning field;
+  `sync_tombstones` (including the friendly deletion origin and last complete entity
+  snapshot needed for safe delete/update restoration), `sync_conflicts`, and
   `sync_acknowledgements` reserve durable causal, deletion, resolution, and
   retention state without changing any existing application row ID.
 
@@ -229,6 +233,15 @@ movement, conflict resolution UI, acknowledgements, and immutable history remain
 
 Conflict resolution is itself a causally newer operation. No phone may resolve a
 conflict only in presentation state.
+
+Protocol-v1 payloads remain backward compatible: new operations include the
+normalized friendly device name and a complete entity snapshot inside the
+authenticated ciphertext. Older operations without these optional fields still
+apply, but MichiFocus disables any resolution that would require unavailable
+reconstruction data. Safe goal and calendar-event conflicts may preserve both
+versions by resolving the original and creating a new random-ID duplicate in one
+transaction; tasks and routines are excluded because blind duplication can break
+execution and historical ownership.
 
 ## Deletion and compaction
 

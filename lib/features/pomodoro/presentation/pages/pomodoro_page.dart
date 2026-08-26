@@ -36,6 +36,10 @@ class PomodoroPage extends StatelessWidget {
       children: [
         const SizedBox(height: 48),
         const _TimerRingSection(),
+        const SizedBox(height: 32),
+        const _TimerControlsSection(),
+        const SizedBox(height: 86),
+        const _FocusLifecycleActionsSection(),
         const SizedBox(height: 24),
         SignalBuilder(
           builder: (context) {
@@ -45,17 +49,17 @@ class PomodoroPage extends StatelessWidget {
               return const SizedBox.shrink();
             }
 
-            return _FocusReflectionCard(
-              key: ValueKey(pendingSessionId),
-              onSubmit: pomodoroController.submitCompletionReflection,
+            return Column(
+              children: [
+                _FocusReflectionCard(
+                  key: ValueKey(pendingSessionId),
+                  onSubmit: pomodoroController.submitCompletionReflection,
+                ),
+                const SizedBox(height: 24),
+              ],
             );
           },
         ),
-        const SizedBox(height: 32),
-        const _TimerControlsSection(),
-        const SizedBox(height: 86),
-        const _FocusLifecycleActionsSection(),
-        const SizedBox(height: 24),
         SignalBuilder(
           builder: (context) {
             final scheduledGoals = goalsController.scheduledGoals();
@@ -116,110 +120,188 @@ class _FocusReflectionCardState extends State<_FocusReflectionCard> {
   bool _wasDistracted = false;
   int _distractionMinutes = 5;
   bool _isSaving = false;
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
+      padding: const EdgeInsets.symmetric(horizontal: 18),
       child: GlassCard(
-        padding: AppCardPaddings.compact,
+        key: const ValueKey('focus-reflection-card'),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.self_improvement_rounded, color: palette.primary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    context.tr('Cierre de enfoque', 'Focus wrap-up'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              context.tr(
-                '¿Cómo te sientes después de este bloque?',
-                'How do you feel after this block?',
-              ),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            _MoodScoreSelector(
-              selectedScore: _endMoodScore,
-              onChanged: (value) => setState(() => _endMoodScore = value),
-            ),
-            const SizedBox(height: 14),
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
-                  value: false,
-                  icon: const Icon(Icons.check_circle_outline_rounded),
-                  label: Text(context.tr('Todo bien', 'All good')),
-                ),
-                ButtonSegment(
-                  value: true,
-                  icon: const Icon(Icons.visibility_off_outlined),
-                  label: Text(context.tr('Me distraje', 'I got distracted')),
-                ),
-              ],
-              selected: {_wasDistracted},
-              onSelectionChanged: (values) =>
-                  setState(() => _wasDistracted = values.single),
-            ),
-            if (_wasDistracted) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      context.tr('Minutos aproximados', 'Approximate minutes'),
-                      style: Theme.of(context).textTheme.titleSmall,
+            Material(
+              color: Colors.transparent,
+              child: Semantics(
+                button: true,
+                expanded: _isExpanded,
+                child: InkWell(
+                  key: const ValueKey('focus-reflection-toggle'),
+                  onTap: () => setState(() => _isExpanded = !_isExpanded),
+                  child: Padding(
+                    padding: AppCardPaddings.compact,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: palette.primaryMuted,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.self_improvement_rounded,
+                            color: palette.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            context.tr('Cierre de enfoque', 'Focus wrap-up'),
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        AnimatedRotation(
+                          turns: _isExpanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Icons.expand_more_rounded,
+                            color: palette.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    '$_distractionMinutes min',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: palette.primary,
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                value: _distractionMinutes.toDouble(),
-                min: 1,
-                max: 60,
-                divisions: 59,
-                label: '$_distractionMinutes min',
-                onChanged: (value) =>
-                    setState(() => _distractionMinutes = value.round()),
-              ),
-            ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isSaving || _endMoodScore == null
-                    ? null
-                    : () async {
-                        setState(() => _isSaving = true);
-                        await widget.onSubmit(
-                          endMoodScore: _endMoodScore!,
-                          wasDistracted: _wasDistracted,
-                          distractionMinutes: _distractionMinutes,
-                        );
-                        if (mounted) {
-                          setState(() => _isSaving = false);
-                        }
-                      },
-                icon: const Icon(Icons.save_alt_rounded),
-                label: Text(
-                  context.tr('Guardar reflexión', 'Save reflection'),
                 ),
+              ),
+            ),
+            ClipRect(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _isExpanded
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Divider(color: palette.neutralSoft, height: 1),
+                            const SizedBox(height: 16),
+                            Text(
+                              context.tr(
+                                '¿Cómo te sientes después de este bloque?',
+                                'How do you feel after this block?',
+                              ),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 10),
+                            _MoodScoreSelector(
+                              selectedScore: _endMoodScore,
+                              onChanged: (value) =>
+                                  setState(() => _endMoodScore = value),
+                            ),
+                            const SizedBox(height: 14),
+                            SegmentedButton<bool>(
+                              segments: [
+                                ButtonSegment(
+                                  value: false,
+                                  icon: const Icon(
+                                    Icons.check_circle_outline_rounded,
+                                  ),
+                                  label: Text(
+                                    context.tr('Todo bien', 'All good'),
+                                  ),
+                                ),
+                                ButtonSegment(
+                                  value: true,
+                                  icon: const Icon(
+                                    Icons.visibility_off_outlined,
+                                  ),
+                                  label: Text(
+                                    context.tr(
+                                      'Me distraje',
+                                      'I got distracted',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              selected: {_wasDistracted},
+                              onSelectionChanged: (values) => setState(
+                                () => _wasDistracted = values.single,
+                              ),
+                            ),
+                            if (_wasDistracted) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      context.tr(
+                                        'Minutos aproximados',
+                                        'Approximate minutes',
+                                      ),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$_distractionMinutes min',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(color: palette.primary),
+                                  ),
+                                ],
+                              ),
+                              Slider(
+                                value: _distractionMinutes.toDouble(),
+                                min: 1,
+                                max: 60,
+                                divisions: 59,
+                                label: '$_distractionMinutes min',
+                                onChanged: (value) => setState(
+                                  () => _distractionMinutes = value.round(),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: _isSaving || _endMoodScore == null
+                                    ? null
+                                    : () async {
+                                        setState(() => _isSaving = true);
+                                        await widget.onSubmit(
+                                          endMoodScore: _endMoodScore!,
+                                          wasDistracted: _wasDistracted,
+                                          distractionMinutes:
+                                              _distractionMinutes,
+                                        );
+                                        if (mounted) {
+                                          setState(() => _isSaving = false);
+                                        }
+                                      },
+                                icon: const Icon(Icons.save_alt_rounded),
+                                label: Text(
+                                  context.tr(
+                                    'Guardar reflexión',
+                                    'Save reflection',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ],
@@ -496,16 +578,13 @@ class _ActiveFocusContextCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        taskTitle == null
-                            ? context.tr(
-                                'Este Pomodoro suma a',
-                                'This Pomodoro counts toward',
-                              )
-                            : context.tr('Enfoque actual', 'Current focus'),
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 3),
+                      if (taskTitle != null) ...[
+                        Text(
+                          context.tr('Enfoque actual', 'Current focus'),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 3),
+                      ],
                       Text(
                         _focusContextLabel(
                           context: context,
@@ -514,9 +593,11 @@ class _ActiveFocusContextCard extends StatelessWidget {
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
-                        ),
+                        style: taskTitle == null
+                            ? Theme.of(context).textTheme.titleSmall
+                            : Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: palette.textSecondary,
+                              ),
                       ),
                     ],
                   ),
@@ -900,6 +981,8 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
             }
           });
         }
+        final showMaximumConcentrationSurface =
+            maximumConcentrationActive || _isClosingMaximumConcentration;
 
         final minutes = runtime.remainingSeconds ~/ 60;
         final seconds = runtime.remainingSeconds % 60;
@@ -930,18 +1013,18 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
                                 palette: palette,
                                 progress: progress,
                                 maximumConcentration:
-                                    maximumConcentrationActive,
+                                    showMaximumConcentrationSurface,
                               ),
                               child: _TimerFace(
                                 timeLabel: timeLabel,
                                 phaseLabel: _phaseTitle(context, runtime.phase),
                                 maximumConcentration:
-                                    maximumConcentrationActive,
+                                    showMaximumConcentrationSurface,
                               ),
                             ),
                           ),
                         ),
-                        if (!maximumConcentrationActive &&
+                        if (!showMaximumConcentrationSurface &&
                             runtime.taskEstimatedSeconds != null) ...[
                           const SizedBox(height: 12),
                           _TaskPlanInfoButton(runtime: runtime),
@@ -958,7 +1041,7 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
                       icon: Icons.replay_rounded,
                       onPressed: runtime.onReset,
                       outline: true,
-                      maximumConcentration: maximumConcentrationActive,
+                      maximumConcentration: showMaximumConcentrationSurface,
                     ),
                     _CircleAction(
                       icon: runtime.isRunning
@@ -966,12 +1049,13 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
                           : Icons.play_arrow_rounded,
                       onPressed: runtime.onPlayPause,
                       large: true,
-                      maximumConcentration: maximumConcentrationActive,
+                      maximumConcentration: showMaximumConcentrationSurface,
                     ),
                     _FocusDisplayMenuButton(
                       isFullscreen: true,
                       maximumConcentrationEnabled: maximumConcentrationEnabled,
-                      maximumConcentrationActive: maximumConcentrationActive,
+                      maximumConcentrationActive:
+                          showMaximumConcentrationSurface,
                       onMaximumConcentrationChanged: (enabled) =>
                           controller.maximumConcentrationMode = enabled,
                     ),
@@ -983,10 +1067,10 @@ class _PomodoroFullscreenPageState extends State<PomodoroFullscreenPage> {
         );
 
         return Scaffold(
-          backgroundColor: maximumConcentrationActive
+          backgroundColor: showMaximumConcentrationSurface
               ? _maximumConcentrationBlack
               : palette.background,
-          body: maximumConcentrationActive
+          body: showMaximumConcentrationSurface
               ? ColoredBox(
                   key: const Key('maximumConcentrationSurface'),
                   color: _maximumConcentrationBlack,
