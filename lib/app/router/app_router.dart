@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/pages/goals_page.dart';
 import 'package:pomodoro_app_v1/features/home/presentation/pages/home_page.dart';
@@ -20,8 +21,14 @@ import 'package:pomodoro_app_v1/shared/templates/app_shell.dart';
 class AppRouter {
   const AppRouter._();
 
+  static String startupLocation({required bool shouldShowOnboarding}) {
+    return shouldShowOnboarding ? OnboardingPage.routePath : HomePage.routePath;
+  }
+
   static final router = GoRouter(
-    initialLocation: SplashPage.routePath,
+    initialLocation: startupLocation(
+      shouldShowOnboarding: appSettingsController.shouldShowOnboarding,
+    ),
     routes: [
       GoRoute(
         path: SplashPage.routePath,
@@ -33,55 +40,81 @@ class AppRouter {
         pageBuilder: (context, state) =>
             _buildTransitionPage(state: state, child: const OnboardingPage()),
       ),
-      ShellRoute(
-        pageBuilder: (context, state, child) => _buildTransitionPage(
+      StatefulShellRoute.indexedStack(
+        pageBuilder: (context, state, navigationShell) => _buildTransitionPage(
           state: state,
           child: AppShell(
-            selectedIndex: _selectedIndexForPath(state.uri.path),
-            child: child,
+            navigationShell: navigationShell,
           ),
         ),
-        routes: [
-          GoRoute(
-            path: HomePage.routePath,
-            pageBuilder: (context, state) =>
-                _buildTransitionPage(state: state, child: const HomePage()),
-          ),
-          GoRoute(
-            path: TasksPage.routePath,
-            pageBuilder: (context, state) => _buildTransitionPage(
-              state: state,
-              child: TasksPage(
-                showRoutines: state.uri.queryParameters['view'] == 'routines',
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: HomePage.routePath,
+                pageBuilder: (context, state) => _buildTransitionPage(
+                  state: state,
+                  child: const HomePage(),
+                ),
               ),
-            ),
+            ],
           ),
-          GoRoute(
-            path: PomodoroPage.routePath,
-            pageBuilder: (context, state) => _buildTransitionPage(
-              state: state,
-              child: const PomodoroPage(),
-            ),
+          StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: TasksPage.routePath,
+                pageBuilder: (context, state) => _buildTransitionPage(
+                  state: state,
+                  child: TasksPage(
+                    showRoutines:
+                        state.uri.queryParameters['view'] == 'routines',
+                  ),
+                ),
+              ),
+            ],
           ),
-          GoRoute(
-            path: GoalsPage.routePath,
-            pageBuilder: (context, state) => _buildTransitionPage(
-              state: state,
-              child: const CalendarPage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: PomodoroPage.routePath,
+                pageBuilder: (context, state) => _buildTransitionPage(
+                  state: state,
+                  child: const PomodoroPage(),
+                ),
+              ),
+            ],
           ),
-          GoRoute(
-            path: SettingsPage.routePath,
-            pageBuilder: (context, state) => _buildTransitionPage(
-              state: state,
-              child: const SettingsPage(),
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: GoalsPage.routePath,
+                pageBuilder: (context, state) => _buildTransitionPage(
+                  state: state,
+                  child: CalendarPage(
+                    initialGoalId: state.uri.queryParameters['goalId'],
+                    initialTaskId: state.uri.queryParameters['taskId'],
+                  ),
+                ),
+              ),
+            ],
           ),
-          GoRoute(
-            path: CalendarPage.routePath,
-            redirect: (context, state) => GoalsPage.routePath,
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: SettingsPage.routePath,
+                pageBuilder: (context, state) => _buildTransitionPage(
+                  state: state,
+                  child: const SettingsPage(),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+      GoRoute(
+        path: CalendarPage.routePath,
+        redirect: (context, state) => GoalsPage.routePath,
       ),
       GoRoute(
         path: PomodoroFullscreenPage.routePath,
@@ -160,17 +193,6 @@ class AppRouter {
       ),
     ],
   );
-
-  static int _selectedIndexForPath(String path) {
-    return switch (path) {
-      HomePage.routePath => 0,
-      TasksPage.routePath => 1,
-      PomodoroPage.routePath => 2,
-      GoalsPage.routePath => 3,
-      SettingsPage.routePath => 4,
-      _ => 0,
-    };
-  }
 
   static Page<void> _buildTransitionPage({
     required GoRouterState state,

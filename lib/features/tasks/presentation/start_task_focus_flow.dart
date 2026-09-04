@@ -83,26 +83,32 @@ Future<void> startTaskFocusFlow({
 
   if (controller.hasActiveRuntime.value) {
     if (controller.activeTaskId.value == task.id) {
-      if (context.mounted) {
-        context.go(PomodoroPage.routePath);
+      final shouldResume = await shouldResumeExistingTaskRuntime(
+        controller: controller,
+        taskId: task.id,
+      );
+      if (shouldResume) {
+        if (context.mounted) {
+          context.go(PomodoroPage.routePath);
+        }
+        return;
       }
-      return;
-    }
-
-    final action = await _showOwnershipConflict(
-      context: context,
-      activeTaskTitle: controller.activeTaskTitle.value,
-    );
-    if (action == _ConflictAction.returnToTimer) {
-      if (context.mounted) {
-        context.go(PomodoroPage.routePath);
+    } else {
+      final action = await _showOwnershipConflict(
+        context: context,
+        activeTaskTitle: controller.activeTaskTitle.value,
+      );
+      if (action == _ConflictAction.returnToTimer) {
+        if (context.mounted) {
+          context.go(PomodoroPage.routePath);
+        }
+        return;
       }
-      return;
+      if (action != _ConflictAction.stopAndSwitch) {
+        return;
+      }
+      await controller.stopForNow();
     }
-    if (action != _ConflictAction.stopAndSwitch) {
-      return;
-    }
-    await controller.stopForNow();
   }
 
   if (!context.mounted) {
@@ -190,6 +196,28 @@ Future<void> startTaskFocusFlow({
   if (context.mounted) {
     context.go(PomodoroPage.routePath);
   }
+}
+
+Future<bool> shouldResumeExistingTaskRuntime({
+  required PomodoroController controller,
+  required String taskId,
+}) async {
+  if (!controller.hasActiveRuntime.value ||
+      controller.activeTaskId.value != taskId) {
+    return false;
+  }
+  final estimatedSeconds = controller.activeTaskEstimatedSeconds.value;
+  if (controller.phase.value == PomodoroPhase.focus &&
+      estimatedSeconds != null) {
+    final remainingFromHistory =
+        estimatedSeconds - controller.activeTaskFocusedSeconds.value;
+    if (controller.remainingSeconds.value > remainingFromHistory) {
+      await controller.discardActiveRuntimeWithoutSaving();
+      return false;
+    }
+  }
+
+  return true;
 }
 
 Future<_ConflictAction?> _showOwnershipConflict({

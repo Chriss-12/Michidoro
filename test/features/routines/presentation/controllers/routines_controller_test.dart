@@ -3,6 +3,7 @@ import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
+import 'package:pomodoro_app_v1/shared/models/date_period_filter.dart';
 
 void main() {
   final now = DateTime(2026, 8, 7, 9);
@@ -43,6 +44,7 @@ void main() {
       );
 
       await controller.load();
+      controller.selectedDateFilter = const DatePeriodFilter.all();
 
       expect(controller.filteredRoutines.value, hasLength(1));
       expect(controller.filteredRoutines.value.single.id, 'routine-1');
@@ -61,6 +63,50 @@ void main() {
       expect(repository.lastEndDate, DateTime(2026, 8, 7));
     });
 
+    test('filters recurring routines by selected calendar period', () async {
+      final controller = RoutinesController(
+        repository: _MemoryRoutinesRepository(
+          routines: [
+            _routine(
+              now: now,
+              id: 'friday',
+              weekdays: const [DateTime.friday],
+            ),
+            _routine(
+              now: now,
+              id: 'monday',
+            ),
+            _routine(
+              now: now,
+              id: 'september',
+              validFromDate: DateTime(2026, 9),
+              weekdays: const [DateTime.tuesday],
+            ),
+          ],
+        ),
+        now: () => now,
+      );
+      await controller.load();
+
+      expect(controller.filteredRoutines.value.single.id, 'friday');
+      controller.selectedDateFilter = DatePeriodFilter.week(
+        DateTime(2026, 8, 10),
+      );
+      expect(
+        controller.filteredRoutines.value.map((routine) => routine.id).toSet(),
+        {'friday', 'monday'},
+      );
+      controller.selectedDateFilter = DatePeriodFilter.month(
+        DateTime(2026, 9),
+      );
+      expect(
+        controller.filteredRoutines.value.map((routine) => routine.id),
+        contains('september'),
+      );
+      controller.selectedDateFilter = const DatePeriodFilter.all();
+      expect(controller.filteredRoutines.value, hasLength(3));
+    });
+
     test('creates wizard drafts and converts existing routines', () {
       var sequence = 0;
       final controller = RoutinesController(
@@ -76,7 +122,11 @@ void main() {
       expect(fresh.isNew, isTrue);
       expect(fresh.status, RoutineStatus.active);
       expect(fresh.iconKey, 'sun');
+      expect(fresh.customColorArgb, 0xFF789B5F);
+      expect(fresh.validFromDate, DateTime(2026, 8, 7));
       expect(existing.isNew, isFalse);
+      expect(existing.customColorArgb, 0xFF2563EB);
+      expect(existing.validFromDate, DateTime(2026, 8, 7));
       expect(existing.items.single.id, 'item-1-routine-1');
       expect(existing.weekdays, [DateTime.monday]);
     });
@@ -115,6 +165,8 @@ void main() {
           'name.required',
           'icon.required',
           'color.required',
+          'color.customRequired',
+          'validity.startRequired',
           'weekdays.invalid',
           'item.position.invalid',
           'item.title.required',
@@ -124,6 +176,52 @@ void main() {
           'item.pomodoro.focus.invalid',
           'item.pomodoro.break.invalid',
         ]),
+      );
+    });
+
+    test('validates routine validity dates', () {
+      final controller = RoutinesController(
+        repository: _MemoryRoutinesRepository(),
+        now: () => now,
+      );
+      final base = controller.newDraft().copyWith(
+        name: 'Morning',
+        weekdays: const [DateTime.monday],
+        items: const [
+          RoutineItemDraft(
+            position: 0,
+            title: 'Exercise',
+            scheduledMinute: 420,
+            durationMinutes: 30,
+          ),
+        ],
+      );
+
+      expect(
+        controller
+            .validate(base.copyWith(clearValidFromDate: true))
+            .map((issue) => issue.code),
+        contains('validity.startRequired'),
+      );
+      expect(
+        controller
+            .validate(
+              base.copyWith(
+                validUntilDate: DateTime(2026, 8, 6),
+              ),
+            )
+            .map((issue) => issue.code),
+        contains('validity.rangeInvalid'),
+      );
+      expect(
+        controller
+            .validate(
+              base.copyWith(
+                validFromDate: DateTime(2026, 8, 7, 9),
+              ),
+            )
+            .map((issue) => issue.code),
+        contains('validity.dateInvalid'),
       );
     });
 
@@ -160,15 +258,17 @@ void main() {
           repository: _MemoryRoutinesRepository(),
           now: () => now,
         );
-        const draft = RoutineEditorDraft(
+        final draft = RoutineEditorDraft(
           id: 'routine-1',
           name: 'Morning',
           iconKey: 'sun',
           colorKey: 'yellow',
+          customColorArgb: 0xFF2563EB,
           status: RoutineStatus.active,
+          validFromDate: DateTime(2026, 8, 7),
           weekdays: [DateTime.monday],
           items: [
-            RoutineItemDraft(
+            const RoutineItemDraft(
               id: 'one',
               position: 0,
               title: 'Deep work',
@@ -176,7 +276,7 @@ void main() {
               durationMinutes: 50,
               pomodoroMode: RoutinePomodoroMode.recommended,
             ),
-            RoutineItemDraft(
+            const RoutineItemDraft(
               id: 'two',
               position: 1,
               title: 'Review',
@@ -216,6 +316,10 @@ void main() {
           now: () => now,
           createId: (scope) => '$scope-${++sequence}',
         );
+        var reminderRefreshes = 0;
+        controller.onReminderScheduleChanged = () async {
+          reminderRefreshes += 1;
+        };
         final draft = controller.newDraft().copyWith(
           name: '  Morning  ',
           description: '  Start well  ',
@@ -236,8 +340,11 @@ void main() {
         expect(saved.id, 'routine-1');
         expect(saved.name, 'Morning');
         expect(saved.description, 'Start well');
+        expect(saved.customColorArgb, 0xFF789B5F);
+        expect(saved.validFromDate, DateTime(2026, 8, 7));
         expect(saved.items.single.id, 'routine-item-2');
         expect(saved.items.single.title, 'Exercise');
+        expect(reminderRefreshes, 1);
         expect(controller.validationIssues.value, isEmpty);
       },
     );
@@ -253,21 +360,23 @@ void main() {
       expect(await controller.saveDraft(invalid), isFalse);
       expect(repository.saveCalls, 0);
 
-      const overlapping = RoutineEditorDraft(
+      final overlapping = RoutineEditorDraft(
         id: 'routine-overlap',
         name: 'Overlap',
         iconKey: 'clock',
         colorKey: 'red',
+        customColorArgb: 0xFFDC2626,
         status: RoutineStatus.active,
+        validFromDate: DateTime(2026, 8, 7),
         weekdays: [1],
         items: [
-          RoutineItemDraft(
+          const RoutineItemDraft(
             position: 0,
             title: 'One',
             scheduledMinute: 60,
             durationMinutes: 30,
           ),
-          RoutineItemDraft(
+          const RoutineItemDraft(
             position: 1,
             title: 'Two',
             scheduledMinute: 75,
@@ -300,6 +409,8 @@ void main() {
         expect(duplicate.items.single.routineId, duplicate.id);
         expect(duplicate.status, RoutineStatus.paused);
         expect(duplicate.name, 'Morning (copy)');
+        expect(duplicate.customColorArgb, source.customColorArgb);
+        expect(duplicate.validFromDate, DateTime(2026, 8, 7));
         expect(repository.routines, hasLength(2));
       },
     );
@@ -500,7 +611,10 @@ class _MemoryRoutinesRepository implements RoutinesRepository {
       description: current.description,
       iconKey: current.iconKey,
       colorKey: current.colorKey,
+      customColorArgb: current.customColorArgb,
       status: status,
+      validFromDate: current.validFromDate,
+      validUntilDate: current.validUntilDate,
       pausedUntilDate: status == RoutineStatus.paused ? pausedUntilDate : null,
       archivedAt: status == RoutineStatus.archived ? archivedAt : null,
       createdAt: current.createdAt,
@@ -518,17 +632,23 @@ Routine _routine({
   String id = 'routine-1',
   RoutineStatus status = RoutineStatus.active,
   DateTime? archivedAt,
+  DateTime? validFromDate,
+  DateTime? validUntilDate,
+  List<int> weekdays = const [DateTime.monday],
 }) {
   return Routine(
     id: id,
     name: 'Morning',
     iconKey: 'sun',
     colorKey: 'yellow',
+    customColorArgb: 0xFF2563EB,
     status: status,
+    validFromDate: validFromDate ?? DateTime(now.year, now.month, now.day),
+    validUntilDate: validUntilDate,
     archivedAt: archivedAt,
     createdAt: now,
     updatedAt: now,
-    weekdays: const [DateTime.monday],
+    weekdays: weekdays,
     items: [
       RoutineItem(
         id: 'item-1-$id',

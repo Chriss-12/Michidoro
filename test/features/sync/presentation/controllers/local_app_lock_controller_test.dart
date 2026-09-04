@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/local_unlock_policy.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/local_unlock_policy_repository.dart';
@@ -101,6 +102,39 @@ void main() {
       controller.onBackgrounded();
       clock.advance(const Duration(seconds: 20));
       controller.onResumed();
+
+      expect(controller.isLocked.value, isTrue);
+    });
+
+    test('inactive does not start the background grace period', () {
+      final clock = _MonotonicClock();
+      final controller = LocalAppLockController(
+        initialPolicy: LocalUnlockPolicy.afterOneMinute,
+        monotonicNow: clock.call,
+      )..authenticationSucceeded();
+      final changeLifecycle = controller.onLifecycleStateChanged;
+
+      changeLifecycle(AppLifecycleState.inactive);
+      clock.advance(const Duration(minutes: 2));
+      changeLifecycle(AppLifecycleState.resumed);
+
+      expect(controller.isLocked.value, isFalse);
+    });
+
+    test('hidden starts one grace period until the app resumes', () {
+      final clock = _MonotonicClock();
+      final controller = LocalAppLockController(
+        initialPolicy: LocalUnlockPolicy.afterOneMinute,
+        monotonicNow: clock.call,
+      )..authenticationSucceeded();
+      final changeLifecycle = controller.onLifecycleStateChanged;
+
+      changeLifecycle(AppLifecycleState.inactive);
+      changeLifecycle(AppLifecycleState.hidden);
+      clock.advance(const Duration(seconds: 40));
+      changeLifecycle(AppLifecycleState.paused);
+      clock.advance(const Duration(seconds: 20));
+      changeLifecycle(AppLifecycleState.resumed);
 
       expect(controller.isLocked.value, isTrue);
     });

@@ -113,6 +113,13 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color gradientStart;
   final Color gradientEnd;
 
+  Color get statusDanger => Color.lerp(const Color(0xFFE05252), primary, 0.22)!;
+  Color get statusWarning =>
+      Color.lerp(const Color(0xFFE3B341), secondary, 0.32)!;
+  Color get statusSuccess =>
+      Color.lerp(const Color(0xFF5EAD68), primary, 0.38)!;
+  Color get statusSuccessStrong => primary;
+
   static const natureFocus = AppPalette(
     primary: Color(0xFF789B5F),
     primaryMuted: Color(0xFFE8F0DF),
@@ -475,6 +482,46 @@ class AppTheme {
         shape: roundedRectangle.copyWith(
           side: BorderSide(color: palette.neutralSoft),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: palette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: roundedRectangle,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: palette.surface,
+        modalBackgroundColor: palette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: palette.surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: palette.textPrimary),
+        shape: roundedRectangle,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: palette.surface,
+        contentTextStyle: TextStyle(color: palette.textPrimary),
+        actionTextColor: palette.primary,
+        elevation: 2,
+        shape: roundedRectangle,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: palette.surface,
+        selectedColor: palette.primaryMuted,
+        disabledColor: palette.neutralSoft.withValues(alpha: 0.45),
+        side: BorderSide(color: palette.neutralSoft),
+        labelStyle: TextStyle(color: palette.textPrimary),
+        secondaryLabelStyle: TextStyle(color: palette.textPrimary),
+        shape: roundedRectangle,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: palette.primary,
+        linearTrackColor: palette.primaryMuted,
+        circularTrackColor: palette.primaryMuted,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

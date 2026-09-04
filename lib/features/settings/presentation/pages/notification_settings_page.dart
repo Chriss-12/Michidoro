@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/controllers/focus_silence_controller.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/widgets/focus_silence_settings_card.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/widgets/routine_reminder_capability_tile.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
@@ -80,6 +83,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
               );
             },
           ),
+          if (serviceLocator.isRegistered<FocusSilenceController>())
+            Padding(
+              padding: AppCardPaddings.standard,
+              child: FocusSilenceSettingsCard(
+                controller: serviceLocator<FocusSilenceController>(),
+              ),
+            ),
           Padding(
             padding: AppCardPaddings.standard,
             child: GlassCard(

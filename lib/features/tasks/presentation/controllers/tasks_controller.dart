@@ -88,9 +88,11 @@ class TasksController {
 
   final TasksRepository _repository;
   final TaskTemporalFilterRepository? _temporalFilterRepository;
+  Future<void>? _loadInFlight;
   Future<void>? _temporalFilterLoad;
   final FlutterSignal<List<Task>> tasks = signal(const []);
   final FlutterSignal<TaskFilter> filter = signal(TaskFilter.all);
+  final FlutterSignal<String?> goalFilter = signal(null);
   final FlutterSignal<TaskTemporalFilter> temporalFilter;
   final FlutterSignal<Set<String>> endedDayKeys = signal(const {});
   final FlutterSignal<String?> validationMessage = signal(null);
@@ -101,8 +103,19 @@ class TasksController {
             .where(temporalFilter.value.includes)
             .toList(growable: false),
       );
-  late final Computed<List<Task>> filteredTasks = computed<List<Task>>(() {
+  late final Computed<List<Task>> goalFilteredTasks = computed<List<Task>>(() {
+    final selectedGoalId = goalFilter.value;
     final currentTasks = temporallyFilteredTasks.value;
+    if (selectedGoalId == null) {
+      return currentTasks;
+    }
+
+    return currentTasks
+        .where((task) => task.goalId == selectedGoalId)
+        .toList(growable: false);
+  });
+  late final Computed<List<Task>> filteredTasks = computed<List<Task>>(() {
+    final currentTasks = goalFilteredTasks.value;
 
     return switch (filter.value) {
       TaskFilter.all => currentTasks,
@@ -118,13 +131,20 @@ class TasksController {
       );
 
   TaskFilter get selectedFilter => filter.value;
+  String? get selectedGoalId => goalFilter.value;
   TaskTemporalFilter get selectedTemporalFilter => temporalFilter.value;
 
-  Future<void> loadTasks() async {
+  Future<void> loadTasks() => _loadInFlight ??= _loadTasksOnce();
+
+  Future<void> _loadTasksOnce() async {
     isLoading.value = true;
-    await (_temporalFilterLoad ??= _loadTemporalFilter());
-    tasks.value = await _repository.loadTasks();
-    isLoading.value = false;
+    try {
+      await (_temporalFilterLoad ??= _loadTemporalFilter());
+      tasks.value = await _repository.loadTasks();
+    } finally {
+      isLoading.value = false;
+      _loadInFlight = null;
+    }
   }
 
   List<Task> tasksForDay(DateTime day) {
@@ -220,7 +240,10 @@ class TasksController {
     };
   }
 
-  Future<bool> createTask(String rawTitle) async {
+  Future<bool> createTask(
+    String rawTitle, {
+    int? durationMinutes,
+  }) async {
     final title = rawTitle.trim();
 
     if (title.isEmpty) {
@@ -228,7 +251,10 @@ class TasksController {
       return false;
     }
 
-    final task = await _repository.createTask(title);
+    final task = await _repository.createTask(
+      title,
+      durationMinutes: durationMinutes,
+    );
 
     tasks.value = [task, ...tasks.value];
     validationMessage.value = null;
@@ -362,6 +388,9 @@ class TasksController {
         _replaceTask(updatedTask);
       }
     }
+    if (goalFilter.value == goalId) {
+      goalFilter.value = null;
+    }
   }
 
   Future<void> deleteTask(String id) async {
@@ -378,6 +407,10 @@ class TasksController {
 
   set selectedFilter(TaskFilter value) {
     filter.value = value;
+  }
+
+  set selectedGoalId(String? value) {
+    goalFilter.value = value;
   }
 
   Future<void> selectTemporalFilter(TaskTemporalFilter value) async {

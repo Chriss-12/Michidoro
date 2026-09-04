@@ -3,6 +3,12 @@ import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
+import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/controllers/quick_notes_controller.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/widgets/quick_notes_view.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/widgets/routines_view.dart';
@@ -10,8 +16,11 @@ import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task_temporal_filter.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
+import 'package:pomodoro_app_v1/features/tasks/presentation/widgets/planned_task_card.dart';
+import 'package:pomodoro_app_v1/features/tasks/presentation/widgets/task_planning_dialog.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
+import 'package:pomodoro_app_v1/shared/molecules/speech_dictation_button.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
 class TasksPage extends StatefulWidget {
@@ -25,10 +34,17 @@ class TasksPage extends StatefulWidget {
 }
 
 class _TasksPageState extends State<TasksPage> {
+  static const _creationDurationOptions = [25, 30, 45, 60, 90, 120];
+
   final TextEditingController _titleController = TextEditingController();
   final TasksController _tasksController = serviceLocator<TasksController>();
   RoutinesRepository? _routinesRepository;
   RoutinesController? _routinesController;
+  QuickNotesController? _quickNotesController;
+  GoalsController? _goalsController;
+  PomodoroController? _pomodoroController;
+  String? _selectedCreationGoalId;
+  int _selectedCreationDurationMinutes = _creationDurationOptions.first;
   late _PlanningView _selectedView;
 
   RoutinesController get _routineController =>
@@ -37,12 +53,21 @@ class _TasksPageState extends State<TasksPage> {
   RoutinesRepository get _routineRepository =>
       _routinesRepository ??= serviceLocator<RoutinesRepository>();
 
+  QuickNotesController get _quickNoteController =>
+      _quickNotesController ??= serviceLocator<QuickNotesController>();
+
   @override
   void initState() {
     super.initState();
     _selectedView = widget.showRoutines
         ? _PlanningView.routines
         : _PlanningView.tasks;
+    _goalsController = serviceLocator.isRegistered<GoalsController>()
+        ? serviceLocator<GoalsController>()
+        : null;
+    _pomodoroController = serviceLocator.isRegistered<PomodoroController>()
+        ? serviceLocator<PomodoroController>()
+        : null;
     if (widget.showRoutines) {
       _routineController.load();
     }
@@ -54,16 +79,52 @@ class _TasksPageState extends State<TasksPage> {
     super.dispose();
   }
 
-  Future<void> _createTask() async {
-    final created = await _tasksController.createTask(_titleController.text);
+  Future<void> _createTask(List<ProductivityGoal> selectableGoals) async {
+    final selectedGoal = _goalById(
+      _selectedCreationGoalId,
+      selectableGoals,
+    );
+    final created = selectedGoal == null
+        ? await _tasksController.createTask(
+            _titleController.text,
+            durationMinutes: _selectedCreationDurationMinutes,
+          )
+        : await _tasksController.createPlannedTask(
+            rawTitle: _titleController.text,
+            scheduledDate: selectedGoal.targetDate!,
+            goalId: selectedGoal.id,
+            durationMinutes: _selectedCreationDurationMinutes,
+          );
     if (created) {
       _titleController.clear();
       if (!mounted) {
         return;
       }
 
+      setState(() {
+        _selectedCreationGoalId = null;
+        _selectedCreationDurationMinutes = _creationDurationOptions.first;
+      });
       FocusScope.of(context).unfocus();
     }
+  }
+
+  Future<void> _selectCreationGoal(
+    List<ProductivityGoal> selectableGoals,
+  ) async {
+    final selection = await showModalBottomSheet<_TaskGoalSelection>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _TaskCreationGoalPicker(
+        goals: selectableGoals,
+        selectedGoalId: _selectedCreationGoalId,
+      ),
+    );
+    if (selection == null || !mounted) {
+      return;
+    }
+    setState(() => _selectedCreationGoalId = selection.goalId);
   }
 
   @override
@@ -74,150 +135,549 @@ class _TasksPageState extends State<TasksPage> {
       builder: (context) {
         final tasks = _tasksController.tasks.value;
         final visibleTasks = _tasksController.filteredTasks.value;
-        final temporallyFilteredTasks =
-            _tasksController.temporallyFilteredTasks.value;
+        final goalFilteredTasks = _tasksController.goalFilteredTasks.value;
         final filter = _tasksController.filter.value;
+        final selectedGoalId = _tasksController.goalFilter.value;
         final temporalFilter = _tasksController.temporalFilter.value;
         final validationMessage = _tasksController.validationMessage.value;
+        final goals =
+            _goalsController?.goals.value ?? const <ProductivityGoal>[];
+        final selectableCreationGoals =
+            _goalsController?.goalsOnOrAfter(DateTime.now()) ??
+            const <ProductivityGoal>[];
+        final selectedCreationGoal = _goalById(
+          _selectedCreationGoalId,
+          selectableCreationGoals,
+        );
+        final focusedSecondsByTask = _focusedSecondsByTask(
+          _pomodoroController?.sessions.value ?? const <PomodoroSession>[],
+        );
 
-        return ListView(
-          padding: AppCardPaddings.page,
-          children: [
-            const SizedBox(height: 24),
-            Text(
-              _selectedView == _PlanningView.tasks
-                  ? context.tr('Mis tareas', 'My tasks')
-                  : context.tr('Mis rutinas', 'My routines'),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: AppDesignTokens.mainTitleFontSize,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              context.tr(
-                _selectedView == _PlanningView.tasks
-                    ? 'Organiza lo importante de hoy'
-                    : 'Programa actividades que repites con frecuencia',
-                _selectedView == _PlanningView.tasks
-                    ? 'Organize what matters today'
-                    : 'Schedule activities you repeat frequently',
-              ),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: palette.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<_PlanningView>(
-                key: const ValueKey('tasks-routines-selector'),
-                segments: [
-                  ButtonSegment(
-                    value: _PlanningView.tasks,
-                    icon: const Icon(Icons.checklist_rounded),
-                    label: Text(context.tr('Tareas', 'Tasks')),
+        return RefreshIndicator(
+          onRefresh: refreshApplicationData,
+          child: ListView(
+            key: const PageStorageKey('tasks-scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: AppCardPaddings.page,
+            children: [
+              const SizedBox(height: 24),
+              Text(
+                switch (_selectedView) {
+                  _PlanningView.tasks => context.tr('Mis tareas', 'My tasks'),
+                  _PlanningView.routines => context.tr(
+                    'Mis rutinas',
+                    'My routines',
                   ),
-                  ButtonSegment(
-                    value: _PlanningView.routines,
-                    icon: const Icon(Icons.event_repeat_rounded),
-                    label: Text(context.tr('Rutinas', 'Routines')),
+                  _PlanningView.quickNotes => context.tr(
+                    'Mis notas rápidas',
+                    'My quick notes',
                   ),
-                ],
-                selected: {_selectedView},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) {
-                  final selected = selection.first;
-                  setState(() => _selectedView = selected);
-                  if (selected == _PlanningView.routines &&
-                      _routineController.routines.value.isEmpty) {
-                    _routineController.load();
-                  } else if (selected == _PlanningView.tasks) {
-                    _tasksController.loadTasks();
-                  }
                 },
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: AppDesignTokens.mainTitleFontSize,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            if (_selectedView == _PlanningView.tasks) ...[
-              GlassCard(
-                padding: AppCardPaddings.compact,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _titleController,
-                      textInputAction: TextInputAction.done,
-                      decoration: InputDecoration(
-                        labelText: context.tr('Nueva tarea', 'New task'),
-                        hintText: context.tr(
-                          'Ej. Revisar avance del proyecto',
-                          'E.g. Review project progress',
-                        ),
-                        errorText: _localizedValidationMessage(
-                          context,
-                          validationMessage,
-                        ),
-                        prefixIcon: const Icon(Icons.add_task_rounded),
-                      ),
-                      onChanged: (_) =>
-                          _tasksController.clearValidationMessage(),
-                      onSubmitted: (_) => _createTask(),
+              const SizedBox(height: 4),
+              Text(
+                context.tr(
+                  switch (_selectedView) {
+                    _PlanningView.tasks => 'Organiza lo importante de hoy',
+                    _PlanningView.routines =>
+                      'Programa actividades que repites con frecuencia',
+                    _PlanningView.quickNotes =>
+                      'Captura ideas y recordatorios sin convertirlos en tareas',
+                  },
+                  switch (_selectedView) {
+                    _PlanningView.tasks => 'Organize what matters today',
+                    _PlanningView.routines =>
+                      'Schedule activities you repeat frequently',
+                    _PlanningView.quickNotes =>
+                      'Capture ideas and reminders without turning them into tasks',
+                  },
+                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<_PlanningView>(
+                  key: const ValueKey('tasks-routines-selector'),
+                  segments: [
+                    ButtonSegment(
+                      value: _PlanningView.tasks,
+                      icon: const Icon(Icons.checklist_rounded),
+                      label: Text(context.tr('Tareas', 'Tasks')),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _createTask,
-                        icon: const Icon(Icons.add_rounded),
-                        label: Text(context.tr('Agregar tarea', 'Add task')),
-                      ),
+                    ButtonSegment(
+                      value: _PlanningView.routines,
+                      icon: const Icon(Icons.event_repeat_rounded),
+                      label: Text(context.tr('Rutinas', 'Routines')),
+                    ),
+                    ButtonSegment(
+                      value: _PlanningView.quickNotes,
+                      icon: const Icon(Icons.sticky_note_2_rounded),
+                      label: Text(context.tr('Notas', 'Notes')),
                     ),
                   ],
+                  selected: {_selectedView},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) {
+                    final selected = selection.first;
+                    setState(() => _selectedView = selected);
+                    if (selected == _PlanningView.routines &&
+                        _routineController.routines.value.isEmpty) {
+                      _routineController.load();
+                    } else if (selected == _PlanningView.quickNotes &&
+                        _quickNoteController.notes.value.isEmpty) {
+                      _quickNoteController.load();
+                    }
+                  },
                 ),
               ),
               const SizedBox(height: 18),
-              if (tasks.isNotEmpty) ...[
-                _TaskFilterBar(
-                  selectedFilter: filter,
-                  tasks: temporallyFilteredTasks,
-                  onFilterChanged: (value) =>
-                      _tasksController.selectedFilter = value,
-                ),
-                const SizedBox(height: 10),
-                _TaskTemporalFilterButton(
-                  filter: temporalFilter,
-                  onPressed: _showTemporalFilterPicker,
+              if (_selectedView == _PlanningView.tasks) ...[
+                GlassCard(
+                  padding: AppCardPaddings.compact,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        key: const ValueKey('task-create-title'),
+                        controller: _titleController,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        minLines: 1,
+                        maxLines: 2,
+                        scrollPadding: const EdgeInsets.only(bottom: 120),
+                        decoration: InputDecoration(
+                          alignLabelWithHint: true,
+                          labelText: context.tr('Nueva tarea', 'New task'),
+                          hintText: context.tr(
+                            'Ej. Revisar avance del proyecto',
+                            'E.g. Review project progress',
+                          ),
+                          errorText: _localizedValidationMessage(
+                            context,
+                            validationMessage,
+                          ),
+                          prefixIcon: const Icon(Icons.add_task_rounded),
+                          suffixIcon: SpeechDictationFieldActions(
+                            fieldId: 'task-create-title',
+                            textController: _titleController,
+                            onChanged: (_) =>
+                                _tasksController.clearValidationMessage(),
+                          ),
+                        ),
+                        onChanged: (_) =>
+                            _tasksController.clearValidationMessage(),
+                      ),
+                      const SizedBox(height: 12),
+                      _TaskCreationGoalSelector(
+                        selectedGoal: selectedCreationGoal,
+                        onPressed: () =>
+                            _selectCreationGoal(selectableCreationGoals),
+                      ),
+                      const SizedBox(height: 12),
+                      _TaskCreationDurationSelector(
+                        options: _creationDurationOptions,
+                        selectedMinutes: _selectedCreationDurationMinutes,
+                        onChanged: (minutes) => setState(
+                          () => _selectedCreationDurationMinutes = minutes,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => _createTask(selectableCreationGoals),
+                          icon: const Icon(Icons.add_rounded),
+                          label: Text(context.tr('Agregar tarea', 'Add task')),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 18),
-              ],
-              GlassCard(
-                child: tasks.isEmpty
-                    ? const _EmptyTasksState()
-                    : _TaskList(
-                        filter: filter,
-                        temporalFilter: temporalFilter,
-                        tasks: visibleTasks,
-                        onToggleCompleted:
-                            _tasksController.toggleTaskCompletion,
-                        onStartFocus: (task) => startTaskFocusFlow(
-                          context: context,
-                          task: task,
-                        ),
-                        onEdit: _showEditTaskDialog,
-                        onDelete: _confirmDeleteTask,
+                if (tasks.isNotEmpty) ...[
+                  _TaskFilterBar(
+                    selectedFilter: filter,
+                    tasks: goalFilteredTasks,
+                    onFilterChanged: (value) =>
+                        _tasksController.selectedFilter = value,
+                  ),
+                  const SizedBox(height: 10),
+                  if (goals.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: _TaskGoalFilter(
+                        goals: goals,
+                        selectedGoalId: selectedGoalId,
+                        onChanged: (value) =>
+                            _tasksController.selectedGoalId = value,
                       ),
-              ),
-            ] else
-              RoutinesView(
-                controller: _routineController,
-                tasksController: _tasksController,
-              ),
-          ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  _TaskTemporalFilterButton(
+                    filter: temporalFilter,
+                    onPressed: _showTemporalFilterPicker,
+                  ),
+                  const SizedBox(height: 18),
+                ],
+                GlassCard(
+                  child: tasks.isEmpty
+                      ? const _EmptyTasksState()
+                      : _TaskList(
+                          filter: filter,
+                          temporalFilter: temporalFilter,
+                          tasks: visibleTasks,
+                          goals: goals,
+                          focusedSecondsByTask: focusedSecondsByTask,
+                          onStatusChanged: (task, status) => _tasksController
+                              .updateTaskStatus(task.id, status),
+                          onStartFocus: (task) => startTaskFocusFlow(
+                            context: context,
+                            task: task,
+                          ),
+                          onEditTitle: _showEditTaskDialog,
+                          onEditPlanning: _showTaskPlanningDialog,
+                          onDelete: _confirmDeleteTask,
+                        ),
+                ),
+              ] else if (_selectedView == _PlanningView.routines)
+                RoutinesView(
+                  controller: _routineController,
+                  tasksController: _tasksController,
+                )
+              else
+                QuickNotesView(controller: _quickNoteController),
+            ],
+          ),
         );
       },
     );
   }
+}
+
+class _TaskCreationDurationSelector extends StatelessWidget {
+  const _TaskCreationDurationSelector({
+    required this.options,
+    required this.selectedMinutes,
+    required this.onChanged,
+  });
+
+  final List<int> options;
+  final int selectedMinutes;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.timer_outlined, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                context.tr('Duración de la tarea', 'Task duration'),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final minutes in options)
+              ChoiceChip(
+                key: ValueKey('task-create-duration-$minutes'),
+                label: Text('$minutes min'),
+                selected: selectedMinutes == minutes,
+                onSelected: (selected) {
+                  if (selected) onChanged(minutes);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskCreationGoalSelector extends StatelessWidget {
+  const _TaskCreationGoalSelector({
+    required this.selectedGoal,
+    required this.onPressed,
+  });
+
+  final ProductivityGoal? selectedGoal;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedDate = selectedGoal?.targetDate;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        key: const ValueKey('task-create-goal-selector'),
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          alignment: Alignment.centerLeft,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.flag_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.tr('Objetivo', 'Goal'),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    selectedGoal?.title ??
+                        context.tr('Sin objetivo', 'No goal'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  if (selectedDate != null)
+                    Text(
+                      MaterialLocalizations.of(
+                        context,
+                      ).formatMediumDate(selectedDate),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_drop_down_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskCreationGoalPicker extends StatefulWidget {
+  const _TaskCreationGoalPicker({
+    required this.goals,
+    required this.selectedGoalId,
+  });
+
+  final List<ProductivityGoal> goals;
+  final String? selectedGoalId;
+
+  @override
+  State<_TaskCreationGoalPicker> createState() =>
+      _TaskCreationGoalPickerState();
+}
+
+class _TaskCreationGoalPickerState extends State<_TaskCreationGoalPicker> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedQuery = _normalizeGoalSearch(_query);
+    final visibleGoals = widget.goals
+        .where(
+          (goal) =>
+              normalizedQuery.isEmpty ||
+              _normalizeGoalSearch(goal.title).contains(normalizedQuery),
+        )
+        .toList(growable: false);
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.72,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.palette.neutral,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                context.tr('Elegir objetivo', 'Choose goal'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                context.tr(
+                  'Solo objetivos de hoy en adelante',
+                  'Only goals from today onward',
+                ),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                key: const ValueKey('task-create-goal-search'),
+                controller: _searchController,
+                autofocus: true,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                minLines: 1,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  alignLabelWithHint: true,
+                  labelText: context.tr(
+                    'Buscar objetivo',
+                    'Search goals',
+                  ),
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: SpeechDictationFieldActions(
+                    fieldId: 'task-create-goal-search',
+                    textController: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                ),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView(
+                  children: [
+                    _TaskGoalPickerTile(
+                      key: const ValueKey('task-create-goal-none'),
+                      title: context.tr('Sin objetivo', 'No goal'),
+                      subtitle: context.tr(
+                        'Crear como tarea rápida',
+                        'Create as a quick task',
+                      ),
+                      selected: widget.selectedGoalId == null,
+                      onTap: () => Navigator.of(
+                        context,
+                      ).pop(const _TaskGoalSelection(null)),
+                    ),
+                    if (visibleGoals.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 24,
+                        ),
+                        child: Text(
+                          normalizedQuery.isEmpty
+                              ? context.tr(
+                                  'No hay objetivos disponibles desde hoy.',
+                                  'There are no goals available from today.',
+                                )
+                              : context.tr(
+                                  'No encontramos objetivos con esa búsqueda.',
+                                  'No goals match that search.',
+                                ),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      )
+                    else
+                      for (final goal in visibleGoals)
+                        _TaskGoalPickerTile(
+                          key: ValueKey(
+                            'task-create-goal-option-${goal.id}',
+                          ),
+                          title: goal.title,
+                          subtitle: MaterialLocalizations.of(
+                            context,
+                          ).formatMediumDate(goal.targetDate!),
+                          selected: widget.selectedGoalId == goal.id,
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pop(_TaskGoalSelection(goal.id)),
+                        ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskGoalPickerTile extends StatelessWidget {
+  const _TaskGoalPickerTile({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(
+        selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+        color: selected
+            ? context.palette.primary
+            : context.palette.textSecondary,
+      ),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      selected: selected,
+      selectedTileColor: context.palette.primaryMuted,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+}
+
+class _TaskGoalSelection {
+  const _TaskGoalSelection(this.goalId);
+
+  final String? goalId;
+}
+
+String _normalizeGoalSearch(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp('[áàäâ]'), 'a')
+      .replaceAll(RegExp('[éèëê]'), 'e')
+      .replaceAll(RegExp('[íìïî]'), 'i')
+      .replaceAll(RegExp('[óòöô]'), 'o')
+      .replaceAll(RegExp('[úùüû]'), 'u')
+      .replaceAll('ñ', 'n');
 }
 
 class _TaskTemporalFilterButton extends StatelessWidget {
@@ -243,7 +703,56 @@ class _TaskTemporalFilterButton extends StatelessWidget {
   }
 }
 
-enum _PlanningView { tasks, routines }
+class _TaskGoalFilter extends StatelessWidget {
+  const _TaskGoalFilter({
+    required this.goals,
+    required this.selectedGoalId,
+    required this.onChanged,
+  });
+
+  static const _allGoalsValue = '';
+
+  final List<ProductivityGoal> goals;
+  final String? selectedGoalId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveValue = goals.any((goal) => goal.id == selectedGoalId)
+        ? selectedGoalId!
+        : _allGoalsValue;
+
+    return DropdownButtonFormField<String>(
+      key: const ValueKey('task-goal-filter'),
+      value: effectiveValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: context.tr('Objetivo', 'Goal'),
+        prefixIcon: const Icon(Icons.flag_outlined),
+      ),
+      items: [
+        DropdownMenuItem(
+          value: _allGoalsValue,
+          child: Text(context.tr('Todos los objetivos', 'All goals')),
+        ),
+        for (final goal in goals)
+          DropdownMenuItem(
+            key: ValueKey('task-goal-filter-${goal.id}'),
+            value: goal.id,
+            child: Text(
+              goal.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (value) =>
+          onChanged(value == null || value.isEmpty ? null : value),
+    );
+  }
+}
+
+enum _PlanningView { tasks, routines, quickNotes }
 
 class _TaskFilterBar extends StatelessWidget {
   const _TaskFilterBar({
@@ -337,18 +846,24 @@ class _TaskList extends StatelessWidget {
     required this.filter,
     required this.temporalFilter,
     required this.tasks,
-    required this.onToggleCompleted,
+    required this.goals,
+    required this.focusedSecondsByTask,
+    required this.onStatusChanged,
     required this.onStartFocus,
-    required this.onEdit,
+    required this.onEditTitle,
+    required this.onEditPlanning,
     required this.onDelete,
   });
 
   final TaskFilter filter;
   final TaskTemporalFilter temporalFilter;
   final List<Task> tasks;
-  final Future<void> Function(String id) onToggleCompleted;
+  final List<ProductivityGoal> goals;
+  final Map<String, int> focusedSecondsByTask;
+  final void Function(Task task, TaskStatus status) onStatusChanged;
   final ValueChanged<Task> onStartFocus;
-  final ValueChanged<Task> onEdit;
+  final ValueChanged<Task> onEditTitle;
+  final ValueChanged<Task> onEditPlanning;
   final Future<void> Function(Task task) onDelete;
 
   @override
@@ -387,11 +902,14 @@ class _TaskList extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         for (final task in tasks) ...[
-          _TaskTile(
+          PlannedTaskCard(
             task: task,
-            onToggleCompleted: () => onToggleCompleted(task.id),
+            goal: _goalForTask(task, goals),
+            focusedSeconds: focusedSecondsByTask[task.id] ?? 0,
+            onStatusChanged: (status) => onStatusChanged(task, status),
             onStartFocus: () => onStartFocus(task),
-            onEdit: () => onEdit(task),
+            onEditTitle: () => onEditTitle(task),
+            onEditPlanning: () => onEditPlanning(task),
             onDelete: () => onDelete(task),
           ),
           if (task != tasks.last) const SizedBox(height: 10),
@@ -570,81 +1088,6 @@ class _YearPickerDialog extends StatelessWidget {
           child: Text(context.tr('Cancelar', 'Cancel')),
         ),
       ],
-    );
-  }
-}
-
-class _TaskTile extends StatelessWidget {
-  const _TaskTile({
-    required this.task,
-    required this.onToggleCompleted,
-    required this.onStartFocus,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Task task;
-  final VoidCallback onToggleCompleted;
-  final VoidCallback onStartFocus;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 42,
-            child: IconButton(
-              tooltip: task.isCompleted
-                  ? context.tr('Marcar como activa', 'Mark as active')
-                  : context.tr('Marcar como completada', 'Mark as completed'),
-              onPressed: onToggleCompleted,
-              icon: Icon(
-                task.isCompleted
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: task.isCompleted ? palette.secondary : palette.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              task.title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: task.isCompleted ? palette.textSecondary : null,
-                decoration: task.isCompleted
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: context.tr('Empezar Pomodoro', 'Start Pomodoro'),
-            onPressed: onStartFocus,
-            icon: const Icon(Icons.play_arrow_rounded),
-          ),
-          IconButton(
-            tooltip: context.tr('Editar tarea', 'Edit task'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded),
-          ),
-          IconButton(
-            tooltip: context.tr('Eliminar tarea', 'Delete task'),
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -839,6 +1282,28 @@ extension on _TasksPageState {
     }
   }
 
+  Future<void> _showTaskPlanningDialog(Task task) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => TaskPlanningDialog(
+        task: task,
+        goals: _goalsController?.goals.value ?? const <ProductivityGoal>[],
+        onSave: ({required goalId, required durationMinutes}) async {
+          final saved = await _tasksController.updateTaskPlanning(
+            id: task.id,
+            goalId: goalId,
+            durationMinutes: durationMinutes,
+          );
+          return saved ? null : _tasksController.validationMessage.value;
+        },
+        onUnschedule: () async {
+          await _tasksController.scheduleTask(task.id, null);
+          await _tasksController.assignTaskToGoal(task.id, null);
+        },
+      ),
+    );
+  }
+
   Future<void> _confirmDeleteTask(Task task) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -922,11 +1387,24 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
+        minLines: 1,
+        maxLines: 2,
         decoration: InputDecoration(
+          alignLabelWithHint: true,
           labelText: context.tr('Título', 'Title'),
           errorText: _errorText,
+          suffixIcon: SpeechDictationFieldActions(
+            fieldId: 'task-edit-title',
+            textController: _controller,
+            onChanged: (_) {
+              if (_errorText != null) {
+                setState(() => _errorText = null);
+              }
+            },
+          ),
         ),
-        textInputAction: TextInputAction.done,
         onChanged: (_) {
           if (_errorText == null) {
             return;
@@ -936,7 +1414,6 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
             _errorText = null;
           });
         },
-        onSubmitted: (_) => _save(),
       ),
       actions: [
         TextButton(
@@ -951,6 +1428,38 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
       ],
     );
   }
+}
+
+ProductivityGoal? _goalForTask(Task task, List<ProductivityGoal> goals) {
+  for (final goal in goals) {
+    if (goal.id == task.goalId) return goal;
+  }
+  return null;
+}
+
+ProductivityGoal? _goalById(
+  String? goalId,
+  List<ProductivityGoal> goals,
+) {
+  if (goalId == null) return null;
+  for (final goal in goals) {
+    if (goal.id == goalId) return goal;
+  }
+  return null;
+}
+
+Map<String, int> _focusedSecondsByTask(List<PomodoroSession> sessions) {
+  final focusedSecondsByTask = <String, int>{};
+  for (final session in sessions) {
+    final taskId = session.taskId;
+    if (taskId == null) continue;
+    focusedSecondsByTask.update(
+      taskId,
+      (value) => value + session.focusedSeconds,
+      ifAbsent: () => session.focusedSeconds,
+    );
+  }
+  return focusedSecondsByTask;
 }
 
 String? _localizedValidationMessage(BuildContext context, String? message) {

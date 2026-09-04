@@ -14,6 +14,9 @@ class Routine {
     required this.weekdays,
     required this.items,
     this.description,
+    this.customColorArgb,
+    this.validFromDate,
+    this.validUntilDate,
     this.pausedUntilDate,
     this.archivedAt,
   });
@@ -23,6 +26,9 @@ class Routine {
   final String? description;
   final String iconKey;
   final String colorKey;
+  final int? customColorArgb;
+  final DateTime? validFromDate;
+  final DateTime? validUntilDate;
   final RoutineStatus status;
   final DateTime? pausedUntilDate;
   final DateTime? archivedAt;

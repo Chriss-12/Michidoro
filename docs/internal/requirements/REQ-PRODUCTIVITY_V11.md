@@ -348,8 +348,15 @@ Acceptance criteria:
 - [x] The MichiFocus percentage/loading screen starts once only after successful
       authentication; cancellation, failure, or unavailable device security
       leaves bootstrap unstarted and exposes only the retryable lock surface.
-- [ ] Background timeout uses monotonic elapsed time, repeated lifecycle events
-      cannot extend it, and invalid elapsed state fails closed.
+      After bootstrap, routing starts directly at onboarding or Home instead of
+      replaying the same percentage animation.
+- [x] After successful authentication, the percentage/loading screen reads the
+      saved local theme once before its first frame and uses the selected
+      palette and light/dark appearance instead of a fixed startup color.
+- [x] Background timeout uses monotonic elapsed time, begins only when the app
+      is actually hidden/paused, ignores transient `inactive` states, cannot be
+      extended by repeated lifecycle events, and fails closed for invalid elapsed
+      state.
 - [ ] MichiFocus uses the Android system prompt and never receives, stores, logs,
       validates, or synchronizes the device PIN, pattern, password, or biometric.
 - [ ] Supported devices permit a strong biometric or the already registered

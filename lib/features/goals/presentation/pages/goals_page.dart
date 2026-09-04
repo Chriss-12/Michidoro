@@ -8,6 +8,7 @@ import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_co
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
+import 'package:pomodoro_app_v1/shared/molecules/speech_dictation_button.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
 class GoalsPage extends StatefulWidget {
@@ -358,12 +359,24 @@ class _EditGoalDialogState extends State<_EditGoalDialog> {
           TextField(
             controller: _titleController,
             autofocus: true,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 1,
+            maxLines: 2,
             decoration: InputDecoration(
               labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
+              suffixIcon: SpeechDictationFieldActions(
+                fieldId: 'goal-edit-title',
+                textController: _titleController,
+                onChanged: (_) {
+                  if (_validationMessage != null) {
+                    setState(() => _validationMessage = null);
+                  }
+                },
+              ),
             ),
-            onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 14),
           _TargetSessionsStepper(
@@ -425,7 +438,10 @@ class _GoalComposerCard extends StatelessWidget {
         children: [
           TextField(
             controller: titleController,
-            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 1,
+            maxLines: 2,
             decoration: InputDecoration(
               labelText: context.tr('Nueva meta', 'New goal'),
               hintText: context.tr(
@@ -434,9 +450,13 @@ class _GoalComposerCard extends StatelessWidget {
               ),
               errorText: validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
+              suffixIcon: SpeechDictationFieldActions(
+                fieldId: 'goal-create-title',
+                textController: titleController,
+                onChanged: onTitleChanged,
+              ),
             ),
             onChanged: onTitleChanged,
-            onSubmitted: (_) => onSubmitted(),
           ),
           const SizedBox(height: 14),
           _TargetSessionsStepper(

@@ -26,6 +26,7 @@ class TimerPreferences {
     this.typographyPreset = AppTypographyPreset.moderna,
     this.enabledStatisticsCharts = const {...StatisticsChartType.values},
     this.language = AppLanguage.spanish,
+    this.maximumConcentrationOpacity = 1,
   });
 
   const TimerPreferences.defaults({this.completedOnboardingVersion = 0})
@@ -48,7 +49,8 @@ class TimerPreferences {
       fontScale = 1,
       typographyPreset = AppTypographyPreset.moderna,
       enabledStatisticsCharts = const {...StatisticsChartType.values},
-      language = AppLanguage.spanish;
+      language = AppLanguage.spanish,
+      maximumConcentrationOpacity = 1;
 
   final int focusMinutes;
   final int shortBreakMinutes;
@@ -71,6 +73,7 @@ class TimerPreferences {
   final AppTypographyPreset typographyPreset;
   final Set<StatisticsChartType> enabledStatisticsCharts;
   final AppLanguage language;
+  final double maximumConcentrationOpacity;
 
   TimerPreferences normalized() {
     return TimerPreferences(
@@ -102,6 +105,7 @@ class TimerPreferences {
           ? const {...StatisticsChartType.values}
           : {...enabledStatisticsCharts},
       language: language,
+      maximumConcentrationOpacity: maximumConcentrationOpacity.clamp(0.2, 1),
     );
   }
 }

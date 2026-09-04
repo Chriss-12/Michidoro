@@ -59,6 +59,11 @@ class FileSettingsRepository implements SettingsRepository {
           decoded['enabledStatisticsCharts'],
         ),
         language: AppLanguage.fromCode(decoded['languageCode']),
+        maximumConcentrationOpacity: _readDouble(
+          decoded,
+          'maximumConcentrationOpacity',
+          1,
+        ),
         completedOnboardingVersion: _readOnboardingVersion(
           decoded['completedOnboardingVersion'],
         ),
@@ -105,6 +110,7 @@ class FileSettingsRepository implements SettingsRepository {
           for (final chart in normalized.enabledStatisticsCharts) chart.name,
         ],
         'languageCode': normalized.language.code,
+        'maximumConcentrationOpacity': normalized.maximumConcentrationOpacity,
         'completedOnboardingVersion': normalized.completedOnboardingVersion,
       }),
       flush: true,

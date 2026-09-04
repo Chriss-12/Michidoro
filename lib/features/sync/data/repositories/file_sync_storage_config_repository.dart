@@ -14,34 +14,41 @@ class FileSyncStorageConfigRepository implements SyncStorageConfigRepository {
   static const _fileName = 'michifocus-sync-settings.json';
 
   final SyncConfigDirectoryProvider _directory;
+  SyncStorageConfig? _cached;
 
   @override
   Future<SyncStorageConfig> load() async {
+    final cached = _cached;
+    if (cached != null) return cached;
     try {
       final file = await _configFile();
-      if (!file.existsSync()) return const SyncStorageConfig();
+      if (!file.existsSync()) return _cache(const SyncStorageConfig());
 
       final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! Map<String, dynamic>) return const SyncStorageConfig();
+      if (decoded is! Map<String, dynamic>) {
+        return _cache(const SyncStorageConfig());
+      }
 
       final modeName = decoded['mode'];
       final mode = SyncStorageMode.values.firstWhere(
         (candidate) => candidate.name == modeName,
         orElse: () => SyncStorageMode.singleDevice,
       );
-      return SyncStorageConfig(
-        mode: mode,
-        folderUri: decoded['folderUri'] is String
-            ? decoded['folderUri'] as String
-            : '',
-        folderLabel: decoded['folderLabel'] is String
-            ? decoded['folderLabel'] as String
-            : '',
-      ).normalized();
+      return _cache(
+        SyncStorageConfig(
+          mode: mode,
+          folderUri: decoded['folderUri'] is String
+              ? decoded['folderUri'] as String
+              : '',
+          folderLabel: decoded['folderLabel'] is String
+              ? decoded['folderLabel'] as String
+              : '',
+        ).normalized(),
+      );
     } on FormatException {
-      return const SyncStorageConfig();
+      return _cache(const SyncStorageConfig());
     } on FileSystemException {
-      return const SyncStorageConfig();
+      return _cache(const SyncStorageConfig());
     }
   }
 
@@ -57,7 +64,10 @@ class FileSyncStorageConfigRepository implements SyncStorageConfigRepository {
       }),
       flush: true,
     );
+    _cached = normalized;
   }
+
+  SyncStorageConfig _cache(SyncStorageConfig value) => _cached = value;
 
   Future<File> _configFile() async {
     final directory = await _directory();

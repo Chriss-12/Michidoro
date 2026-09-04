@@ -33,6 +33,21 @@ void main() {
     expect(loaded?.manifest.passwordKdf.memoryKiB, 64 * 1024);
   });
 
+  test('reuses an absent group result without reopening its file', () async {
+    var directoryReads = 0;
+    final cachedRepository = FileSyncGroupEnrollmentRepository(
+      directory: () async {
+        directoryReads++;
+        return directory;
+      },
+    );
+
+    await cachedRepository.load();
+    await cachedRepository.load();
+
+    expect(directoryReads, 1);
+  });
+
   test('refuses to overwrite an existing group', () async {
     await repository.create(_enrollment());
 

@@ -3,7 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
 import 'package:pomodoro_app_v1/features/calendar/domain/entities/calendar_event.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/entities/weekly_schedule_export_document.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/entities/weekly_schedule_export_file.dart';
 import 'package:pomodoro_app_v1/features/calendar/domain/repositories/calendar_events_repository.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/repositories/weekly_schedule_exporter.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
@@ -22,7 +25,7 @@ import 'package:pomodoro_app_v1/l10n/app_localizations.dart';
 
 void main() {
   testWidgets(
-    'renders a dense routine day without duplicates in both languages',
+    'omits the separate daily agenda in both languages',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 1100));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -63,37 +66,24 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('Rutinas'),
+        find.byKey(const ValueKey('goal-period-card')),
         320,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Rutinas'), findsOneWidget);
-      _expectOccurrence(
-        routinesRepository,
-        'routine-0',
-        status: 'Completada',
-        overlap: 'Horario superpuesto',
+      expect(find.text('Rutinas'), findsNothing);
+      expect(find.text('Tareas del día'), findsNothing);
+      expect(find.text('Agenda local de planificación'), findsNothing);
+      expect(find.text('Sin eventos planificados'), findsNothing);
+      expect(find.textContaining('Rutina 0'), findsNothing);
+      expect(find.textContaining('Evento de calendario'), findsNothing);
+      final spanishLayoutException = tester.takeException();
+      expect(
+        spanishLayoutException,
+        isNull,
+        reason: spanishLayoutException is FlutterError
+            ? spanishLayoutException.toStringDeep()
+            : '$spanishLayoutException',
       );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-1',
-        status: 'Omitida',
-        overlap: 'Horario superpuesto',
-      );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-2',
-        status: 'Perdida',
-        overlap: 'Horario superpuesto',
-      );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-3',
-        status: 'Pendiente',
-        overlap: 'Horario superpuesto',
-        projection: 'Proy',
-      );
-      expect(tester.takeException(), isNull);
 
       await tester.binding.setSurfaceSize(const Size(320, 1100));
       await tester.pumpWidget(
@@ -115,68 +105,258 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('Routines'),
+        find.byKey(const ValueKey('goal-period-card')),
         320,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Routines'), findsOneWidget);
-      _expectOccurrence(
-        routinesRepository,
-        'routine-0',
-        status: 'Completed',
-        overlap: 'Time overlap',
+      expect(find.text('Routines'), findsNothing);
+      expect(find.text('Local planning agenda'), findsNothing);
+      expect(find.text('No events planned'), findsNothing);
+      expect(find.textContaining('Rutina 0'), findsNothing);
+      expect(find.textContaining('Evento de calendario'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'renders the weekly school timetable with goals and activity blocks',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 1100));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final routinesRepository = _DenseRoutinesRepository(now);
+      final weeklyScheduleExporter = _FakeWeeklyScheduleExporter();
+      final pomodoroController = PomodoroController(
+        repository: _EmptyPomodoroRepository(),
       );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-1',
-        status: 'Skipped',
-        overlap: 'Time overlap',
+      addTearDown(pomodoroController.dispose);
+
+      await tester.pumpWidget(
+        _CalendarTestApp(
+          locale: const Locale('es'),
+          theme: AppTheme.fromPreset(
+            AppThemePreset.natureFocus,
+            isDark: false,
+          ),
+          calendarController: CalendarController(
+            repository: _DenseCalendarRepository(now),
+          ),
+          goalsController: GoalsController(
+            repository: _DenseGoalsRepository(now),
+          ),
+          tasksController: TasksController(
+            repository: _DenseTasksRepository(now),
+          ),
+          pomodoroController: pomodoroController,
+          routinesController: RoutinesController(
+            repository: routinesRepository,
+            now: () => now,
+          ),
+          weeklyScheduleExporter: weeklyScheduleExporter,
+        ),
       );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-2',
-        status: 'Missed',
-        overlap: 'Time overlap',
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(const ValueKey('planning-view-selector'));
+      await tester.tap(
+        find.descendant(of: selector, matching: find.text('Semana')),
       );
-      _expectOccurrence(
-        routinesRepository,
-        'routine-3',
-        status: 'Pending',
-        overlap: 'Time overlap',
-        projection: 'Projection',
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('weekly-schedule-card')),
+        findsOneWidget,
+      );
+      expect(find.text('Horario semanal'), findsOneWidget);
+      expect(find.text('Objetivos de la semana'), findsOneWidget);
+      expect(find.textContaining('1 objetivos · 1/3 tareas'), findsOneWidget);
+      expect(find.text('1/3 tareas'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('weekly-layout-selector')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('weekly-horizontal-scroll')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('compact-week-day-${_dateKey(now)}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey(
+            'compact-week-activity-routine-0-'
+            '${_dateKey(now)}-${8 * 60}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.layers_rounded), findsWidgets);
+
+      await tester.tap(find.byKey(const ValueKey('weekly-goals-toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('1/3 tareas'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('export-week-pdf')));
+      await tester.pumpAndSettle();
+      expect(weeklyScheduleExporter.exportedDocuments, hasLength(1));
+      expect(
+        weeklyScheduleExporter.exportedDocuments.single.activities,
+        isNotEmpty,
+      );
+      expect(find.textContaining('PDF guardado en:'), findsOneWidget);
+
+      final layoutSelector = find.byKey(
+        const ValueKey('weekly-layout-selector'),
+      );
+      await tester.tap(
+        find.descendant(
+          of: layoutSelector,
+          matching: find.text('Cuadrícula'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('weekly-horizontal-scroll')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey(
+            'week-activity-routine-0-'
+            '${_dateKey(now)}-${8 * 60}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      final weeklyException = tester.takeException();
+      expect(
+        weeklyException,
+        isNull,
+        reason: weeklyException is FlutterError
+            ? weeklyException.toStringDeep()
+            : '$weeklyException',
+      );
+    },
+  );
+
+  testWidgets(
+    'reveals a routed goal, groups its tasks, and exposes contextual creation',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final pomodoroController = PomodoroController(
+        repository: _EmptyPomodoroRepository(),
+      );
+      addTearDown(pomodoroController.dispose);
+
+      await tester.pumpWidget(
+        _CalendarTestApp(
+          locale: const Locale('es'),
+          theme: AppTheme.fromPreset(
+            AppThemePreset.natureFocus,
+            isDark: false,
+          ),
+          calendarController: CalendarController(
+            repository: _DenseCalendarRepository(now),
+          ),
+          goalsController: GoalsController(
+            repository: _DenseGoalsRepository(now),
+          ),
+          tasksController: TasksController(
+            repository: _DenseTasksRepository(now),
+          ),
+          pomodoroController: pomodoroController,
+          routinesController: RoutinesController(
+            repository: _DenseRoutinesRepository(now),
+            now: () => now,
+          ),
+          initialGoalId: 'goal-1',
+          initialTaskId: 'task-1',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('period-goal-tasks-goal-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('period-goal-task-highlight-task-1')),
+        findsOneWidget,
+      );
+      expect(find.text('Pendiente'), findsWidgets);
+      expect(find.text('En progreso'), findsWidgets);
+      expect(find.text('Completada'), findsWidgets);
+
+      final toggle = find.byKey(
+        const ValueKey('period-goal-toggle-goal-1'),
+      );
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('period-goal-tasks-goal-1')),
+        findsNothing,
+      );
+
+      final createButton = find.byKey(
+        const ValueKey('planning-create-button'),
+      );
+      final goalCard = find.byKey(const ValueKey('goal-period-card'));
+      await tester.scrollUntilVisible(
+        createButton,
+        -280,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.descendant(of: goalCard, matching: createButton),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSize(createButton).width,
+        closeTo(
+          tester.getSize(find.byKey(const ValueKey('pick-goal-period'))).width,
+          0.1,
+        ),
+      );
+      await tester.tap(createButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Nueva tarea'), findsWidgets);
+      expect(find.text('Nuevo objetivo'), findsOneWidget);
+
+      await tester.tap(find.text('Nuevo objetivo'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey('speech-input-calendar-goal-create-title'),
+        ),
+        findsOneWidget,
+      );
+      Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+      await tester.pumpAndSettle();
+
+      await tester.tap(createButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nueva tarea').last);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          const ValueKey('speech-input-calendar-task-create-title'),
+        ),
+        findsOneWidget,
       );
       expect(tester.takeException(), isNull);
     },
   );
 }
 
-void _expectOccurrence(
-  _DenseRoutinesRepository repository,
-  String routineId, {
-  required String status,
-  required String overlap,
-  String? projection,
-}) {
-  final card = find.byKey(repository.occurrenceKey(routineId));
-  expect(card, findsOneWidget);
-  expect(
-    find.descendant(of: card, matching: find.text(status)),
-    findsOneWidget,
-  );
-  expect(
-    find.descendant(of: card, matching: find.text(overlap)),
-    findsOneWidget,
-  );
-  if (projection != null) {
-    expect(
-      find.descendant(
-        of: card,
-        matching: find.textContaining(projection),
-      ),
-      findsOneWidget,
-    );
-  }
-}
+String _dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 class _CalendarTestApp extends StatelessWidget {
   const _CalendarTestApp({
@@ -187,6 +367,9 @@ class _CalendarTestApp extends StatelessWidget {
     required this.tasksController,
     required this.pomodoroController,
     required this.routinesController,
+    this.weeklyScheduleExporter,
+    this.initialGoalId,
+    this.initialTaskId,
   });
 
   final Locale locale;
@@ -196,6 +379,9 @@ class _CalendarTestApp extends StatelessWidget {
   final TasksController tasksController;
   final PomodoroController pomodoroController;
   final RoutinesController routinesController;
+  final WeeklyScheduleExporter? weeklyScheduleExporter;
+  final String? initialGoalId;
+  final String? initialTaskId;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -210,9 +396,34 @@ class _CalendarTestApp extends StatelessWidget {
         tasksController: tasksController,
         pomodoroController: pomodoroController,
         routinesController: routinesController,
+        weeklyScheduleExporter:
+            weeklyScheduleExporter ?? _FakeWeeklyScheduleExporter(),
+        initialGoalId: initialGoalId,
+        initialTaskId: initialTaskId,
       ),
     ),
   );
+}
+
+class _FakeWeeklyScheduleExporter implements WeeklyScheduleExporter {
+  final exportedDocuments = <WeeklyScheduleExportDocument>[];
+  final openedFiles = <WeeklyScheduleExportFile>[];
+
+  @override
+  Future<WeeklyScheduleExportFile?> export(
+    WeeklyScheduleExportDocument document,
+  ) async {
+    exportedDocuments.add(document);
+    return const WeeklyScheduleExportFile(
+      displayPath: 'Descargas/michi-focus.pdf',
+      openReference: 'content://michi-focus.pdf',
+    );
+  }
+
+  @override
+  Future<void> open(WeeklyScheduleExportFile file) async {
+    openedFiles.add(file);
+  }
 }
 
 class _DenseCalendarRepository extends Fake
@@ -264,6 +475,7 @@ class _DenseTasksRepository extends Fake implements TasksRepository {
         title: 'Tarea planificada con un nombre especialmente largo $index',
         status: TaskStatus.values[index % TaskStatus.values.length],
         scheduledDate: DateTime(now.year, now.month, now.day),
+        goalId: index < 3 ? 'goal-1' : null,
         durationMinutes: 30 + index * 5,
         createdAt: now,
       ),
@@ -289,11 +501,6 @@ class _DenseRoutinesRepository extends Fake implements RoutinesRepository {
   late final Map<String, List<RoutineItemRun>> itemRuns = {
     for (var index = 0; index < 3; index++) 'run-$index': _itemRuns(index),
   };
-
-  ValueKey<String> occurrenceKey(String routineId) => ValueKey(
-    'routine-occurrence-$routineId-'
-    '${DateTime(now.year, now.month, now.day).toIso8601String()}',
-  );
 
   Routine _routine(int index) => Routine(
     id: 'routine-$index',

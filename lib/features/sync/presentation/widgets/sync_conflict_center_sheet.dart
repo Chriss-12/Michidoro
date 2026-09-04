@@ -470,6 +470,7 @@ IconData _entityIcon(String entityType) => switch (entityType) {
   'task' => Icons.task_alt_rounded,
   'calendarEvent' => Icons.event_outlined,
   'routine' => Icons.repeat_rounded,
+  'quickNote' => Icons.sticky_note_2_outlined,
   _ => Icons.data_object_rounded,
 };
 
@@ -479,6 +480,7 @@ String _entityLabel(BuildContext context, String entityType) =>
       'task' => context.tr('Tarea', 'Task'),
       'calendarEvent' => context.tr('Evento del calendario', 'Calendar event'),
       'routine' => context.tr('Rutina', 'Routine'),
+      'quickNote' => context.tr('Nota rápida', 'Quick note'),
       _ => context.tr('Dato sincronizado', 'Synchronized data'),
     };
 
@@ -492,6 +494,11 @@ String _fieldLabel(BuildContext context, String field) => switch (field) {
   'targetSessions' => context.tr('meta de sesiones', 'session target'),
   'targetDate' => context.tr('fecha objetivo', 'target date'),
   'aggregate' => context.tr('contenido de la rutina', 'routine content'),
+  'text' => context.tr('texto', 'text'),
+  'colorArgb' => context.tr('color', 'color'),
+  'localDate' => context.tr('fecha', 'date'),
+  'priority' => context.tr('prioridad', 'priority'),
+  'position' => context.tr('orden', 'order'),
   _ => field,
 };
 

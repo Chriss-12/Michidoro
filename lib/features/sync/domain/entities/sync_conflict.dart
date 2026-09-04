@@ -43,7 +43,13 @@ class SyncConflict {
       local.isDeletion || remote.isDeletion || fieldName == null;
 
   bool get canPreserveBoth {
-    if (!const {'goal', 'calendarEvent'}.contains(entityType)) return false;
+    if (!const {
+      'goal',
+      'calendarEvent',
+      'quickNote',
+    }.contains(entityType)) {
+      return false;
+    }
     if (isDeletionConflict) {
       final surviving = local.isDeletion ? remote : local;
       return !surviving.isDeletion && surviving.snapshot.isNotEmpty;

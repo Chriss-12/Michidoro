@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/entities/local_unlock_policy.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/local_unlock_policy_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
@@ -57,6 +58,19 @@ class LocalAppLockController {
     policy.value = nextPolicy;
     isLocked.value = false;
     _backgroundedAt = null;
+  }
+
+  void onLifecycleStateChanged(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        onResumed();
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        onBackgrounded();
+      case AppLifecycleState.inactive:
+        break;
+    }
   }
 
   void onBackgrounded() {

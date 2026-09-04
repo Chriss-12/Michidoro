@@ -11,14 +11,19 @@ import 'package:pomodoro_app_v1/shared/templates/page_header.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({
-    required this.selectedIndex,
-    required this.child,
+    this.navigationShell,
+    this.selectedIndex,
+    this.child,
     this.showHeader = true,
     super.key,
-  });
+  }) : assert(
+         navigationShell != null || (selectedIndex != null && child != null),
+         'Provide a navigation shell or a selected index and child.',
+       );
 
-  final int selectedIndex;
-  final Widget child;
+  final StatefulNavigationShell? navigationShell;
+  final int? selectedIndex;
+  final Widget? child;
   final bool showHeader;
 
   static const List<String> routes = [
@@ -32,6 +37,9 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final persistentShell = navigationShell;
+    final activeIndex = persistentShell?.currentIndex ?? selectedIndex!;
+    final content = persistentShell ?? child!;
 
     return Scaffold(
       backgroundColor: palette.background,
@@ -43,7 +51,7 @@ class AppShell extends StatelessWidget {
           child: Column(
             children: [
               if (showHeader) const PageHeader(title: ''),
-              Expanded(child: child),
+              Expanded(child: content),
             ],
           ),
         ),
@@ -58,11 +66,14 @@ class AppShell extends StatelessWidget {
         child: NavigationBar(
           height: 72,
           backgroundColor: palette.surface,
-          selectedIndex: selectedIndex,
+          selectedIndex: activeIndex,
           onDestinationSelected: (index) {
-            if (index != selectedIndex) {
-              context.go(routes[index]);
+            if (index == activeIndex) return;
+            if (persistentShell != null) {
+              persistentShell.goBranch(index);
+              return;
             }
+            context.go(routes[index]);
           },
           destinations: [
             NavigationDestination(

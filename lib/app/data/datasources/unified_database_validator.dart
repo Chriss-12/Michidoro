@@ -12,6 +12,7 @@ class UnifiedDatabaseValidator {
     'pomodoro_sessions',
     'pomodoro_runtime',
     'calendar_events',
+    'quick_notes',
     'task_completion_events',
     'reporting_metadata',
     'routines',
@@ -39,6 +40,9 @@ class UnifiedDatabaseValidator {
     'pomodoro_sessions_started_at_idx',
     'pomodoro_sessions_ended_at_idx',
     'calendar_events_scheduled_at_idx',
+    'quick_notes_position_idx',
+    'quick_notes_local_date_idx',
+    'quick_notes_updated_at_idx',
     'routines_status_idx',
     'routines_updated_at_idx',
     'routine_days_weekday_routine_idx',
@@ -91,6 +95,9 @@ class UnifiedDatabaseValidator {
       'calendar_events',
       ['scheduled_at'],
     ),
+    'quick_notes_position_idx': _IndexContract('quick_notes', ['position']),
+    'quick_notes_local_date_idx': _IndexContract('quick_notes', ['local_date']),
+    'quick_notes_updated_at_idx': _IndexContract('quick_notes', ['updated_at']),
     'routines_status_idx': _IndexContract('routines', ['status']),
     'routines_updated_at_idx': _IndexContract('routines', ['updated_at']),
     'routine_days_weekday_routine_idx': _IndexContract(
@@ -232,6 +239,7 @@ class UnifiedDatabaseValidator {
       await _validateForeignKeyContracts(database);
       await _validateRoutineSchema(database);
       await _validateRoutineValues(database);
+      await _validateQuickNotes(database);
       await database.customStatement(
         'UPDATE pomodoro_runtime '
         'SET is_running = 0, last_tick_at = NULL',
@@ -394,6 +402,9 @@ class UnifiedDatabaseValidator {
       'routines': [
         "check (status in ('active', 'paused', 'archived'))",
         'paused_until_local_date',
+        'custom_color_argb',
+        'valid_from_local_date',
+        'valid_until_local_date',
         'archived_at is not null',
       ],
       'routine_days': ['check (weekday between 1 and 7)'],
@@ -405,6 +416,7 @@ class UnifiedDatabaseValidator {
       'routine_runs': [
         "check (local_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')",
         "check (status in ('scheduled', 'inprogress', 'completed', 'skipped', 'missed'))",
+        'custom_color_argb_snapshot',
         'completed_at is not null',
       ],
       'routine_item_runs': [
@@ -435,12 +447,76 @@ class UnifiedDatabaseValidator {
         .customSelect(
           'SELECT paused_until_local_date AS local_date FROM routines '
           'WHERE paused_until_local_date IS NOT NULL UNION ALL '
+          'SELECT valid_from_local_date FROM routines '
+          'WHERE valid_from_local_date IS NOT NULL UNION ALL '
+          'SELECT valid_until_local_date FROM routines '
+          'WHERE valid_until_local_date IS NOT NULL UNION ALL '
           'SELECT local_date FROM routine_runs',
         )
         .get();
+    final invalidColors = await database
+        .customSelect(
+          'SELECT 1 FROM routines '
+          'WHERE custom_color_argb IS NOT NULL AND '
+          'custom_color_argb NOT BETWEEN 4278190080 AND 4294967295 '
+          'UNION ALL SELECT 1 FROM routine_runs '
+          'WHERE custom_color_argb_snapshot IS NOT NULL AND '
+          'custom_color_argb_snapshot NOT BETWEEN 4278190080 AND 4294967295 '
+          'LIMIT 1',
+        )
+        .get();
+    if (invalidColors.isNotEmpty) {
+      throw const FormatException('Existen colores de rutina invalidos.');
+    }
+
     for (final row in dateRows) {
       if (!_isCanonicalLocalDate(row.read<String>('local_date'))) {
         throw const FormatException('Existen fechas locales invalidas.');
+      }
+    }
+  }
+
+  Future<void> _validateQuickNotes(MichiFocusDatabase database) async {
+    final row = await database
+        .customSelect(
+          "SELECT sql FROM sqlite_master WHERE type = 'table' "
+          "AND name = 'quick_notes'",
+        )
+        .getSingleOrNull();
+    final sql = row == null ? '' : _normalizeSql(row.read<String>('sql'));
+    const requiredFragments = [
+      'length(trim(text_content)) between 1 and 500',
+      'color_argb between 4278190080 and 4294967295',
+      "priority is null or priority in ('high', 'medium', 'low')",
+      "local_date is null or local_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+    ];
+    if (requiredFragments.any((fragment) => !sql.contains(fragment))) {
+      throw const FormatException('Contrato de tabla invalido: quick_notes.');
+    }
+
+    final invalidValues = await database
+        .customSelect(
+          'SELECT 1 FROM quick_notes WHERE '
+          'length(trim(text_content)) NOT BETWEEN 1 AND 500 OR '
+          'color_argb NOT BETWEEN 4278190080 AND 4294967295 OR '
+          "(priority IS NOT NULL AND priority NOT IN ('high', 'medium', 'low')) "
+          'LIMIT 1',
+        )
+        .get();
+    if (invalidValues.isNotEmpty) {
+      throw const FormatException('Existen notas rapidas invalidas.');
+    }
+
+    final dates = await database
+        .customSelect(
+          'SELECT local_date FROM quick_notes WHERE local_date IS NOT NULL',
+        )
+        .get();
+    for (final date in dates) {
+      if (!_isCanonicalLocalDate(date.read<String>('local_date'))) {
+        throw const FormatException(
+          'Existen fechas de notas rapidas invalidas.',
+        );
       }
     }
   }

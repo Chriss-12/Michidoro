@@ -10,6 +10,8 @@ import 'package:signals_flutter/signals_flutter.dart';
 
 enum PomodoroPhase { focus, shortBreak, longBreak }
 
+enum MaximumConcentrationStyle { clear, oled }
+
 class PomodoroController {
   PomodoroController({
     required PomodoroSessionsRepository repository,
@@ -50,6 +52,10 @@ class PomodoroController {
   final FlutterSignal<bool> hasActiveRuntime = signal(false);
   final FlutterSignal<bool> hasStartedRuntime = signal(false);
   final FlutterSignal<bool> maximumConcentrationEnabled = signal(false);
+  final FlutterSignal<MaximumConcentrationStyle> maximumConcentrationStyle =
+      signal(MaximumConcentrationStyle.oled);
+  final FlutterSignal<bool> amoledProtectionEnabled = signal(true);
+  final FlutterSignal<bool> keepScreenAwakeEnabled = signal(false);
   final FlutterSignal<PomodoroPlanMode> planMode = signal(
     PomodoroPlanMode.singleBlock,
   );
@@ -60,11 +66,23 @@ class PomodoroController {
   Future<void> Function(String goalId)? onGoalPomodoroCompleted;
   Future<void> Function(String taskId)? onTaskFocusStarted;
   Future<void> Function(String taskId)? onTaskPlanCompleted;
+  void Function()? onRuntimeStateChanged;
   late final Computed<int> completedPomodoros = computed<int>(
     () => sessions.value
         .where((session) => session.status == PomodoroSessionStatus.completed)
         .length,
   );
+  late final Computed<int> completedPlanPomodoros = computed<int>(() {
+    if (!hasActiveRuntime.value) return 0;
+
+    final total = totalBlocks.value;
+    final completed = phase.value == PomodoroPhase.focus
+        ? currentBlockIndex.value - 1
+        : currentBlockIndex.value;
+    if (completed < 0) return 0;
+    if (completed > total) return total;
+    return completed;
+  });
   late final Computed<int> totalFocusSeconds = computed<int>(
     () => sessions.value.fold<int>(
       0,
@@ -211,6 +229,11 @@ class PomodoroController {
         restored.focusStartedAt != null ||
         restored.phase != PomodoroRuntimePhase.focus;
     _hasStructuredTaskPlan = restored.taskId != null;
+    onRuntimeStateChanged?.call();
+
+    if (await _reconcileRestoredRuntime(restored)) {
+      return;
+    }
 
     if (restored.isRunning) {
       final now = _now();
@@ -274,6 +297,28 @@ class PomodoroController {
 
   set maximumConcentrationMode(bool enabled) {
     maximumConcentrationEnabled.value = enabled;
+    if (enabled) {
+      keepScreenAwakeEnabled.value = true;
+    }
+  }
+
+  MaximumConcentrationStyle get maximumConcentrationDisplayStyle =>
+      maximumConcentrationStyle.value;
+
+  set maximumConcentrationDisplayStyle(MaximumConcentrationStyle style) {
+    maximumConcentrationStyle.value = style;
+  }
+
+  bool get amoledProtection => amoledProtectionEnabled.value;
+
+  set amoledProtection(bool enabled) {
+    amoledProtectionEnabled.value = enabled;
+  }
+
+  bool get keepScreenAwake => keepScreenAwakeEnabled.value;
+
+  set keepScreenAwake(bool enabled) {
+    keepScreenAwakeEnabled.value = enabled;
   }
 
   set selectedGoalId(String? goalId) {
@@ -325,24 +370,22 @@ class PomodoroController {
           .where((session) => session.taskId == taskId)
           .map((session) => session.focusedSeconds),
     );
-    if (summary.remainingMinutes == 0) {
+    if (summary.remainingSeconds == 0) {
       return false;
     }
 
-    final fullPlan = createPomodoroTaskPlan(
-      remainingMinutes: summary.remainingMinutes,
-      cadence: cadence,
-    );
-    final selectedBlocks = mode == PomodoroPlanMode.continuous
-        ? fullPlan.blocks
-        : [fullPlan.blocks.first];
+    final cadenceSeconds = cadence.focusMinutes * 60;
+    final remainingBlockCount =
+        (summary.remainingSeconds + cadenceSeconds - 1) ~/ cadenceSeconds;
 
-    _focusSeconds = cadence.focusMinutes * 60;
+    _focusSeconds = cadenceSeconds;
     _shortBreakSeconds = cadence.breakMinutes * 60;
-    _currentFocusSeconds = selectedBlocks.first.focusMinutes * 60;
+    _currentFocusSeconds = _min(cadenceSeconds, summary.remainingSeconds);
     planMode.value = mode;
     currentBlockIndex.value = 1;
-    totalBlocks.value = selectedBlocks.length;
+    totalBlocks.value = mode == PomodoroPlanMode.continuous
+        ? remainingBlockCount
+        : 1;
     phase.value = PomodoroPhase.focus;
     remainingSeconds.value = _currentFocusSeconds;
     _startedAt = null;
@@ -356,6 +399,11 @@ class PomodoroController {
   }
 
   void clearSelectedTask() {
+    _clearSelectedTaskState();
+    unawaited(_runtimeRepository?.clear());
+  }
+
+  void _clearSelectedTaskState() {
     activeTaskId.value = null;
     activeTaskTitle.value = null;
     activeGoalId.value = null;
@@ -363,9 +411,17 @@ class PomodoroController {
     hasActiveRuntime.value = false;
     hasStartedRuntime.value = false;
     maximumConcentrationEnabled.value = false;
+    maximumConcentrationStyle.value = MaximumConcentrationStyle.oled;
+    amoledProtectionEnabled.value = true;
+    keepScreenAwakeEnabled.value = false;
     _hasStructuredTaskPlan = false;
     _runtimeCreatedAt = null;
-    unawaited(_runtimeRepository?.clear());
+    onRuntimeStateChanged?.call();
+  }
+
+  Future<void> _clearSelectedTaskAndRuntime() async {
+    _clearSelectedTaskState();
+    await _runtimeRepository?.clear();
   }
 
   void clearSelectedGoal(String goalId) {
@@ -419,6 +475,7 @@ class PomodoroController {
     _lastTickAt = null;
     hasStartedRuntime.value = false;
     maximumConcentrationEnabled.value = false;
+    keepScreenAwakeEnabled.value = false;
     unawaited(checkpointRuntime());
   }
 
@@ -444,6 +501,7 @@ class PomodoroController {
     hasActiveRuntime.value = false;
     hasStartedRuntime.value = false;
     maximumConcentrationEnabled.value = false;
+    keepScreenAwakeEnabled.value = false;
     planMode.value = PomodoroPlanMode.singleBlock;
     currentBlockIndex.value = 1;
     totalBlocks.value = 1;
@@ -452,6 +510,7 @@ class PomodoroController {
     _runtimeCreatedAt = null;
     _hasStructuredTaskPlan = false;
     _pendingReflectionSessionIds.clear();
+    onRuntimeStateChanged?.call();
   }
 
   void discardSession() {
@@ -463,6 +522,7 @@ class PomodoroController {
     remainingSeconds.value = currentPhaseSeconds;
     hasStartedRuntime.value = false;
     maximumConcentrationEnabled.value = false;
+    keepScreenAwakeEnabled.value = false;
     unawaited(checkpointRuntime());
   }
 
@@ -494,7 +554,18 @@ class PomodoroController {
     _lastTickAt = null;
     _currentFocusSeconds = _focusSeconds;
     remainingSeconds.value = _currentFocusSeconds;
-    clearSelectedTask();
+    await _clearSelectedTaskAndRuntime();
+  }
+
+  Future<void> discardActiveRuntimeWithoutSaving() async {
+    _timer?.cancel();
+    isRunning.value = false;
+    phase.value = PomodoroPhase.focus;
+    _startedAt = null;
+    _lastTickAt = null;
+    _currentFocusSeconds = _focusSeconds;
+    remainingSeconds.value = _currentFocusSeconds;
+    await _clearSelectedTaskAndRuntime();
   }
 
   Future<void> finishEarly() async {
@@ -579,7 +650,7 @@ class PomodoroController {
       isRunning.value = false;
       phase.value = PomodoroPhase.focus;
       _lastTickAt = null;
-      clearSelectedTask();
+      await _clearSelectedTaskAndRuntime();
       return;
     }
 
@@ -669,7 +740,7 @@ class PomodoroController {
       phase.value = PomodoroPhase.focus;
       _lastTickAt = null;
       _startedAt = null;
-      clearSelectedTask();
+      await _clearSelectedTaskAndRuntime();
       final completionCallback = onBreakCompleted;
       if (completionCallback != null) {
         unawaited(completionCallback());
@@ -682,16 +753,9 @@ class PomodoroController {
         planMode.value == PomodoroPlanMode.continuous &&
         currentBlockIndex.value < totalBlocks.value) {
       currentBlockIndex.value += 1;
-      final remainingMinutes = _remainingActiveTaskMinutes();
-      if (remainingMinutes > 0) {
-        final nextPlan = createPomodoroTaskPlan(
-          remainingMinutes: remainingMinutes,
-          cadence: PomodoroCadence(
-            focusMinutes: cadenceFocusMinutes,
-            breakMinutes: cadenceBreakMinutes,
-          ),
-        );
-        _currentFocusSeconds = nextPlan.blocks.first.focusMinutes * 60;
+      final remainingTaskSeconds = _remainingActiveTaskSeconds();
+      if (remainingTaskSeconds > 0) {
+        _currentFocusSeconds = _min(_focusSeconds, remainingTaskSeconds);
       }
     } else {
       _currentFocusSeconds = _focusSeconds;
@@ -716,6 +780,7 @@ class PomodoroController {
     } else {
       hasStartedRuntime.value = false;
       maximumConcentrationEnabled.value = false;
+      keepScreenAwakeEnabled.value = false;
       await checkpointRuntime();
     }
   }
@@ -798,7 +863,7 @@ class PomodoroController {
     return PomodoroPhase.shortBreak;
   }
 
-  int _remainingActiveTaskMinutes() {
+  int _remainingActiveTaskSeconds() {
     final taskId = activeTaskId.value;
     final estimatedSeconds = activeTaskEstimatedSeconds.value;
     if (taskId == null || estimatedSeconds == null) {
@@ -810,7 +875,52 @@ class PomodoroController {
       focusedSeconds: sessions.value
           .where((session) => session.taskId == taskId)
           .map((session) => session.focusedSeconds),
-    ).remainingMinutes;
+    ).remainingSeconds;
+  }
+
+  Future<bool> _reconcileRestoredRuntime(
+    PomodoroRuntimeState restored,
+  ) async {
+    final taskId = restored.taskId;
+    final estimatedSeconds = activeTaskEstimatedSeconds.value;
+    if (taskId == null || estimatedSeconds == null) return false;
+
+    final persistedFocusedSeconds = activeTaskFocusedSeconds.value;
+    if (persistedFocusedSeconds <= restored.taskFocusedSecondsAtStart) {
+      return false;
+    }
+
+    final remainingTaskSeconds = estimatedSeconds - persistedFocusedSeconds;
+    if (remainingTaskSeconds <= 0) {
+      await _clearSelectedTaskAndRuntime();
+      return true;
+    }
+
+    final latestSession = sessions.value.firstWhere(
+      (session) => session.taskId == taskId,
+    );
+    _timer?.cancel();
+    isRunning.value = false;
+    _lastTickAt = null;
+    _startedAt = null;
+
+    if (latestSession.status == PomodoroSessionStatus.completed) {
+      phase.value = _nextBreakPhase();
+      remainingSeconds.value = currentPhaseSeconds;
+      hasStartedRuntime.value = true;
+    } else {
+      phase.value = PomodoroPhase.focus;
+      _currentFocusSeconds = _min(_focusSeconds, remainingTaskSeconds);
+      remainingSeconds.value = _currentFocusSeconds;
+      currentBlockIndex.value = 1;
+      totalBlocks.value = planMode.value == PomodoroPlanMode.continuous
+          ? (remainingTaskSeconds + _focusSeconds - 1) ~/ _focusSeconds
+          : 1;
+      hasStartedRuntime.value = false;
+    }
+
+    await checkpointRuntime();
+    return true;
   }
 
   bool _hasCompletedActiveTask() {
@@ -828,6 +938,7 @@ class PomodoroController {
   }
 
   Future<void> checkpointRuntime() async {
+    onRuntimeStateChanged?.call();
     final repository = _runtimeRepository;
     if (repository == null) {
       return;
@@ -885,3 +996,5 @@ class PomodoroController {
     };
   }
 }
+
+int _min(int first, int second) => first < second ? first : second;

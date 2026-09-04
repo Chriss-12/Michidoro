@@ -1035,6 +1035,7 @@ void main() {
             StatisticsChartType.circular,
             StatisticsChartType.xy,
           },
+          maximumConcentrationOpacity: 0.55,
         ),
       );
       final controller = AppSettingsController();
@@ -1070,6 +1071,7 @@ void main() {
         StatisticsChartType.circular,
         StatisticsChartType.xy,
       });
+      expect(controller.maximumConcentrationOpacity.value, 0.55);
       expect(controller.remainingSeconds.value, 40 * 60);
     });
 
@@ -1098,6 +1100,7 @@ void main() {
         ..fontScale.value = 2
         ..selectedTypographyPreset = AppTypographyPreset.normal
         ..language.value = AppLanguage.english
+        ..setMaximumConcentrationOpacity(0.1)
         ..setStatisticsChartEnabled(
           StatisticsChartType.groupedBars,
           enabled: false,
@@ -1127,6 +1130,7 @@ void main() {
       expect(repository.saved?.fontScale, AppTypography.maxFontScale);
       expect(repository.saved?.typographyPreset, AppTypographyPreset.normal);
       expect(repository.saved?.language, AppLanguage.english);
+      expect(repository.saved?.maximumConcentrationOpacity, 0.2);
       expect(
         repository.saved?.enabledStatisticsCharts,
         isNot(contains(StatisticsChartType.groupedBars)),
@@ -1197,6 +1201,39 @@ void main() {
         );
       },
     );
+
+    test('persists and restores AMOLED opacity in JSON', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'michidoro-amoled-opacity-settings-',
+      );
+      final channel = _mockPathProviderDocumentsDirectory(directory.path);
+      addTearDown(() async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        if (directory.existsSync()) {
+          await directory.delete(recursive: true);
+        }
+      });
+      const repository = FileSettingsRepository();
+      final controller = AppSettingsController()
+        ..setMaximumConcentrationOpacity(0.6);
+
+      await repository.saveTimerPreferences(controller.timerPreferences);
+
+      final settingsFile = File(
+        '${directory.path}/michidoro-settings.json',
+      );
+      final json = jsonDecode(await settingsFile.readAsString());
+      expect(json, isA<Map<String, dynamic>>());
+      expect(
+        (json as Map<String, dynamic>)['maximumConcentrationOpacity'],
+        0.6,
+      );
+      expect(
+        (await repository.loadTimerPreferences()).maximumConcentrationOpacity,
+        0.6,
+      );
+    });
   });
 }
 

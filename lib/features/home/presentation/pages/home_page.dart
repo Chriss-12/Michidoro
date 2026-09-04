@@ -27,37 +27,42 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = AppSettingsScope.of(context);
 
-    return ListView(
-      padding: AppCardPaddings.page,
-      children: [
-        Text(
-          context.tr(
-            'Hola, ${settings.profileName}',
-            'Hello, ${settings.profileName}',
+    return RefreshIndicator(
+      onRefresh: refreshApplicationData,
+      child: ListView(
+        key: const PageStorageKey('home-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppCardPaddings.page,
+        children: [
+          Text(
+            context.tr(
+              'Hola, ${settings.profileName}',
+              'Hello, ${settings.profileName}',
+            ),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: AppDesignTokens.mainTitleFontSize,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: AppDesignTokens.mainTitleFontSize,
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 4),
+          Text(
+            context.tr('Listo para enfocarte hoy', 'Ready to focus today'),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          context.tr('Listo para enfocarte hoy', 'Ready to focus today'),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 18),
-        const _EnergyCard(),
-        const SizedBox(height: 18),
-        const _TaskStatusOverviewCard(),
-        const SizedBox(height: 18),
-        const _PerformanceDashboardCard(),
-        const SizedBox(height: 18),
-        const _StatisticsDownloadCard(),
-        const SizedBox(height: 18),
-        const _DailyGoalCard(),
-        const SizedBox(height: 18),
-        const _WeeklyProgressCardV2(),
-      ],
+          const SizedBox(height: 18),
+          const _EnergyCard(),
+          const SizedBox(height: 18),
+          const _TaskStatusOverviewCard(),
+          const SizedBox(height: 18),
+          const _PerformanceDashboardCard(),
+          const SizedBox(height: 18),
+          const _StatisticsDownloadCard(),
+          const SizedBox(height: 18),
+          const _DailyGoalCard(),
+          const SizedBox(height: 18),
+          const _WeeklyProgressCardV2(),
+        ],
+      ),
     );
   }
 }
@@ -1283,7 +1288,7 @@ class _StackedTaskStatusChart extends StatelessWidget {
                 _StackSegment(
                   value: snapshot.taskSummary.inProgress,
                   total: total,
-                  color: const Color(0xFFE3B341),
+                  color: context.palette.statusWarning,
                 ),
                 _StackSegment(
                   value: snapshot.taskSummary.completed,
@@ -2050,8 +2055,8 @@ class _StatisticsDownloadCard extends StatefulWidget {
 
 class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
   StatisticsReportPeriod _period = StatisticsReportPeriod.day;
-  DateTime? _from;
-  DateTime? _to;
+  DateTime _from = DateUtils.dateOnly(DateTime.now());
+  DateTime _to = DateUtils.dateOnly(DateTime.now());
   bool _isExporting = false;
 
   @override
@@ -2065,14 +2070,90 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            context.tr('Descargar estadísticas', 'Download statistics'),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontSize: AppDesignTokens.sectionTitleFontSize,
-              fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.primaryMuted,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(9),
+                  child: Icon(
+                    Icons.assessment_outlined,
+                    color: palette.primary,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr(
+                        'Descargar estadísticas',
+                        'Download statistics',
+                      ),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: AppDesignTokens.sectionTitleFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      context.tr(
+                        'Crea un PDF privado y listo para compartir.',
+                        'Create a private PDF ready to share.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette.primaryMuted.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: palette.neutralSoft),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.folder_outlined,
+                    color: palette.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      settings.reportsDirectoryPath.trim().isEmpty
+                          ? context.tr(
+                              'Destino: Descargas',
+                              'Destination: Downloads',
+                            )
+                          : context.tr(
+                              'Destino: carpeta seleccionada',
+                              'Destination: selected folder',
+                            ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           DropdownButtonFormField<StatisticsReportPeriod>(
             value: _period,
             decoration: InputDecoration(
@@ -2114,28 +2195,75 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _pickDate(isFrom: true),
-                    child: Text(
-                      _from == null
-                          ? context.tr('Desde', 'From')
-                          : _formatDate(_from!),
-                    ),
+                    child: Text(_formatDate(_from)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _pickDate(isFrom: false),
-                    child: Text(
-                      _to == null
-                          ? context.tr('Hasta', 'To')
-                          : _formatDate(_to!),
-                    ),
+                    child: Text(_formatDate(_to)),
                   ),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: const PageStorageKey('report-chart-selector'),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              visualDensity: VisualDensity.compact,
+              leading: Icon(
+                Icons.bar_chart_rounded,
+                color: palette.primary,
+                size: 22,
+              ),
+              title: Text(
+                context.tr('Gráficas incluidas', 'Included charts'),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              subtitle: Text(
+                context.tr(
+                  '${settings.enabledStatisticsCharts.length} gráficas seleccionadas',
+                  '${settings.enabledStatisticsCharts.length} charts selected',
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+              children: [
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final chart in StatisticsChartType.values)
+                        FilterChip(
+                          key: ValueKey('report-chart-${chart.name}'),
+                          label: Text(_chartTypeLabel(context, chart)),
+                          selected: settings.enabledStatisticsCharts.contains(
+                            chart,
+                          ),
+                          onSelected: (enabled) {
+                            settings.onStatisticsChartVisibilityChanged(
+                              chart,
+                              enabled: enabled,
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             context.tr(
               'El PDF incluye gráficas de rendimiento, estudio vs descanso '
@@ -2176,8 +2304,8 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
       final reportFile = await settings.onDownloadStatisticsPdf(
         StatisticsReportRequest(
           period: _period,
-          from: _from,
-          to: _to,
+          from: _period == StatisticsReportPeriod.range ? _from : null,
+          to: _period == StatisticsReportPeriod.range ? _to : null,
         ),
       );
       if (mounted) {
@@ -2243,7 +2371,7 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
       context: context,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1),
-      initialDate: isFrom ? _from ?? now : _to ?? now,
+      initialDate: isFrom ? _from : _to,
     );
 
     if (picked == null) {
@@ -2253,8 +2381,14 @@ class _StatisticsDownloadCardState extends State<_StatisticsDownloadCard> {
     setState(() {
       if (isFrom) {
         _from = picked;
+        if (_to.isBefore(picked)) {
+          _to = picked;
+        }
       } else {
         _to = picked;
+        if (_from.isAfter(picked)) {
+          _from = picked;
+        }
       }
     });
   }
@@ -2347,7 +2481,7 @@ class _DailyGoalCard extends StatelessWidget {
                 children: [
                   _SoftIcon(
                     icon: Icons.track_changes_rounded,
-                    color: _progressColor(today.band),
+                    color: _progressColor(today.band, palette),
                   ),
                   const Spacer(),
                   Text(
@@ -2376,7 +2510,7 @@ class _DailyGoalCard extends StatelessWidget {
                 value: progress,
                 minHeight: 5,
                 borderRadius: BorderRadius.circular(99),
-                color: _progressColor(today.band),
+                color: _progressColor(today.band, palette),
                 backgroundColor: palette.primaryMuted,
               ),
               const SizedBox(height: 12),
@@ -2603,7 +2737,7 @@ class _WeeklyDayProgressV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final color = _progressColor(band);
+    final color = _progressColor(band, palette);
     final normalizedProgress = progress.clamp(0.0, 1.0);
     final percentage = (normalizedProgress * 100).round();
 
@@ -2746,12 +2880,12 @@ class _SoftIcon extends StatelessWidget {
   }
 }
 
-Color _progressColor(TaskProgressBand band) {
+Color _progressColor(TaskProgressBand band, AppPalette palette) {
   return switch (band) {
-    TaskProgressBand.red => const Color(0xFFE05252),
-    TaskProgressBand.yellow => const Color(0xFFE3B341),
-    TaskProgressBand.green => const Color(0xFF5EAD68),
-    TaskProgressBand.strongGreen => const Color(0xFF188E53),
+    TaskProgressBand.red => palette.statusDanger,
+    TaskProgressBand.yellow => palette.statusWarning,
+    TaskProgressBand.green => palette.statusSuccess,
+    TaskProgressBand.strongGreen => palette.statusSuccessStrong,
   };
 }
 

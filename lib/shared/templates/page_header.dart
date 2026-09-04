@@ -10,6 +10,7 @@ import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
+import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 
 class PageHeader extends StatelessWidget {
@@ -354,6 +355,9 @@ Future<void> _showProfileQuickStats(
                     final snapshot = _ProfileStatsSnapshot.fromReportData(
                       selection: selection,
                       report: reportSnapshot.data!,
+                      taskSummary: serviceLocator<TasksController>()
+                          .allTaskSummary
+                          .value,
                     );
                     return Column(
                       children: [
@@ -579,6 +583,7 @@ class _QuickTaskStats extends StatelessWidget {
           icon: Icons.playlist_add_check_rounded,
           title: context.tr('Pendientes', 'Pending'),
           value: '${snapshot.pendingTasks}',
+          valueKey: const ValueKey('profile-pending-task-count'),
           subtitle: snapshot.rangeLabel(context),
           color: context.palette.secondary,
         ),
@@ -587,14 +592,16 @@ class _QuickTaskStats extends StatelessWidget {
           icon: Icons.pending_actions_rounded,
           title: context.tr('En progreso', 'In progress'),
           value: '${snapshot.inProgressTasks}',
+          valueKey: const ValueKey('profile-in-progress-task-count'),
           subtitle: snapshot.rangeLabel(context),
-          color: const Color(0xFFE3B341),
+          color: context.palette.statusWarning,
         ),
         const SizedBox(height: 8),
         _QuickStatsTile(
           icon: Icons.task_alt_rounded,
           title: context.tr('Completadas', 'Completed'),
           value: '${snapshot.completedTasks}',
+          valueKey: const ValueKey('profile-completed-task-count'),
           subtitle: snapshot.rangeLabel(context),
           color: context.palette.primary,
         ),
@@ -637,11 +644,13 @@ class _QuickStatsTile extends StatelessWidget {
     required this.value,
     required this.subtitle,
     required this.color,
+    this.valueKey,
   });
 
   final IconData icon;
   final String title;
   final String value;
+  final Key? valueKey;
   final String subtitle;
   final Color color;
 
@@ -676,6 +685,7 @@ class _QuickStatsTile extends StatelessWidget {
           ),
           Text(
             value,
+            key: valueKey,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: color,
               fontWeight: FontWeight.w800,
@@ -700,12 +710,13 @@ class _ProfileStatsSnapshot {
   factory _ProfileStatsSnapshot.fromReportData({
     required _ProfileStatsSelection selection,
     required StatisticsReportData report,
+    required TaskStatusSummary taskSummary,
   }) {
     return _ProfileStatsSnapshot(
       selection: selection,
-      pendingTasks: report.tasks.listed,
-      inProgressTasks: report.tasks.inProgress,
-      completedTasks: report.tasks.completed,
+      pendingTasks: taskSummary.listed,
+      inProgressTasks: taskSummary.inProgress,
+      completedTasks: taskSummary.completed,
       averageMood: report.moodAverage,
       reflectionCount: report.moodSampleCount,
     );
@@ -857,7 +868,7 @@ class _NotificationCenter extends StatelessWidget {
   }
 }
 
-enum _NotificationKind { task, routine, general }
+enum _NotificationKind { goal, task, routine, general }
 
 class _NotificationCard extends StatelessWidget {
   const _NotificationCard({required this.notification});
@@ -869,11 +880,13 @@ class _NotificationCard extends StatelessWidget {
     final palette = context.palette;
     final kind = _notificationKind(notification);
     final accent = switch (kind) {
+      _NotificationKind.goal => palette.primary,
       _NotificationKind.task => palette.primary,
       _NotificationKind.routine => palette.secondary,
       _NotificationKind.general => palette.tertiary,
     };
     final softBackground = switch (kind) {
+      _NotificationKind.goal => palette.primaryMuted,
       _NotificationKind.task => palette.primaryMuted,
       _NotificationKind.routine => palette.secondarySoft,
       _NotificationKind.general => palette.neutralSoft,
@@ -881,7 +894,8 @@ class _NotificationCard extends StatelessWidget {
     final taskCount = kind == _NotificationKind.task
         ? _pendingTaskCount(notification)
         : null;
-    final body = kind == _NotificationKind.task
+    final body =
+        kind == _NotificationKind.task || kind == _NotificationKind.goal
         ? null
         : _localizedNotificationBody(context, notification.body);
 
@@ -956,6 +970,10 @@ class _NotificationCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    if (kind == _NotificationKind.goal) ...[
+                      const SizedBox(height: 8),
+                      _GoalNotificationCounts(notification: notification),
+                    ],
                     if (body != null && body.isNotEmpty) ...[
                       const SizedBox(height: 5),
                       Text(
@@ -999,6 +1017,82 @@ class _NotificationCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalNotificationCounts extends StatelessWidget {
+  const _GoalNotificationCounts({required this.notification});
+
+  final AppNotification notification;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final goalId = notification.goalId ?? 'unknown';
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 6,
+      children: [
+        _GoalNotificationCount(
+          key: ValueKey('notification-goal-$goalId-listed'),
+          icon: Icons.assignment_outlined,
+          count: notification.pendingCount ?? 0,
+          color: palette.tertiary,
+          label: context.tr('Pendientes', 'Pending'),
+        ),
+        _GoalNotificationCount(
+          key: ValueKey('notification-goal-$goalId-inProgress'),
+          icon: Icons.pending_actions_rounded,
+          count: notification.inProgressCount ?? 0,
+          color: palette.secondary,
+          label: context.tr('En progreso', 'In progress'),
+        ),
+        _GoalNotificationCount(
+          key: ValueKey('notification-goal-$goalId-completed'),
+          icon: Icons.task_alt_rounded,
+          count: notification.completedCount ?? 0,
+          color: palette.primary,
+          label: context.tr('Completadas', 'Completed'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GoalNotificationCount extends StatelessWidget {
+  const _GoalNotificationCount({
+    required this.icon,
+    required this.count,
+    required this.color,
+    required this.label,
+    super.key,
+  });
+
+  final IconData icon;
+  final int count;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$label: $count',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: context.palette.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),
@@ -1061,6 +1155,11 @@ class _NotificationKindIcon extends StatelessWidget {
     final palette = context.palette;
     final kind = _notificationKind(notification);
     final (icon, color, label) = switch (kind) {
+      _NotificationKind.goal => (
+        Icons.flag_rounded,
+        palette.primary,
+        context.tr('Objetivo', 'Goal'),
+      ),
       _NotificationKind.task => (
         Icons.task_alt_rounded,
         palette.primary,
@@ -1093,6 +1192,10 @@ class _NotificationKindIcon extends StatelessWidget {
 }
 
 _NotificationKind _notificationKind(AppNotification notification) {
+  if (notification.isGoalSummary) {
+    return _NotificationKind.goal;
+  }
+
   final searchable =
       '${notification.title} ${notification.body} '
               '${notification.routePath ?? ''}'

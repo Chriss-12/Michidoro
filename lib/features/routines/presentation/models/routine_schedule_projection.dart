@@ -8,6 +8,7 @@ class RoutineScheduleOccurrence {
     required this.name,
     required this.iconKey,
     required this.colorKey,
+    required this.customColorArgb,
     required this.localDate,
     required this.startMinute,
     required this.status,
@@ -23,6 +24,7 @@ class RoutineScheduleOccurrence {
   final String name;
   final String iconKey;
   final String colorKey;
+  final int? customColorArgb;
   final DateTime localDate;
   final int startMinute;
   final RoutineRunStatus status;
@@ -39,6 +41,7 @@ class RoutineScheduleOccurrence {
         name: name,
         iconKey: iconKey,
         colorKey: colorKey,
+        customColorArgb: customColorArgb,
         localDate: localDate,
         startMinute: startMinute,
         status: status,
@@ -49,6 +52,67 @@ class RoutineScheduleOccurrence {
         isVirtual: isVirtual,
         hasOverlap: hasOverlap ?? this.hasOverlap,
       );
+}
+
+class RoutineScheduleActivity {
+  const RoutineScheduleActivity({
+    required this.sourceRoutineId,
+    required this.routineName,
+    required this.routineIconKey,
+    required this.colorKey,
+    required this.customColorArgb,
+    required this.localDate,
+    required this.title,
+    required this.startMinute,
+    required this.durationMinutes,
+    required this.status,
+    required this.isOptional,
+    required this.isVirtual,
+    required this.hasOverlap,
+  });
+
+  final String sourceRoutineId;
+  final String routineName;
+  final String routineIconKey;
+  final String colorKey;
+  final int? customColorArgb;
+  final DateTime localDate;
+  final String title;
+  final int startMinute;
+  final int durationMinutes;
+  final RoutineRunStatus status;
+  final bool isOptional;
+  final bool isVirtual;
+  final bool hasOverlap;
+
+  int get endMinute => startMinute + durationMinutes;
+
+  RoutineScheduleActivity copyWith({bool? hasOverlap}) =>
+      RoutineScheduleActivity(
+        sourceRoutineId: sourceRoutineId,
+        routineName: routineName,
+        routineIconKey: routineIconKey,
+        colorKey: colorKey,
+        customColorArgb: customColorArgb,
+        localDate: localDate,
+        title: title,
+        startMinute: startMinute,
+        durationMinutes: durationMinutes,
+        status: status,
+        isOptional: isOptional,
+        isVirtual: isVirtual,
+        hasOverlap: hasOverlap ?? this.hasOverlap,
+      );
+}
+
+class RoutineScheduleProjection {
+  const RoutineScheduleProjection({
+    required this.occurrences,
+    required this.activities,
+  });
+
+  final List<RoutineScheduleOccurrence> occurrences;
+  final List<RoutineScheduleActivity> activities;
 }
 
 class RoutineTodayFocus {
@@ -93,6 +157,8 @@ List<RoutineScheduleOccurrence> projectRoutineSchedule({
   final result = <RoutineScheduleOccurrence>[];
 
   for (final run in runs) {
+    final runDay = _dateOnly(run.localDate);
+    if (runDay.isBefore(start) || runDay.isAfter(end)) continue;
     final items = itemRuns[run.id] ?? const <RoutineItemRun>[];
     final requiredItems = items.where((item) => !item.isOptionalSnapshot);
     result.add(
@@ -101,7 +167,8 @@ List<RoutineScheduleOccurrence> projectRoutineSchedule({
         name: run.nameSnapshot,
         iconKey: run.iconKeySnapshot,
         colorKey: run.colorKeySnapshot,
-        localDate: _dateOnly(run.localDate),
+        customColorArgb: run.customColorArgbSnapshot,
+        localDate: runDay,
         startMinute: run.scheduledStartMinuteSnapshot,
         status: run.status,
         totalRequiredItems: requiredItems.length,
@@ -132,14 +199,20 @@ List<RoutineScheduleOccurrence> projectRoutineSchedule({
     if (routine.status != RoutineStatus.active || routine.items.isEmpty) {
       continue;
     }
-    final createdDay = _dateOnly(routine.createdAt);
+    final firstValidDay = _dateOnly(
+      routine.validFromDate ?? routine.createdAt,
+    );
+    final lastValidDay = routine.validUntilDate == null
+        ? null
+        : _dateOnly(routine.validUntilDate!);
     for (
       var day = start;
       !day.isAfter(end);
       day = day.add(const Duration(days: 1))
     ) {
       if (day.isBefore(currentDay) ||
-          day.isBefore(createdDay) ||
+          day.isBefore(firstValidDay) ||
+          (lastValidDay != null && day.isAfter(lastValidDay)) ||
           !routine.weekdays.contains(day.weekday) ||
           runsByOccurrence.containsKey('${routine.id}:${_dateKey(day)}')) {
         continue;
@@ -150,6 +223,7 @@ List<RoutineScheduleOccurrence> projectRoutineSchedule({
           name: routine.name,
           iconKey: routine.iconKey,
           colorKey: routine.colorKey,
+          customColorArgb: routine.customColorArgb,
           localDate: day,
           startMinute: routine.items
               .map((item) => item.scheduledMinute)
@@ -175,6 +249,131 @@ List<RoutineScheduleOccurrence> projectRoutineSchedule({
         : first.startMinute.compareTo(second.startMinute);
   });
   return _markOverlaps(result, routines);
+}
+
+List<RoutineScheduleActivity> projectRoutineActivities({
+  required List<Routine> routines,
+  required List<RoutineRun> runs,
+  required Map<String, List<RoutineItemRun>> itemRuns,
+  required DateTime startDate,
+  required DateTime endDate,
+  required DateTime today,
+}) {
+  final start = _dateOnly(startDate);
+  final end = _dateOnly(endDate);
+  final currentDay = _dateOnly(today);
+  final runsByOccurrence = {
+    for (final run in runs)
+      '${run.sourceRoutineId}:${_dateKey(run.localDate)}': run,
+  };
+  final result = <RoutineScheduleActivity>[];
+
+  for (final run in runs) {
+    final runDay = _dateOnly(run.localDate);
+    if (runDay.isBefore(start) || runDay.isAfter(end)) continue;
+    for (final item in itemRuns[run.id] ?? const <RoutineItemRun>[]) {
+      result.add(
+        RoutineScheduleActivity(
+          sourceRoutineId: run.sourceRoutineId,
+          routineName: run.nameSnapshot,
+          routineIconKey: run.iconKeySnapshot,
+          colorKey: run.colorKeySnapshot,
+          customColorArgb: run.customColorArgbSnapshot,
+          localDate: runDay,
+          title: item.titleSnapshot,
+          startMinute:
+              item.scheduledAtSnapshot.hour * 60 +
+              item.scheduledAtSnapshot.minute,
+          durationMinutes: item.durationMinutesSnapshot,
+          status: item.status,
+          isOptional: item.isOptionalSnapshot,
+          isVirtual: false,
+          hasOverlap: false,
+        ),
+      );
+    }
+  }
+
+  for (final routine in routines) {
+    if (routine.status != RoutineStatus.active || routine.items.isEmpty) {
+      continue;
+    }
+    final firstValidDay = _dateOnly(
+      routine.validFromDate ?? routine.createdAt,
+    );
+    final lastValidDay = routine.validUntilDate == null
+        ? null
+        : _dateOnly(routine.validUntilDate!);
+    for (
+      var day = start;
+      !day.isAfter(end);
+      day = day.add(const Duration(days: 1))
+    ) {
+      if (day.isBefore(currentDay) ||
+          day.isBefore(firstValidDay) ||
+          (lastValidDay != null && day.isAfter(lastValidDay)) ||
+          !routine.weekdays.contains(day.weekday) ||
+          runsByOccurrence.containsKey('${routine.id}:${_dateKey(day)}')) {
+        continue;
+      }
+      for (final item in routine.items) {
+        result.add(
+          RoutineScheduleActivity(
+            sourceRoutineId: routine.id,
+            routineName: routine.name,
+            routineIconKey: routine.iconKey,
+            colorKey: routine.colorKey,
+            customColorArgb: routine.customColorArgb,
+            localDate: day,
+            title: item.title,
+            startMinute: item.scheduledMinute,
+            durationMinutes: item.durationMinutes,
+            status: RoutineRunStatus.scheduled,
+            isOptional: item.isOptional,
+            isVirtual: true,
+            hasOverlap: false,
+          ),
+        );
+      }
+    }
+  }
+
+  result.sort((first, second) {
+    final byDate = first.localDate.compareTo(second.localDate);
+    return byDate != 0
+        ? byDate
+        : first.startMinute.compareTo(second.startMinute);
+  });
+  return _markActivityOverlaps(result);
+}
+
+List<RoutineScheduleActivity> _markActivityOverlaps(
+  List<RoutineScheduleActivity> activities,
+) {
+  final overlapping = <int>{};
+  for (var first = 0; first < activities.length; first++) {
+    for (var second = first + 1; second < activities.length; second++) {
+      if (!_sameDate(
+        activities[first].localDate,
+        activities[second].localDate,
+      )) {
+        if (activities[second].localDate.isAfter(activities[first].localDate)) {
+          break;
+        }
+        continue;
+      }
+      if (activities[first].startMinute < activities[second].endMinute &&
+          activities[second].startMinute < activities[first].endMinute) {
+        overlapping
+          ..add(first)
+          ..add(second);
+      }
+    }
+  }
+  return [
+    for (var index = 0; index < activities.length; index++)
+      activities[index].copyWith(hasOverlap: overlapping.contains(index)),
+  ];
 }
 
 RoutineTodayFocus? projectRoutineTodayFocus({

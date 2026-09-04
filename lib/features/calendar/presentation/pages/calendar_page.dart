@@ -1,31 +1,35 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
-import 'package:pomodoro_app_v1/features/calendar/domain/entities/calendar_event.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/entities/weekly_schedule_export_document.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/entities/weekly_schedule_export_file.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/repositories/weekly_schedule_exporter.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/widgets/goal_date_range_dialog.dart';
+import 'package:pomodoro_app_v1/features/calendar/presentation/widgets/weekly_schedule_card.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/models/goal_period_filter.dart';
-import 'package:pomodoro_app_v1/features/pomodoro/domain/entities/pomodoro_session.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/controllers/quick_notes_controller.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/widgets/planning_quick_notes_card.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/models/routine_schedule_projection.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
-import 'package:pomodoro_app_v1/features/routines/presentation/start_routine_focus_flow.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
-import 'package:pomodoro_app_v1/features/tasks/presentation/start_task_focus_flow.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
+import 'package:pomodoro_app_v1/shared/molecules/speech_dictation_button.dart';
 import 'package:signals_flutter/signals_flutter.dart';
+
+enum _PlanningCalendarView { month, week }
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({
@@ -34,7 +38,11 @@ class CalendarPage extends StatefulWidget {
     this.goalsController,
     this.tasksController,
     this.pomodoroController,
+    this.quickNotesController,
     this.routinesController,
+    this.weeklyScheduleExporter,
+    this.initialGoalId,
+    this.initialTaskId,
   });
 
   static const routePath = '/calendar';
@@ -43,7 +51,11 @@ class CalendarPage extends StatefulWidget {
   final GoalsController? goalsController;
   final TasksController? tasksController;
   final PomodoroController? pomodoroController;
+  final QuickNotesController? quickNotesController;
   final RoutinesController? routinesController;
+  final WeeklyScheduleExporter? weeklyScheduleExporter;
+  final String? initialGoalId;
+  final String? initialTaskId;
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();
@@ -53,14 +65,22 @@ class _CalendarPageState extends State<CalendarPage> {
   late final CalendarController _controller;
   late final GoalsController _goalsController;
   late final TasksController _tasksController;
-  late final PomodoroController _pomodoroController;
+  QuickNotesController? _quickNotesController;
+  WeeklyScheduleExporter? _weeklyScheduleExporter;
   RoutinesController? _routinesController;
   late DateTime _visibleMonth;
   late DateTime _selectedDay;
   GoalPeriod _goalPeriod = GoalPeriod.all;
   DateTimeRange? _goalDateRange;
+  _PlanningCalendarView _planningView = _PlanningCalendarView.month;
   List<RoutineScheduleOccurrence> _routineSchedule = const [];
+  List<RoutineScheduleActivity> _routineActivities = const [];
+  int _scheduleRequestId = 0;
   bool _isLoading = true;
+  bool _isExportingWeek = false;
+  String? _expandedGoalId;
+  String? _highlightedTaskId;
+  final Map<String, GlobalKey> _goalKeys = {};
 
   @override
   void initState() {
@@ -70,8 +90,16 @@ class _CalendarPageState extends State<CalendarPage> {
         widget.goalsController ?? serviceLocator<GoalsController>();
     _tasksController =
         widget.tasksController ?? serviceLocator<TasksController>();
-    _pomodoroController =
-        widget.pomodoroController ?? serviceLocator<PomodoroController>();
+    _quickNotesController =
+        widget.quickNotesController ??
+        (serviceLocator.isRegistered<QuickNotesController>()
+            ? serviceLocator<QuickNotesController>()
+            : null);
+    _weeklyScheduleExporter =
+        widget.weeklyScheduleExporter ??
+        (serviceLocator.isRegistered<WeeklyScheduleExporter>()
+            ? serviceLocator<WeeklyScheduleExporter>()
+            : null);
     _routinesController =
         widget.routinesController ??
         (serviceLocator.isRegistered<RoutinesController>()
@@ -80,6 +108,11 @@ class _CalendarPageState extends State<CalendarPage> {
     final now = DateTime.now();
     _visibleMonth = DateTime(now.year, now.month);
     _selectedDay = DateTime(now.year, now.month, now.day);
+    _expandedGoalId = widget.initialGoalId;
+    _highlightedTaskId = widget.initialTaskId;
+    if (widget.initialGoalId != null) {
+      _goalPeriod = GoalPeriod.all;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadPlanningData());
     });
@@ -87,12 +120,6 @@ class _CalendarPageState extends State<CalendarPage> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedEvents = _controller.eventsForDay(_selectedDay);
-    final selectedGoals = _goalsController.goalsForDay(_selectedDay);
-    final selectedTasks = _tasksController.tasksForDay(_selectedDay);
-    final selectedRoutines = _routineSchedule
-        .where((occurrence) => _sameDate(occurrence.localDate, _selectedDay))
-        .toList(growable: false);
     final plannedDays = {
       ..._controller.plannedDaysForMonth(_visibleMonth),
       ..._goalsController.plannedDaysForMonth(_visibleMonth),
@@ -109,140 +136,207 @@ class _CalendarPageState extends State<CalendarPage> {
       _visibleMonth,
     );
 
-    return ListView(
-      padding: AppCardPaddings.pageWithTop,
-      children: [
-        Text(
-          context.tr('Planificación', 'Planning'),
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: AppDesignTokens.mainTitleFontSize,
-            fontWeight: FontWeight.w700,
+    return RefreshIndicator(
+      onRefresh: _refreshPlanningData,
+      child: ListView(
+        key: const PageStorageKey('goals-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppCardPaddings.pageWithTop,
+        children: [
+          Text(
+            context.tr('Planificación', 'Planning'),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: AppDesignTokens.mainTitleFontSize,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          context.tr(
-            'Organiza objetivos, tareas y rutinas en un solo lugar.',
-            'Organize goals, tasks, and routines in one place.',
+          const SizedBox(height: 4),
+          Text(
+            context.tr(
+              'Organiza objetivos, fechas y actividades en un solo lugar.',
+              'Organize goals, dates, and activities in one place.',
+            ),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 24),
-        _MonthCard(
-          visibleMonth: _visibleMonth,
-          selectedDay: _selectedDay,
-          plannedDays: plannedDays,
-          taskProgressByDay: taskProgressByDay,
-          onPreviousMonth: () {
-            setState(() {
-              _visibleMonth = DateTime(
-                _visibleMonth.year,
-                _visibleMonth.month - 1,
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<_PlanningCalendarView>(
+              key: const ValueKey('planning-view-selector'),
+              segments: [
+                ButtonSegment(
+                  value: _PlanningCalendarView.month,
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  label: Text(context.tr('Mes', 'Month')),
+                ),
+                ButtonSegment(
+                  value: _PlanningCalendarView.week,
+                  icon: const Icon(Icons.view_week_rounded),
+                  label: Text(context.tr('Semana', 'Week')),
+                ),
+              ],
+              selected: {_planningView},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                _changePlanningView(selection.single);
+              },
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (_planningView == _PlanningCalendarView.month)
+            _MonthCard(
+              visibleMonth: _visibleMonth,
+              selectedDay: _selectedDay,
+              plannedDays: plannedDays,
+              taskProgressByDay: taskProgressByDay,
+              onPreviousMonth: () {
+                setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month - 1,
+                  );
+                  _selectedDay = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month,
+                  );
+                });
+                unawaited(_loadRoutineSchedule());
+              },
+              onNextMonth: () {
+                setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month + 1,
+                  );
+                  _selectedDay = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month,
+                  );
+                });
+                unawaited(_loadRoutineSchedule());
+              },
+              onDaySelected: (day) {
+                setState(() => _selectedDay = day);
+              },
+            )
+          else
+            SignalBuilder(
+              builder: (context) => WeeklyScheduleCard(
+                weekStart: _mondayOf(_selectedDay),
+                selectedDay: _selectedDay,
+                goals: _goalsController.goals.value,
+                tasks: _tasksController.tasks.value,
+                activities: _routineActivities,
+                isLoading: _isLoading,
+                isExporting: _isExportingWeek,
+                onPreviousWeek: () => _shiftWeek(-1),
+                onCurrentWeek: _goToCurrentWeek,
+                onNextWeek: () => _shiftWeek(1),
+                onDaySelected: (day) {
+                  setState(() {
+                    _selectedDay = day;
+                    _visibleMonth = DateTime(day.year, day.month);
+                  });
+                },
+                onOpenRoutine: (activity) {
+                  unawaited(_openRoutine(activity.sourceRoutineId));
+                },
+                onExportPdf: () => unawaited(_exportWeeklySchedule()),
+              ),
+            ),
+          const SizedBox(height: 18),
+          SignalBuilder(
+            builder: (context) {
+              final controller = _quickNotesController;
+              if (controller == null) return const SizedBox.shrink();
+              final notes = controller.notesForDay(_selectedDay);
+              if (notes.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: PlanningQuickNotesCard(
+                  notes: notes,
+                  onToggle: controller.toggle,
+                ),
               );
-              _selectedDay = DateTime(
-                _visibleMonth.year,
-                _visibleMonth.month,
-              );
-            });
-            unawaited(_loadRoutineSchedule());
-          },
-          onNextMonth: () {
-            setState(() {
-              _visibleMonth = DateTime(
-                _visibleMonth.year,
-                _visibleMonth.month + 1,
-              );
-              _selectedDay = DateTime(
-                _visibleMonth.year,
-                _visibleMonth.month,
-              );
-            });
-            unawaited(_loadRoutineSchedule());
-          },
-          onDaySelected: (day) {
-            setState(() => _selectedDay = day);
-          },
-        ),
-        const SizedBox(height: 18),
-        SignalBuilder(
-          builder: (context) {
-            final goals = filterGoalsForPeriod(
-              _goalsController.goals.value,
-              period: _goalPeriod,
-              referenceDay: _selectedDay,
-              customRange: _goalDateRange,
-            );
-            return _GoalPeriodCard(
-              period: _goalPeriod,
-              periodLabel: _goalPeriodLabel(
-                context,
+            },
+          ),
+          SignalBuilder(
+            builder: (context) {
+              final goals = filterGoalsForPeriod(
+                _goalsController.goals.value,
                 period: _goalPeriod,
                 referenceDay: _selectedDay,
                 customRange: _goalDateRange,
-              ),
-              hasSelectedRange: _goalDateRange != null,
-              goals: goals,
-              tasks: _tasksController.tasks.value,
-              onPeriodChanged: _changeGoalPeriod,
-              onPrevious: () => _shiftGoalPeriod(-1),
-              onNext: () => _shiftGoalPeriod(1),
-              onPickPeriod: _pickGoalPeriod,
-              onEditGoal: _showEditGoalDialog,
-              onDeleteGoal: _confirmDeleteGoal,
-            );
-          },
-        ),
-        const SizedBox(height: 18),
-        SignalBuilder(
-          builder: (context) {
-            final focusedSecondsByTask = _focusedSecondsByTask(
-              _pomodoroController.sessions.value,
-            );
-
-            return _AgendaCard(
-              selectedDay: _selectedDay,
-              goals: selectedGoals,
-              tasks: selectedTasks,
-              focusedSecondsByTask: focusedSecondsByTask,
-              events: selectedEvents,
-              routines: selectedRoutines,
-              isLoading: _isLoading,
-              onAddGoal: _showCreateGoalDialog,
-              onAddTask: _showCreateTaskDialog,
-              onScheduleTask: _showScheduleExistingTaskDialog,
-              onTaskStatusChanged: _updateTaskStatus,
-              onEditTaskPlanning: _showEditTaskPlanningDialog,
-              onDeleteTask: _confirmDeleteTask,
-              onStartTaskFocus: (task) {
-                final routinesController = _routinesController;
-                final execution = routinesController == null
-                    ? null
-                    : findRoutineTaskExecution(
-                        controller: routinesController,
-                        taskId: task.id,
-                      );
-                if (routinesController != null && execution != null) {
-                  unawaited(
-                    startRoutineTaskFocusFlow(
-                      context: context,
-                      task: task,
-                      run: execution.run,
-                      item: execution.item,
-                      controller: routinesController,
-                    ),
-                  );
-                  return;
-                }
-                unawaited(startTaskFocusFlow(context: context, task: task));
-              },
-              onOpenRoutine: (occurrence) => context.push(
-                '${RoutineEditorPage.routePath}?id=${occurrence.sourceRoutineId}',
-              ),
-            );
-          },
-        ),
-      ],
+              );
+              return _GoalPeriodCard(
+                period: _goalPeriod,
+                periodLabel: _goalPeriodLabel(
+                  context,
+                  period: _goalPeriod,
+                  referenceDay: _selectedDay,
+                  customRange: _goalDateRange,
+                ),
+                hasSelectedRange: _goalDateRange != null,
+                goals: goals,
+                tasks: _tasksController.tasks.value,
+                onPeriodChanged: _changeGoalPeriod,
+                onPrevious: () => _shiftGoalPeriod(-1),
+                onNext: () => _shiftGoalPeriod(1),
+                onPickPeriod: _pickGoalPeriod,
+                onEditGoal: _showEditGoalDialog,
+                onDeleteGoal: _confirmDeleteGoal,
+                expandedGoalId: _expandedGoalId,
+                highlightedTaskId: _highlightedTaskId,
+                goalKeyFor: (goalId) =>
+                    _goalKeys.putIfAbsent(goalId, GlobalKey.new),
+                onAddTask: _showCreateTaskDialog,
+                onAddGoal: _showCreateGoalDialog,
+                onGoalToggle: (goalId) {
+                  setState(() {
+                    _expandedGoalId = _expandedGoalId == goalId ? null : goalId;
+                    if (_expandedGoalId != goalId) {
+                      _highlightedTaskId = null;
+                    }
+                  });
+                },
+              );
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  void _changePlanningView(_PlanningCalendarView view) {
+    if (view == _planningView) return;
+    setState(() => _planningView = view);
+    unawaited(_loadRoutineSchedule());
+  }
+
+  void _shiftWeek(int direction) {
+    final shifted = _selectedDay.add(Duration(days: 7 * direction));
+    setState(() {
+      _selectedDay = shifted;
+      _visibleMonth = DateTime(shifted.year, shifted.month);
+    });
+    unawaited(_loadRoutineSchedule());
+  }
+
+  void _goToCurrentWeek() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    setState(() {
+      _selectedDay = today;
+      _visibleMonth = DateTime(today.year, today.month);
+    });
+    unawaited(_loadRoutineSchedule());
+  }
+
+  Future<void> _openRoutine(String routineId) async {
+    await context.push('${RoutineEditorPage.routePath}?id=$routineId');
+    if (!mounted) return;
+    await _routinesController?.load(day: _selectedDay);
+    await _loadRoutineSchedule();
   }
 
   void _changeGoalPeriod(GoalPeriod period) {
@@ -314,6 +408,7 @@ class _CalendarPageState extends State<CalendarPage> {
       _controller.loadEvents(),
       _goalsController.loadGoals(),
       _tasksController.loadTasks(),
+      if (_quickNotesController != null) _quickNotesController!.load(),
       if (_routinesController != null) _routinesController!.load(),
     ]);
     await _loadRoutineSchedule(notify: false);
@@ -323,26 +418,188 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     setState(() => _isLoading = false);
+    if (widget.initialGoalId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealGoal());
+    }
+  }
+
+  Future<void> _refreshPlanningData() async {
+    await refreshApplicationData();
+    await _loadRoutineSchedule();
+  }
+
+  void _revealGoal() {
+    if (!mounted) return;
+    final goalId = widget.initialGoalId;
+    if (goalId == null || _goalsController.goalById(goalId) == null) return;
+
+    final targetContext = _goalKeys[goalId]?.currentContext;
+    if (targetContext == null) return;
+    unawaited(
+      Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.18,
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+      ),
+    );
   }
 
   Future<void> _loadRoutineSchedule({bool notify = true}) async {
     final controller = _routinesController;
     if (controller == null) return;
+    final requestId = ++_scheduleRequestId;
+    final requestedView = _planningView;
     final requestedMonth = _visibleMonth;
-    final days = _monthGridDays(requestedMonth);
-    final schedule = await controller.scheduleBetween(
-      startDate: days.first,
-      endDate: days.last,
+    final requestedWeek = _mondayOf(_selectedDay);
+    final monthDays = _monthGridDays(requestedMonth);
+    final startDate = requestedView == _PlanningCalendarView.month
+        ? monthDays.first
+        : requestedWeek;
+    final endDate = requestedView == _PlanningCalendarView.month
+        ? monthDays.last
+        : requestedWeek.add(const Duration(days: 6));
+    final projection = await controller.scheduleProjectionBetween(
+      startDate: startDate,
+      endDate: endDate,
     );
     if (!mounted ||
-        requestedMonth.year != _visibleMonth.year ||
-        requestedMonth.month != _visibleMonth.month) {
+        requestId != _scheduleRequestId ||
+        requestedView != _planningView ||
+        (requestedView == _PlanningCalendarView.month &&
+            (requestedMonth.year != _visibleMonth.year ||
+                requestedMonth.month != _visibleMonth.month)) ||
+        (requestedView == _PlanningCalendarView.week &&
+            !_sameDate(requestedWeek, _mondayOf(_selectedDay)))) {
       return;
     }
     if (notify) {
-      setState(() => _routineSchedule = schedule);
+      setState(() {
+        _routineSchedule = projection.occurrences;
+        _routineActivities = projection.activities;
+      });
     } else {
-      _routineSchedule = schedule;
+      _routineSchedule = projection.occurrences;
+      _routineActivities = projection.activities;
+    }
+  }
+
+  Future<void> _exportWeeklySchedule() async {
+    final exporter = _weeklyScheduleExporter;
+    if (exporter == null) return;
+    if (_isExportingWeek || _isLoading) return;
+    final weekStart = _mondayOf(_selectedDay);
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final tasks = _tasksController.tasks.value;
+    final goals = _goalsController.goals.value
+        .where(
+          (goal) =>
+              goal.targetDate != null &&
+              !_dateOnly(goal.targetDate!).isBefore(weekStart) &&
+              !_dateOnly(goal.targetDate!).isAfter(weekEnd),
+        )
+        .map((goal) {
+          final relatedTasks = tasks
+              .where((task) => task.goalId == goal.id)
+              .toList(growable: false);
+          return WeeklyScheduleExportGoal(
+            targetDate: goal.targetDate!,
+            title: goal.title,
+            completedTasks: relatedTasks
+                .where((task) => task.isCompleted)
+                .length,
+            totalTasks: relatedTasks.length,
+          );
+        })
+        .toList(growable: false);
+    final document = WeeklyScheduleExportDocument(
+      weekStart: weekStart,
+      generatedAt: DateTime.now(),
+      isEnglish: Localizations.localeOf(context).languageCode == 'en',
+      activities: _routineActivities
+          .map(
+            (activity) => WeeklyScheduleExportActivity(
+              localDate: activity.localDate,
+              routineName: activity.routineName,
+              title: activity.title,
+              startMinute: activity.startMinute,
+              durationMinutes: activity.durationMinutes,
+              statusLabel: _routineRunStatusLabel(context, activity.status),
+              colorKey: activity.colorKey,
+              customColorArgb: activity.customColorArgb,
+              hasOverlap: activity.hasOverlap,
+            ),
+          )
+          .toList(growable: false),
+      goals: goals,
+    );
+
+    setState(() => _isExportingWeek = true);
+    try {
+      final file = await exporter.export(document);
+      if (!mounted) return;
+      if (file == null) {
+        _showWeeklyExportMessage(
+          context.tr('Exportación cancelada.', 'Export canceled.'),
+        );
+        return;
+      }
+      _showWeeklyExportMessage(
+        context.tr(
+          'PDF guardado en: ${file.displayPath}',
+          'PDF saved to: ${file.displayPath}',
+        ),
+        file: file,
+      );
+    } on Object {
+      if (!mounted) return;
+      _showWeeklyExportMessage(
+        context.tr(
+          'No se pudo guardar el PDF. Inténtalo nuevamente.',
+          'The PDF could not be saved. Please try again.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExportingWeek = false);
+    }
+  }
+
+  void _showWeeklyExportMessage(
+    String message, {
+    WeeklyScheduleExportFile? file,
+  }) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: file == null
+              ? null
+              : SnackBarAction(
+                  label: context.tr('Abrir', 'Open'),
+                  onPressed: () {
+                    unawaited(_openWeeklySchedulePdf(file));
+                  },
+                ),
+        ),
+      );
+  }
+
+  Future<void> _openWeeklySchedulePdf(
+    WeeklyScheduleExportFile file,
+  ) async {
+    final exporter = _weeklyScheduleExporter;
+    if (exporter == null) return;
+    try {
+      await exporter.open(file);
+    } on Object {
+      if (!mounted) return;
+      _showWeeklyExportMessage(
+        context.tr(
+          'No se encontró una aplicación para abrir el PDF.',
+          'No application was found to open the PDF.',
+        ),
+      );
     }
   }
 
@@ -363,52 +620,6 @@ class _CalendarPageState extends State<CalendarPage> {
         selectedDay: _selectedDay,
         goals: _goalsController.goalsForDay(_selectedDay),
         onSave: _saveTaskFromDialog,
-      ),
-    );
-  }
-
-  Future<void> _showScheduleExistingTaskDialog() async {
-    final quickTasks = _tasksController.quickTasks();
-    if (quickTasks.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              context.tr(
-                'No hay tareas rápidas para programar.',
-                'There are no quick tasks to schedule.',
-              ),
-            ),
-          ),
-        );
-      return;
-    }
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => _ScheduleTaskDialog(
-        selectedDay: _selectedDay,
-        tasks: quickTasks,
-        goals: _goalsController.goalsForDay(_selectedDay),
-        onSave: _scheduleExistingTaskFromDialog,
-      ),
-    );
-  }
-
-  Future<void> _showEditTaskPlanningDialog(Task task) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => _EditTaskPlanningDialog(
-        task: task,
-        goals: _goalsController.goalsForDay(_selectedDay),
-        onSave: ({required goalId, required durationMinutes}) =>
-            _updateTaskPlanningFromDialog(
-              task: task,
-              goalId: goalId,
-              durationMinutes: durationMinutes,
-            ),
-        onUnschedule: () => _unscheduleTaskFromDialog(task),
       ),
     );
   }
@@ -476,95 +687,6 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     return null;
-  }
-
-  Future<String?> _scheduleExistingTaskFromDialog({
-    required String taskId,
-    required String? goalId,
-  }) async {
-    await _tasksController.moveTaskToDay(
-      id: taskId,
-      scheduledDate: _selectedDay,
-      goalId: goalId,
-    );
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    return null;
-  }
-
-  Future<String?> _updateTaskPlanningFromDialog({
-    required Task task,
-    required String? goalId,
-    required int durationMinutes,
-  }) async {
-    final saved = await _tasksController.updateTaskPlanning(
-      id: task.id,
-      goalId: goalId,
-      durationMinutes: durationMinutes,
-    );
-    if (!saved) {
-      return _tasksController.validationMessage.value;
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    return null;
-  }
-
-  Future<void> _unscheduleTaskFromDialog(Task task) async {
-    await _tasksController.scheduleTask(task.id, null);
-    await _tasksController.assignTaskToGoal(task.id, null);
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _updateTaskStatus(Task task, TaskStatus status) async {
-    await _tasksController.updateTaskStatus(task.id, status);
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _confirmDeleteTask(Task task) async {
-    final delete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(context.tr('Eliminar tarea', 'Delete task')),
-          content: Text(
-            context.tr(
-              'Se eliminará "${task.title}" de este día.',
-              '"${task.title}" will be removed from this day.',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(context.tr('Cancelar', 'Cancel')),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              icon: const Icon(Icons.delete_outline_rounded),
-              label: Text(context.tr('Eliminar', 'Delete')),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (delete ?? false) {
-      await _tasksController.deleteTask(task.id);
-      if (mounted) {
-        setState(() {});
-      }
-    }
   }
 
   Future<String?> _updateGoalFromDialog({
@@ -726,13 +848,29 @@ class _CreateGoalDialogState extends State<_CreateGoalDialog> {
           TextField(
             controller: _titleController,
             autofocus: true,
-            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 1,
+            maxLines: 2,
             decoration: InputDecoration(
               labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
+              suffixIcon: SpeechDictationFieldActions(
+                fieldId: 'calendar-goal-create-title',
+                textController: _titleController,
+                onChanged: (_) {
+                  if (_validationMessage != null) {
+                    setState(() => _validationMessage = null);
+                  }
+                },
+              ),
             ),
-            onSubmitted: (_) => unawaited(_submit()),
+            onChanged: (_) {
+              if (_validationMessage != null) {
+                setState(() => _validationMessage = null);
+              }
+            },
           ),
         ],
       ),
@@ -841,12 +979,29 @@ class _EditCalendarGoalDialogState extends State<_EditCalendarGoalDialog> {
           TextField(
             controller: _titleController,
             autofocus: true,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 1,
+            maxLines: 2,
             decoration: InputDecoration(
               labelText: context.tr('Objetivo', 'Goal'),
               errorText: _validationMessage,
               prefixIcon: const Icon(Icons.flag_rounded),
+              suffixIcon: SpeechDictationFieldActions(
+                fieldId: 'calendar-goal-edit-title',
+                textController: _titleController,
+                onChanged: (_) {
+                  if (_validationMessage != null) {
+                    setState(() => _validationMessage = null);
+                  }
+                },
+              ),
             ),
-            onSubmitted: (_) => unawaited(_submit()),
+            onChanged: (_) {
+              if (_validationMessage != null) {
+                setState(() => _validationMessage = null);
+              }
+            },
           ),
           const SizedBox(height: 16),
           Row(
@@ -1012,13 +1167,29 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
             TextField(
               controller: _titleController,
               autofocus: true,
-              textInputAction: TextInputAction.done,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 2,
               decoration: InputDecoration(
                 labelText: context.tr('Tarea', 'Task'),
                 errorText: _validationMessage,
                 prefixIcon: const Icon(Icons.task_alt_rounded),
+                suffixIcon: SpeechDictationFieldActions(
+                  fieldId: 'calendar-task-create-title',
+                  textController: _titleController,
+                  onChanged: (_) {
+                    if (_validationMessage != null) {
+                      setState(() => _validationMessage = null);
+                    }
+                  },
+                ),
               ),
-              onSubmitted: (_) => unawaited(_submit()),
+              onChanged: (_) {
+                if (_validationMessage != null) {
+                  setState(() => _validationMessage = null);
+                }
+              },
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
@@ -1087,334 +1258,6 @@ class _CreateTaskDialogState extends State<_CreateTaskDialog> {
           label: Text(context.tr('Crear', 'Create')),
         ),
       ],
-    );
-  }
-}
-
-class _ScheduleTaskDialog extends StatefulWidget {
-  const _ScheduleTaskDialog({
-    required this.selectedDay,
-    required this.tasks,
-    required this.goals,
-    required this.onSave,
-  });
-
-  final DateTime selectedDay;
-  final List<Task> tasks;
-  final List<ProductivityGoal> goals;
-  final Future<String?> Function({
-    required String taskId,
-    required String? goalId,
-  })
-  onSave;
-
-  @override
-  State<_ScheduleTaskDialog> createState() => _ScheduleTaskDialogState();
-}
-
-class _ScheduleTaskDialogState extends State<_ScheduleTaskDialog> {
-  late String _selectedTaskId;
-  String? _selectedGoalId;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedTaskId = widget.tasks.first.id;
-  }
-
-  Future<void> _submit() async {
-    if (_isSaving) {
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    await widget.onSave(
-      taskId: _selectedTaskId,
-      goalId: _selectedGoalId,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      title: Text(context.tr('Asignar tarea rápida', 'Assign quick task')),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<String>(
-            value: _selectedTaskId,
-            decoration: InputDecoration(
-              labelText: context.tr('Tarea rápida', 'Quick task'),
-              prefixIcon: const Icon(Icons.checklist_rounded),
-            ),
-            items: widget.tasks
-                .map(
-                  (task) => DropdownMenuItem<String>(
-                    value: task.id,
-                    child: Text(task.title),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) {
-                return;
-              }
-
-              setState(() => _selectedTaskId = value);
-            },
-          ),
-          if (widget.goals.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String?>(
-              value: _selectedGoalId,
-              decoration: InputDecoration(
-                labelText: context.tr('Objetivo', 'Goal'),
-                prefixIcon: const Icon(Icons.flag_rounded),
-              ),
-              items: [
-                DropdownMenuItem<String?>(
-                  child: Text(context.tr('Sin objetivo', 'No goal')),
-                ),
-                ...widget.goals.map(
-                  (goal) => DropdownMenuItem<String?>(
-                    value: goal.id,
-                    child: Text(goal.title),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => _selectedGoalId = value);
-              },
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: Text(context.tr('Cancelar', 'Cancel')),
-        ),
-        FilledButton.icon(
-          onPressed: _isSaving ? null : () => unawaited(_submit()),
-          icon: const Icon(Icons.calendar_month_rounded),
-          label: Text(context.tr('Asignar', 'Assign')),
-        ),
-      ],
-    );
-  }
-}
-
-class _EditTaskPlanningDialog extends StatefulWidget {
-  const _EditTaskPlanningDialog({
-    required this.task,
-    required this.goals,
-    required this.onSave,
-    required this.onUnschedule,
-  });
-
-  final Task task;
-  final List<ProductivityGoal> goals;
-  final Future<String?> Function({
-    required String? goalId,
-    required int durationMinutes,
-  })
-  onSave;
-  final Future<void> Function() onUnschedule;
-
-  @override
-  State<_EditTaskPlanningDialog> createState() =>
-      _EditTaskPlanningDialogState();
-}
-
-class _EditTaskPlanningDialogState extends State<_EditTaskPlanningDialog> {
-  late String? _selectedGoalId = widget.task.goalId;
-  late final TextEditingController _durationController;
-  String? _validationMessage;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _durationController = TextEditingController(
-      text: '${widget.task.durationMinutes ?? 25}',
-    );
-  }
-
-  @override
-  void dispose() {
-    _durationController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_isSaving) {
-      return;
-    }
-
-    final durationMinutes = int.tryParse(_durationController.text.trim());
-    if (durationMinutes == null ||
-        durationMinutes <= 0 ||
-        durationMinutes > 24 * 60) {
-      setState(() {
-        _validationMessage = context.tr(
-          'Escribe una duración entre 1 y 1440 minutos.',
-          'Enter a duration between 1 and 1440 minutes.',
-        );
-      });
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    final validationMessage = await widget.onSave(
-      goalId: _selectedGoalId,
-      durationMinutes: durationMinutes,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (validationMessage != null) {
-      setState(() {
-        _isSaving = false;
-        _validationMessage = context.localizeMessage(validationMessage);
-      });
-      return;
-    }
-
-    Navigator.of(context).pop();
-  }
-
-  Future<void> _unschedule() async {
-    if (_isSaving) {
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    await widget.onUnschedule();
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: Text(context.tr('Planificación de tarea', 'Task planning')),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.task_alt_rounded),
-              title: Text(widget.task.title),
-              subtitle: Text(context.tr('Tarea planificada', 'Planned task')),
-            ),
-            DropdownButtonFormField<String?>(
-              value: _selectedGoalId,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: context.tr('Objetivo', 'Goal'),
-                prefixIcon: const Icon(Icons.flag_rounded),
-              ),
-              items: [
-                DropdownMenuItem<String?>(
-                  child: Text(context.tr('Sin objetivo', 'No goal')),
-                ),
-                ...widget.goals.map(
-                  (goal) => DropdownMenuItem<String?>(
-                    value: goal.id,
-                    child: Text(
-                      goal.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: _isSaving
-                  ? null
-                  : (value) => setState(() => _selectedGoalId = value),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _durationController,
-              enabled: !_isSaving,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: context.tr(
-                  'Duración en minutos',
-                  'Duration in minutes',
-                ),
-                prefixIcon: const Icon(Icons.timer_outlined),
-                errorText: _validationMessage,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final minutes in const [25, 30, 45, 60, 90, 120])
-                  ChoiceChip(
-                    label: Text('$minutes min'),
-                    selected: int.tryParse(_durationController.text) == minutes,
-                    onSelected: _isSaving
-                        ? null
-                        : (_) {
-                            setState(() {
-                              _durationController.text = '$minutes';
-                              _validationMessage = null;
-                            });
-                          },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isSaving ? null : () => unawaited(_submit()),
-                icon: const Icon(Icons.save_rounded),
-                label: Text(context.tr('Guardar', 'Save')),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-                child: Text(context.tr('Cancelar', 'Cancel')),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: _isSaving ? null : () => unawaited(_unschedule()),
-                icon: const Icon(Icons.event_busy_rounded),
-                label: Text(context.tr('Quitar del día', 'Remove from day')),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1602,7 +1445,7 @@ class _DayCell extends StatelessWidget {
     final progress = taskProgress;
     final markerColor = progress == null
         ? palette.secondary
-        : _calendarProgressColor(progress.band);
+        : _calendarProgressColor(progress.band, palette);
 
     return InkWell(
       borderRadius: BorderRadius.circular(8),
@@ -1666,6 +1509,52 @@ class _DayCell extends StatelessWidget {
   }
 }
 
+class _PlanningCreateMenu extends StatelessWidget {
+  const _PlanningCreateMenu({
+    required this.onAddTask,
+    required this.onAddGoal,
+  });
+
+  final VoidCallback onAddTask;
+  final VoidCallback onAddGoal;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: MenuAnchor(
+        menuChildren: [
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.add_task_rounded),
+            onPressed: onAddTask,
+            child: Text(context.tr('Nueva tarea', 'New task')),
+          ),
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.flag_rounded),
+            onPressed: onAddGoal,
+            child: Text(context.tr('Nuevo objetivo', 'New goal')),
+          ),
+        ],
+        builder: (context, controller, child) => SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            key: const ValueKey('planning-create-button'),
+            onPressed: () {
+              if (controller.isOpen) {
+                controller.close();
+              } else {
+                controller.open();
+              }
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: Text(context.tr('Crear', 'Create')),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GoalPeriodCard extends StatelessWidget {
   const _GoalPeriodCard({
     required this.period,
@@ -1679,6 +1568,12 @@ class _GoalPeriodCard extends StatelessWidget {
     required this.onPickPeriod,
     required this.onEditGoal,
     required this.onDeleteGoal,
+    required this.expandedGoalId,
+    required this.highlightedTaskId,
+    required this.goalKeyFor,
+    required this.onAddTask,
+    required this.onAddGoal,
+    required this.onGoalToggle,
   });
 
   final GoalPeriod period;
@@ -1692,6 +1587,12 @@ class _GoalPeriodCard extends StatelessWidget {
   final VoidCallback onPickPeriod;
   final ValueChanged<ProductivityGoal> onEditGoal;
   final ValueChanged<ProductivityGoal> onDeleteGoal;
+  final String? expandedGoalId;
+  final String? highlightedTaskId;
+  final GlobalKey Function(String goalId) goalKeyFor;
+  final VoidCallback onAddTask;
+  final VoidCallback onAddGoal;
+  final ValueChanged<String> onGoalToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -1733,6 +1634,8 @@ class _GoalPeriodCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          _PlanningCreateMenu(onAddTask: onAddTask, onAddGoal: onAddGoal),
           const SizedBox(height: 14),
           Column(
             key: const ValueKey('goal-period-selector'),
@@ -1832,10 +1735,17 @@ class _GoalPeriodCard extends StatelessWidget {
           else
             for (var index = 0; index < goals.length; index++) ...[
               _PeriodGoalTile(
+                key: goalKeyFor(goals[index].id),
                 goal: goals[index],
+                tasks: tasks
+                    .where((task) => task.goalId == goals[index].id)
+                    .toList(growable: false),
                 summary: TaskStatusSummary.fromTasks(
                   tasks.where((task) => task.goalId == goals[index].id),
                 ),
+                isExpanded: expandedGoalId == goals[index].id,
+                highlightedTaskId: highlightedTaskId,
+                onToggle: () => onGoalToggle(goals[index].id),
                 onEdit: () => onEditGoal(goals[index]),
                 onDelete: () => onDeleteGoal(goals[index]),
               ),
@@ -1881,13 +1791,22 @@ class _GoalPeriodSegment extends StatelessWidget {
 class _PeriodGoalTile extends StatelessWidget {
   const _PeriodGoalTile({
     required this.goal,
+    required this.tasks,
     required this.summary,
+    required this.isExpanded,
+    required this.highlightedTaskId,
+    required this.onToggle,
     required this.onEdit,
     required this.onDelete,
+    super.key,
   });
 
   final ProductivityGoal goal;
+  final List<Task> tasks;
   final TaskStatusSummary summary;
+  final bool isExpanded;
+  final String? highlightedTaskId;
+  final VoidCallback onToggle;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -1900,80 +1819,121 @@ class _PeriodGoalTile extends StatelessWidget {
 
     return Semantics(
       container: true,
-      child: Row(
+      child: Column(
         key: ValueKey('period-goal-${goal.id}'),
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Icon(Icons.flag_rounded, color: palette.secondary, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  goal.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: InkWell(
+                  key: ValueKey('period-goal-toggle-${goal.id}'),
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: onToggle,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Icon(
+                            Icons.flag_rounded,
+                            color: palette.secondary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                goal.title,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                dateLabel,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: palette.textSecondary),
+                              ),
+                              const SizedBox(height: 8),
+                              LinearProgressIndicator(
+                                value: summary.completionRatio,
+                                minHeight: 6,
+                                borderRadius: BorderRadius.circular(8),
+                                color: palette.primary,
+                                backgroundColor: palette.neutralSoft,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                context.tr(
+                                  '${summary.completed}/${summary.total} tareas completadas',
+                                  '${summary.completed}/${summary.total} tasks completed',
+                                ),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(color: palette.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          isExpanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: palette.textSecondary,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  dateLabel,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: summary.completionRatio,
-                  minHeight: 6,
-                  borderRadius: BorderRadius.circular(8),
-                  color: palette.primary,
-                  backgroundColor: palette.neutralSoft,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  context.tr(
-                    '${summary.completed}/${summary.total} tareas completadas',
-                    '${summary.completed}/${summary.total} tasks completed',
-                  ),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: palette.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuButton<_GoalDeadlineAction>(
-            tooltip: context.tr('Opciones de objetivo', 'Goal options'),
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (action) {
-              switch (action) {
-                case _GoalDeadlineAction.edit:
-                  onEdit();
-                case _GoalDeadlineAction.delete:
-                  onDelete();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: _GoalDeadlineAction.edit,
-                child: ListTile(
-                  leading: const Icon(Icons.edit_rounded),
-                  title: Text(context.tr('Editar objetivo', 'Edit goal')),
                 ),
               ),
-              PopupMenuItem(
-                value: _GoalDeadlineAction.delete,
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(context.tr('Eliminar objetivo', 'Delete goal')),
-                ),
+              PopupMenuButton<_GoalDeadlineAction>(
+                tooltip: context.tr('Opciones de objetivo', 'Goal options'),
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (action) {
+                  switch (action) {
+                    case _GoalDeadlineAction.edit:
+                      onEdit();
+                    case _GoalDeadlineAction.delete:
+                      onDelete();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: _GoalDeadlineAction.edit,
+                    child: ListTile(
+                      leading: const Icon(Icons.edit_rounded),
+                      title: Text(context.tr('Editar objetivo', 'Edit goal')),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _GoalDeadlineAction.delete,
+                    child: ListTile(
+                      leading: const Icon(Icons.delete_outline_rounded),
+                      title: Text(
+                        context.tr('Eliminar objetivo', 'Delete goal'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: isExpanded
+                ? _GoalTaskDetails(
+                    goalId: goal.id,
+                    tasks: tasks,
+                    highlightedTaskId: highlightedTaskId,
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -1981,168 +1941,110 @@ class _PeriodGoalTile extends StatelessWidget {
   }
 }
 
-class _AgendaCard extends StatelessWidget {
-  const _AgendaCard({
-    required this.selectedDay,
-    required this.goals,
+class _GoalTaskDetails extends StatelessWidget {
+  const _GoalTaskDetails({
+    required this.goalId,
     required this.tasks,
-    required this.focusedSecondsByTask,
-    required this.events,
-    required this.routines,
-    required this.isLoading,
-    required this.onAddGoal,
-    required this.onAddTask,
-    required this.onScheduleTask,
-    required this.onTaskStatusChanged,
-    required this.onEditTaskPlanning,
-    required this.onDeleteTask,
-    required this.onStartTaskFocus,
-    required this.onOpenRoutine,
+    required this.highlightedTaskId,
   });
 
-  final DateTime selectedDay;
-  final List<ProductivityGoal> goals;
+  final String goalId;
   final List<Task> tasks;
-  final Map<String, int> focusedSecondsByTask;
-  final List<CalendarEvent> events;
-  final List<RoutineScheduleOccurrence> routines;
-  final bool isLoading;
-  final VoidCallback onAddGoal;
-  final VoidCallback onAddTask;
-  final VoidCallback onScheduleTask;
-  final void Function(Task task, TaskStatus status) onTaskStatusChanged;
-  final ValueChanged<Task> onEditTaskPlanning;
-  final ValueChanged<Task> onDeleteTask;
-  final ValueChanged<Task> onStartTaskFocus;
-  final ValueChanged<RoutineScheduleOccurrence> onOpenRoutine;
+  final String? highlightedTaskId;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return GlassCard(
-      padding: AppCardPaddings.spacious,
+    return Container(
+      key: ValueKey('period-goal-tasks-$goalId'),
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(
+        color: palette.surface.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.neutral),
+      ),
+      child: tasks.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                context.tr(
+                  'Este objetivo todavía no tiene tareas.',
+                  'This goal does not have tasks yet.',
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final status in TaskStatus.values)
+                  _GoalTaskStatusGroup(
+                    status: status,
+                    tasks: tasks
+                        .where((task) => task.status == status)
+                        .toList(growable: false),
+                    highlightedTaskId: highlightedTaskId,
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _GoalTaskStatusGroup extends StatelessWidget {
+  const _GoalTaskStatusGroup({
+    required this.status,
+    required this.tasks,
+    required this.highlightedTaskId,
+  });
+
+  final TaskStatus status;
+  final List<Task> tasks;
+  final String? highlightedTaskId;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _taskStatusStyle(context, status);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(style.icon, size: 17, color: style.color),
+              const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  _formatSelectedDay(context, selectedDay),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: AppDesignTokens.sectionTitleFontSize,
-                    fontWeight: FontWeight.w700,
+                  _taskStatusLabel(context, status),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: style.color,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              if (tasks.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                _TaskStatusSummaryMenu(tasks: tasks),
-              ],
+              Text(
+                '${tasks.length}',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: style.color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            context.tr(
-              'Agenda local de planificación',
-              'Local planning agenda',
+          if (tasks.isNotEmpty) const SizedBox(height: 7),
+          for (final task in tasks) ...[
+            _GoalTaskRow(
+              task: task,
+              style: style,
+              highlighted: task.id == highlightedTaskId,
             ),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: onAddTask,
-                icon: const Icon(Icons.add_task_rounded),
-                label: Text(context.tr('Nueva tarea', 'New task')),
-              ),
-              MenuAnchor(
-                builder: (context, controller, child) {
-                  return IconButton.outlined(
-                    tooltip: context.tr('Más acciones', 'More actions'),
-                    onPressed: () {
-                      if (controller.isOpen) {
-                        controller.close();
-                      } else {
-                        controller.open();
-                      }
-                    },
-                    icon: const Icon(Icons.more_horiz_rounded),
-                  );
-                },
-                menuChildren: [
-                  MenuItemButton(
-                    leadingIcon: const Icon(Icons.flag_rounded),
-                    onPressed: onAddGoal,
-                    child: Text(context.tr('Crear objetivo', 'Create goal')),
-                  ),
-                  MenuItemButton(
-                    leadingIcon: const Icon(Icons.playlist_add_check_rounded),
-                    onPressed: onScheduleTask,
-                    child: Text(
-                      context.tr('Asignar tarea rápida', 'Assign quick task'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          if (isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (events.isEmpty &&
-              goals.isEmpty &&
-              tasks.isEmpty &&
-              routines.isEmpty)
-            _EmptyAgenda(day: selectedDay)
-          else ...[
-            if (routines.isNotEmpty) ...[
-              _AgendaSectionTitle(
-                icon: Icons.event_repeat_rounded,
-                label: context.tr('Rutinas', 'Routines'),
-                count: routines.length,
-              ),
-              const SizedBox(height: 10),
-              for (final routine in routines) ...[
-                _RoutineOccurrenceTile(
-                  occurrence: routine,
-                  onOpen: () => onOpenRoutine(routine),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ],
-            if (tasks.isNotEmpty) ...[
-              _AgendaSectionTitle(
-                icon: Icons.task_alt_rounded,
-                label: context.tr('Tareas del día', 'Tasks for the day'),
-                count: tasks.length,
-              ),
-              const SizedBox(height: 10),
-              for (final task in tasks) ...[
-                _PlannedTaskTile(
-                  task: task,
-                  goal: _goalForTask(task, goals),
-                  focusedSeconds: focusedSecondsByTask[task.id] ?? 0,
-                  onStatusChanged: (status) =>
-                      onTaskStatusChanged(task, status),
-                  onEditPlanning: () => onEditTaskPlanning(task),
-                  onDelete: () => onDeleteTask(task),
-                  onStartFocus: () => onStartTaskFocus(task),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ],
-            for (final event in events) ...[
-              _EventTile(event: event),
-              if (event != events.last) const SizedBox(height: 12),
-            ],
+            const SizedBox(height: 6),
           ],
         ],
       ),
@@ -2150,150 +2052,42 @@ class _AgendaCard extends StatelessWidget {
   }
 }
 
-class _AgendaSectionTitle extends StatelessWidget {
-  const _AgendaSectionTitle({
-    required this.icon,
-    required this.label,
-    required this.count,
+class _GoalTaskRow extends StatelessWidget {
+  const _GoalTaskRow({
+    required this.task,
+    required this.style,
+    required this.highlighted,
   });
 
-  final IconData icon;
-  final String label;
-  final int count;
+  final Task task;
+  final _TaskStatusStyle style;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Row(
-      children: [
-        Icon(icon, color: palette.primary, size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+    return AnimatedContainer(
+      key: highlighted
+          ? ValueKey('period-goal-task-highlight-${task.id}')
+          : ValueKey('period-goal-task-${task.id}'),
+      duration: const Duration(milliseconds: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: highlighted ? palette.primaryMuted : style.surface,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: highlighted ? palette.primary : style.border,
+          width: highlighted ? 1.5 : 1,
         ),
-        Text(
-          '$count',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: palette.primary,
-            fontWeight: FontWeight.w800,
-          ),
+      ),
+      child: Text(
+        task.title,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: palette.textPrimary,
+          fontWeight: highlighted ? FontWeight.w800 : FontWeight.w600,
+          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
         ),
-      ],
-    );
-  }
-}
-
-class _TaskStatusSummaryMenu extends StatelessWidget {
-  const _TaskStatusSummaryMenu({required this.tasks});
-
-  final List<Task> tasks;
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = TaskStatusSummary.fromTasks(tasks);
-    final palette = context.palette;
-
-    return MenuAnchor(
-      builder: (context, controller, child) {
-        return InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            if (controller.isOpen) {
-              controller.close();
-            } else {
-              controller.open();
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: palette.primaryMuted.withValues(alpha: 0.68),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: palette.primary.withValues(alpha: 0.24),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.task_alt_rounded, color: palette.primary, size: 17),
-                const SizedBox(width: 6),
-                Text(
-                  '${summary.completed}/${summary.total}',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: palette.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      menuChildren: [
-        _TaskStatusSummaryMenuItem(
-          status: TaskStatus.listed,
-          value: summary.listed,
-        ),
-        _TaskStatusSummaryMenuItem(
-          status: TaskStatus.inProgress,
-          value: summary.inProgress,
-        ),
-        _TaskStatusSummaryMenuItem(
-          status: TaskStatus.completed,
-          value: summary.completed,
-        ),
-      ],
-    );
-  }
-}
-
-class _TaskStatusSummaryMenuItem extends StatelessWidget {
-  const _TaskStatusSummaryMenuItem({
-    required this.status,
-    required this.value,
-  });
-
-  final TaskStatus status;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = _taskStatusStyle(context, status);
-
-    return MenuItemButton(
-      onPressed: () {},
-      leadingIcon: Icon(style.icon, color: style.color),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_taskStatusLabel(context, status)),
-          const SizedBox(width: 18),
-          Container(
-            width: 30,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(
-              color: style.background,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '$value',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: style.color,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2301,394 +2095,10 @@ class _TaskStatusSummaryMenuItem extends StatelessWidget {
 
 enum _GoalDeadlineAction { edit, delete }
 
-class _PlannedTaskTile extends StatelessWidget {
-  const _PlannedTaskTile({
-    required this.task,
-    required this.goal,
-    required this.focusedSeconds,
-    required this.onStatusChanged,
-    required this.onEditPlanning,
-    required this.onDelete,
-    required this.onStartFocus,
-  });
-
-  final Task task;
-  final ProductivityGoal? goal;
-  final int focusedSeconds;
-  final ValueChanged<TaskStatus> onStatusChanged;
-  final VoidCallback onEditPlanning;
-  final VoidCallback onDelete;
-  final VoidCallback onStartFocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final completed = task.status == TaskStatus.completed;
-    final statusStyle = _taskStatusStyle(context, task.status);
-    final durationMinutes = task.durationMinutes;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: statusStyle.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusStyle.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            statusStyle.icon,
-            color: statusStyle.color,
-            size: 22,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: completed ? palette.textSecondary : null,
-                    decoration: completed
-                        ? TextDecoration.lineThrough
-                        : TextDecoration.none,
-                    decorationColor: statusStyle.color,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _Tag(
-                      label: _taskStatusLabel(context, task.status),
-                      color: statusStyle.color,
-                      background: statusStyle.background,
-                    ),
-                    if (task.durationMinutes != null)
-                      _Tag(label: '${task.durationMinutes} min'),
-                    if (goal == null)
-                      _Tag(label: context.tr('Sin objetivo', 'No goal'))
-                    else
-                      _Tag(label: goal!.title),
-                  ],
-                ),
-                if (durationMinutes != null) ...[
-                  const SizedBox(height: 12),
-                  _TaskFocusProgress(
-                    focusedSeconds: focusedSeconds,
-                    durationMinutes: durationMinutes,
-                    color: statusStyle.color,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          PopupMenuButton<_PlannedTaskAction>(
-            tooltip: context.tr('Opciones de tarea', 'Task options'),
-            icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (action) {
-              switch (action) {
-                case _PlannedTaskAction.startFocus:
-                  onStartFocus();
-                case _PlannedTaskAction.editPlanning:
-                  onEditPlanning();
-                case _PlannedTaskAction.deleteTask:
-                  onDelete();
-                case _PlannedTaskAction.markListed:
-                  onStatusChanged(TaskStatus.listed);
-                case _PlannedTaskAction.markInProgress:
-                  onStatusChanged(TaskStatus.inProgress);
-                case _PlannedTaskAction.markCompleted:
-                  onStatusChanged(TaskStatus.completed);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: _PlannedTaskAction.startFocus,
-                child: ListTile(
-                  leading: const Icon(Icons.play_arrow_rounded),
-                  title: Text(
-                    context.tr('Empezar Pomodoro', 'Start Pomodoro'),
-                  ),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PlannedTaskAction.editPlanning,
-                child: ListTile(
-                  leading: const Icon(Icons.edit_calendar_rounded),
-                  title: Text(
-                    context.tr('Editar planificación', 'Edit planning'),
-                  ),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PlannedTaskAction.markListed,
-                child: ListTile(
-                  leading: const Icon(Icons.radio_button_unchecked_rounded),
-                  title: Text(context.tr('Marcar pendiente', 'Mark pending')),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PlannedTaskAction.markInProgress,
-                child: ListTile(
-                  leading: const Icon(Icons.timelapse_rounded),
-                  title: Text(
-                    context.tr('Marcar en progreso', 'Mark in progress'),
-                  ),
-                ),
-              ),
-              PopupMenuItem(
-                value: _PlannedTaskAction.markCompleted,
-                child: ListTile(
-                  leading: const Icon(Icons.check_circle_rounded),
-                  title: Text(
-                    context.tr('Marcar completada', 'Mark completed'),
-                  ),
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: _PlannedTaskAction.deleteTask,
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(context.tr('Eliminar tarea', 'Delete task')),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _PlannedTaskAction {
-  startFocus,
-  editPlanning,
-  deleteTask,
-  markListed,
-  markInProgress,
-  markCompleted,
-}
-
-class _TaskFocusProgress extends StatelessWidget {
-  const _TaskFocusProgress({
-    required this.focusedSeconds,
-    required this.durationMinutes,
-    required this.color,
-  });
-
-  final int focusedSeconds;
-  final int durationMinutes;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final focusedMinutes = focusedSeconds ~/ 60;
-    final shownMinutes = focusedMinutes.clamp(0, durationMinutes);
-    final progress = durationMinutes <= 0
-        ? 0.0
-        : (focusedSeconds / (durationMinutes * 60)).clamp(0.0, 1.0);
-    final percentage = (progress * 100).round();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '$shownMinutes/$durationMinutes min',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: palette.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Text(
-              '$percentage%',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 7,
-            color: color,
-            backgroundColor: palette.neutralSoft.withValues(alpha: 0.45),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmptyAgenda extends StatelessWidget {
-  const _EmptyAgenda({required this.day});
-
-  final DateTime day;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Text(
-        context.tr(
-          'Sin tareas planificadas para el ${day.day}.',
-          'No tasks planned for day ${day.day}.',
-        ),
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
-      ),
-    );
-  }
-}
-
-class _RoutineOccurrenceTile extends StatelessWidget {
-  const _RoutineOccurrenceTile({
-    required this.occurrence,
-    required this.onOpen,
-  });
-
-  final RoutineScheduleOccurrence occurrence;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final color = switch (occurrence.status) {
-      RoutineRunStatus.completed => palette.primary,
-      RoutineRunStatus.inProgress => palette.secondary,
-      RoutineRunStatus.skipped => palette.textSecondary,
-      RoutineRunStatus.missed => palette.tertiary,
-      RoutineRunStatus.scheduled => palette.primary,
-    };
-    return Container(
-      key: ValueKey(
-        'routine-occurrence-${occurrence.sourceRoutineId}-'
-        '${occurrence.localDate.toIso8601String()}',
-      ),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: occurrence.isVirtual
-            ? palette.primaryMuted.withValues(alpha: 0.18)
-            : palette.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: occurrence.hasOverlap
-              ? palette.tertiary
-              : color.withValues(alpha: 0.42),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.event_repeat_rounded, color: color, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  occurrence.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatMinute(context, occurrence.startMinute),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _Tag(
-                      label: _routineOccurrenceStatus(context, occurrence),
-                      color: color,
-                      background: color.withValues(alpha: 0.12),
-                    ),
-                    _Tag(
-                      label:
-                          '${occurrence.completedRequiredItems}/'
-                          '${occurrence.totalRequiredItems}',
-                    ),
-                    if (occurrence.isVirtual)
-                      _Tag(
-                        label: context.tr('Proyección', 'Projection'),
-                        color: palette.textSecondary,
-                        background: palette.neutralSoft.withValues(alpha: 0.5),
-                      ),
-                    if (occurrence.skippedOptionalItems > 0)
-                      _Tag(
-                        label: context.tr(
-                          '${occurrence.skippedOptionalItems} opcional omitida',
-                          '${occurrence.skippedOptionalItems} optional skipped',
-                        ),
-                        color: palette.textSecondary,
-                        background: palette.neutralSoft.withValues(alpha: 0.5),
-                      ),
-                    if (occurrence.missedRequiredItems > 0)
-                      _Tag(
-                        label: context.tr(
-                          '${occurrence.missedRequiredItems} pendiente perdida',
-                          '${occurrence.missedRequiredItems} required missed',
-                        ),
-                        color: palette.tertiary,
-                        background: palette.accentPeach.withValues(alpha: 0.5),
-                      ),
-                    if (occurrence.hasOverlap)
-                      _Tag(
-                        label: context.tr(
-                          'Horario superpuesto',
-                          'Time overlap',
-                        ),
-                        color: palette.tertiary,
-                        background: palette.accentPeach.withValues(alpha: 0.5),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: context.tr('Ver rutina', 'View routine'),
-            onPressed: onOpen,
-            icon: const Icon(Icons.arrow_forward_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _routineOccurrenceStatus(
+String _routineRunStatusLabel(
   BuildContext context,
-  RoutineScheduleOccurrence occurrence,
-) => switch (occurrence.status) {
+  RoutineRunStatus status,
+) => switch (status) {
   RoutineRunStatus.scheduled => context.tr('Pendiente', 'Pending'),
   RoutineRunStatus.inProgress => context.tr('En progreso', 'In progress'),
   RoutineRunStatus.completed => context.tr('Completada', 'Completed'),
@@ -2696,93 +2106,19 @@ String _routineOccurrenceStatus(
   RoutineRunStatus.missed => context.tr('Perdida', 'Missed'),
 };
 
-String _formatMinute(BuildContext context, int minute) =>
-    MaterialLocalizations.of(context).formatTimeOfDay(
-      TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
-    );
-
-class _EventTile extends StatelessWidget {
-  const _EventTile({required this.event});
-
-  final CalendarEvent event;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.neutralSoft),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.event_available_rounded, color: palette.primary, size: 22),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.title,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimeRange(event),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 10),
-                _Tag(label: '${event.durationMinutes} min'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  const _Tag({
-    required this.label,
-    this.color,
-    this.background,
-  });
-
-  final String label;
-  final Color? color;
-  final Color? background;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final foreground = color ?? palette.primary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: background ?? palette.primaryMuted.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: foreground),
-      ),
-    );
-  }
-}
-
 List<DateTime> _monthGridDays(DateTime month) {
   final firstDay = DateTime(month.year, month.month);
   final start = firstDay.subtract(Duration(days: firstDay.weekday % 7));
 
   return List.generate(42, (index) => start.add(Duration(days: index)));
+}
+
+DateTime _dateOnly(DateTime value) =>
+    DateTime(value.year, value.month, value.day);
+
+DateTime _mondayOf(DateTime date) {
+  final normalized = DateTime(date.year, date.month, date.day);
+  return normalized.subtract(Duration(days: normalized.weekday - 1));
 }
 
 bool _sameDate(DateTime first, DateTime second) {
@@ -2860,44 +2196,8 @@ String _formatSelectedDay(BuildContext context, DateTime date) {
       : '${weekdays[date.weekday % 7]} ${date.day} de ${months[date.month - 1]}';
 }
 
-String _formatTimeRange(CalendarEvent event) {
-  return '${_formatClock(event.scheduledAt)} - ${_formatClock(event.endsAt)}';
-}
-
-String _formatClock(DateTime date) {
-  return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-}
-
 String _formatShortDate(DateTime date) {
   return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
-}
-
-ProductivityGoal? _goalForTask(Task task, List<ProductivityGoal> goals) {
-  for (final goal in goals) {
-    if (goal.id == task.goalId) {
-      return goal;
-    }
-  }
-
-  return null;
-}
-
-Map<String, int> _focusedSecondsByTask(List<PomodoroSession> sessions) {
-  final focusedSecondsByTask = <String, int>{};
-  for (final session in sessions) {
-    final taskId = session.taskId;
-    if (taskId == null) {
-      continue;
-    }
-
-    focusedSecondsByTask.update(
-      taskId,
-      (value) => value + session.focusedSeconds,
-      ifAbsent: () => session.focusedSeconds,
-    );
-  }
-
-  return focusedSecondsByTask;
 }
 
 String _taskStatusLabel(BuildContext context, TaskStatus status) {
@@ -2952,12 +2252,12 @@ class _TaskStatusStyle {
   final Color border;
 }
 
-Color _calendarProgressColor(TaskProgressBand band) {
+Color _calendarProgressColor(TaskProgressBand band, AppPalette palette) {
   return switch (band) {
-    TaskProgressBand.red => const Color(0xFFE05252),
-    TaskProgressBand.yellow => const Color(0xFFE3B341),
-    TaskProgressBand.green => const Color(0xFF5EAD68),
-    TaskProgressBand.strongGreen => const Color(0xFF188E53),
+    TaskProgressBand.red => palette.statusDanger,
+    TaskProgressBand.yellow => palette.statusWarning,
+    TaskProgressBand.green => palette.statusSuccess,
+    TaskProgressBand.strongGreen => palette.statusSuccessStrong,
   };
 }
 

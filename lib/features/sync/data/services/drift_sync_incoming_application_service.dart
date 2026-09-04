@@ -169,6 +169,12 @@ class DriftSyncIncomingApplicationService {
         applyDelete,
       ),
       'routine' => _applyRoutine(database, operation, fields, applyDelete),
+      'quickNote' => _applyQuickNote(
+        database,
+        operation,
+        fields,
+        applyDelete,
+      ),
       _ => throw const FormatException('Unsupported entity type.'),
     };
   }
@@ -368,6 +374,83 @@ class DriftSyncIncomingApplicationService {
     );
   }
 
+  Future<void> _applyQuickNote(
+    MichiFocusDatabase database,
+    SyncOperation operation,
+    Set<String> fields,
+    bool applyDelete,
+  ) async {
+    final table = database.quickNoteRecords;
+    if (applyDelete) {
+      await (database.delete(
+        table,
+      )..where((row) => row.id.equals(operation.entityId))).go();
+      return;
+    }
+    final values = operation.changedFields;
+    final existing = await (database.select(
+      table,
+    )..where((row) => row.id.equals(operation.entityId))).getSingleOrNull();
+    if (existing == null) {
+      if (operation.operationKind != 'create') {
+        throw const _MissingDependencyException();
+      }
+      await database
+          .into(table)
+          .insert(
+            QuickNoteRecordsCompanion.insert(
+              id: operation.entityId,
+              textContent: _string(values, 'text'),
+              isCompleted: Value(_bool(values, 'isCompleted')),
+              colorArgb: _opaqueColor(values['colorArgb']),
+              localDate: Value(_localDateOrNull(values['localDate'])),
+              priority: Value(_quickNotePriority(values['priority'])),
+              position: _int(values, 'position'),
+              createdAt: _dateTime(values, 'createdAt'),
+              updatedAt: _dateTime(values, 'updatedAt'),
+            ),
+          );
+      return;
+    }
+    await (database.update(
+      table,
+    )..where((row) => row.id.equals(operation.entityId))).write(
+      QuickNoteRecordsCompanion(
+        textContent: _valueIf(fields, 'text', () => _string(values, 'text')),
+        isCompleted: _valueIf(
+          fields,
+          'isCompleted',
+          () => _bool(values, 'isCompleted'),
+        ),
+        colorArgb: _valueIf(
+          fields,
+          'colorArgb',
+          () => _opaqueColor(values['colorArgb']),
+        ),
+        localDate: _nullableValueIf(
+          fields,
+          'localDate',
+          () => _localDateOrNull(values['localDate']),
+        ),
+        priority: _nullableValueIf(
+          fields,
+          'priority',
+          () => _quickNotePriority(values['priority']),
+        ),
+        position: _valueIf(
+          fields,
+          'position',
+          () => _int(values, 'position'),
+        ),
+        updatedAt: _valueIf(
+          fields,
+          'updatedAt',
+          () => _dateTime(values, 'updatedAt'),
+        ),
+      ),
+    );
+  }
+
   Future<void> _applyRoutine(
     MichiFocusDatabase database,
     SyncOperation operation,
@@ -394,6 +477,13 @@ class DriftSyncIncomingApplicationService {
           description: Value(_nullableString(aggregate['description'])),
           iconKey: Value(_string(aggregate, 'iconKey')),
           colorKey: Value(_string(aggregate, 'colorKey')),
+          customColorArgb: Value(_nullableInt(aggregate['customColorArgb'])),
+          validFromLocalDate: Value(
+            _nullableString(aggregate['validFromLocalDate']),
+          ),
+          validUntilLocalDate: Value(
+            _nullableString(aggregate['validUntilLocalDate']),
+          ),
           status: Value(_routineStatus(aggregate['status'])),
           pausedUntilLocalDate: Value(
             _nullableString(aggregate['pausedUntilLocalDate']),
@@ -503,7 +593,8 @@ int _priority(String entityType) => switch (entityType) {
   'routine' => 1,
   'task' => 2,
   'calendarEvent' => 3,
-  _ => 4,
+  'quickNote' => 4,
+  _ => 5,
 };
 
 Value<T> _valueIf<T>(Set<String> fields, String field, T Function() value) =>
@@ -569,6 +660,36 @@ String _routineStatus(Object? value) {
       !const {'active', 'paused', 'archived'}.contains(value)) {
     throw const FormatException();
   }
+  return value;
+}
+
+int _opaqueColor(Object? value) {
+  if (value is! int || value < 0xFF000000 || value > 0xFFFFFFFF) {
+    throw const FormatException();
+  }
+  return value;
+}
+
+String? _quickNotePriority(Object? value) {
+  if (value == null) return null;
+  if (value is! String || !const {'high', 'medium', 'low'}.contains(value)) {
+    throw const FormatException();
+  }
+  return value;
+}
+
+String? _localDateOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is! String || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
+    throw const FormatException();
+  }
+  final parts = value.split('-').map(int.parse).toList(growable: false);
+  final date = DateTime(parts[0], parts[1], parts[2]);
+  final normalized =
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+  if (normalized != value) throw const FormatException();
   return value;
 }
 

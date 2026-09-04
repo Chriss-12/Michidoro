@@ -84,6 +84,11 @@ class AppNotification {
     required this.body,
     required this.createdAt,
     this.routePath,
+    this.goalId,
+    this.taskId,
+    this.pendingCount,
+    this.inProgressCount,
+    this.completedCount,
   });
 
   final String id;
@@ -91,6 +96,13 @@ class AppNotification {
   final String body;
   final DateTime createdAt;
   final String? routePath;
+  final String? goalId;
+  final String? taskId;
+  final int? pendingCount;
+  final int? inProgressCount;
+  final int? completedCount;
+
+  bool get isGoalSummary => goalId != null;
 }
 
 class AppSettingsController {
@@ -165,6 +177,7 @@ class AppSettingsController {
   final FlutterSignal<Set<StatisticsChartType>> enabledStatisticsCharts =
       signal({...StatisticsChartType.values});
   final FlutterSignal<List<AppNotification>> notifications = signal(const []);
+  final FlutterSignal<double> maximumConcentrationOpacity = signal(1);
 
   Timer? _timer;
   SettingsRepository? _settingsRepository;
@@ -200,6 +213,7 @@ class AppSettingsController {
     language.value = normalized.language;
     completedOnboardingVersion.value = normalized.completedOnboardingVersion;
     enabledStatisticsCharts.value = normalized.enabledStatisticsCharts;
+    maximumConcentrationOpacity.value = normalized.maximumConcentrationOpacity;
     if (!isPomodoroRunning.value) {
       remainingSeconds.value = normalized.focusMinutes * 60;
     }
@@ -228,6 +242,7 @@ class AppSettingsController {
       enabledStatisticsCharts: enabledStatisticsCharts.value,
       language: language.value,
       completedOnboardingVersion: completedOnboardingVersion.value,
+      maximumConcentrationOpacity: maximumConcentrationOpacity.value,
     ).normalized();
   }
 
@@ -264,6 +279,10 @@ class AppSettingsController {
 
   void setReportsDirectoryPath(String value) {
     reportsDirectoryPath.value = value.trim();
+  }
+
+  void setMaximumConcentrationOpacity(double value) {
+    maximumConcentrationOpacity.value = value.clamp(0.2, 1);
   }
 
   void setProfileName(String value) {
@@ -357,6 +376,11 @@ class AppSettingsController {
     required String title,
     required String body,
     String? routePath,
+    String? goalId,
+    String? taskId,
+    int? pendingCount,
+    int? inProgressCount,
+    int? completedCount,
   }) {
     final createdAt = DateTime.now();
     final next = AppNotification(
@@ -365,6 +389,11 @@ class AppSettingsController {
       body: body,
       createdAt: createdAt,
       routePath: routePath,
+      goalId: goalId,
+      taskId: taskId,
+      pendingCount: pendingCount,
+      inProgressCount: inProgressCount,
+      completedCount: completedCount,
     );
 
     notifications.value = [

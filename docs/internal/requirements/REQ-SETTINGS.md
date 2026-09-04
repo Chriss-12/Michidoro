@@ -95,6 +95,16 @@ Notes:
   Graphite Night persisted across app restart and APK reinstall.
 - `flutter analyze`, the full 110-test suite, focused theme/widget tests, APK
   build, installation, and Android screenshot inspection passed.
+- 2026-09-03: Theme changes no longer animate the complete retained tab tree.
+  Each selection applies in one global update while asynchronous local
+  persistence and startup restoration remain unchanged.
+- 2026-09-03: Shared dialogs, sheets, menus, snackbars, chips and progress
+  indicators now derive their surfaces and accents from the active palette.
+  Home, Profile and Calendar use palette-aware semantic status colors, and the
+  startup illustration adapts its contrast to every light and dark preset.
+  User-selected routine/note identity colors and the explicit Clear/OLED focus
+  palettes remain intentionally independent. `flutter analyze` and the full
+  498-test suite passed.
 
 ### REQ-SET-004 - Notification preferences later
 

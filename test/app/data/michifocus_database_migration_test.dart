@@ -51,7 +51,10 @@ void main() {
       expect(metadata, hasLength(1));
       expect(metadata.single.id, 'completion-history');
       expect(runtime, isEmpty);
-      expect(version.read<int>('user_version'), 7);
+      expect(
+        version.read<int>('user_version'),
+        MichiFocusDatabase.currentSchemaVersion,
+      );
       expect(await database.select(database.routineRecords).get(), isEmpty);
       expect(
         indexes.map((row) => row.read<String>('name')).toSet(),
@@ -103,7 +106,10 @@ void main() {
       columns.map((column) => column.read<String>('name')),
       contains('mood_prompt_pending'),
     );
-    expect(version.read<int>('user_version'), 7);
+    expect(
+      version.read<int>('user_version'),
+      MichiFocusDatabase.currentSchemaVersion,
+    );
   });
 
   test('migrates populated schema 3 and preserves active runtime', () async {
@@ -170,7 +176,10 @@ void main() {
     expect(runtime?.id, 'active-runtime');
     expect(runtime?.taskId, 'task-v3');
     expect(runtime?.isRunning, isTrue);
-    expect(version.read<int>('user_version'), 7);
+    expect(
+      version.read<int>('user_version'),
+      MichiFocusDatabase.currentSchemaVersion,
+    );
     expect(await database.select(database.routineRecords).get(), isEmpty);
   });
 
@@ -249,7 +258,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      7,
+      MichiFocusDatabase.currentSchemaVersion,
     );
 
     await database.close();
@@ -263,7 +272,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      7,
+      MichiFocusDatabase.currentSchemaVersion,
     );
     expect(
       await database
@@ -315,7 +324,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      7,
+      MichiFocusDatabase.currentSchemaVersion,
     );
   });
 
@@ -375,7 +384,7 @@ void main() {
     expect(
       (await database.customSelect('PRAGMA user_version').getSingle())
           .read<int>('user_version'),
-      7,
+      MichiFocusDatabase.currentSchemaVersion,
     );
   });
 }

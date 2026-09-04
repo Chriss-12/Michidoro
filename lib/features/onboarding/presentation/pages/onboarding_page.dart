@@ -84,42 +84,60 @@ class _OnboardingPageState extends State<OnboardingPage> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 12, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
+                  child: Container(
+                    key: const Key('onboarding-header'),
+                    padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+                    decoration: BoxDecoration(
+                      color: palette.surface.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: palette.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: palette.primaryMuted,
+                            borderRadius: BorderRadius.circular(8),
                           ),
+                          child: Icon(
+                            Icons.pets_rounded,
+                            color: palette.primary,
+                            size: 21,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
                           child: Text(
-                            'MichiDoro',
+                            'Michi Focus',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  color: palette.background,
+                                  color: palette.textPrimary,
                                   fontWeight: FontWeight.w900,
                                 ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _isCompleting ? null : _finish,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: palette.textPrimary.withValues(alpha: 1),
-                            borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          key: const Key('onboarding-skip'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: palette.primary,
+                            backgroundColor: palette.primaryMuted,
+                            disabledForegroundColor: palette.textSecondary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 5,
-                          ),
+                          onPressed: _isCompleting ? null : _finish,
                           child: Text(context.tr('Omitir', 'Skip')),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -198,8 +216,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 label: Text(
                                   isLastPage
                                       ? context.tr(
-                                          'Empezar a usar MichiDoro',
-                                          'Start using MichiDoro',
+                                          'Empezar a usar Michi Focus',
+                                          'Start using Michi Focus',
                                         )
                                       : context.tr('Continuar', 'Continue'),
                                   maxLines: 2,
@@ -224,52 +242,68 @@ class _OnboardingPageState extends State<OnboardingPage> {
   List<_OnboardingData> _pages(BuildContext context) {
     return [
       _OnboardingData(
-        title: context.tr('Organiza tu día', 'Organize your day'),
+        title: context.tr(
+          'Todo tu día, en un lugar',
+          'Your whole day, in one place',
+        ),
         description: context.tr(
-          'Convierte objetivos en tareas con fecha y tiempo estimado. Tu planificación queda lista para actuar.',
-          'Turn goals into scheduled tasks with a time estimate. Your plan stays ready for action.',
+          'Organiza tareas, objetivos, rutinas y notas rápidas. Usa filtros por fecha y el horario semanal para encontrar lo importante sin perder tiempo.',
+          'Organize tasks, goals, routines, and quick notes. Use date filters and the weekly schedule to find what matters without wasting time.',
         ),
         supportingText: context.tr(
-          'Tareas · Objetivos · Calendario',
-          'Tasks · Goals · Calendar',
+          'Planificación diaria y semanal',
+          'Daily and weekly planning',
         ),
-        visual: _OnboardingVisual.organize,
+        supportingIcon: Icons.calendar_view_week_rounded,
+        visual: _OnboardingVisual.plan,
       ),
       _OnboardingData(
-        title: context.tr('Enfócate con intención', 'Focus with intention'),
+        title: context.tr(
+          'Enfoque que se adapta a ti',
+          'Focus that adapts to you',
+        ),
         description: context.tr(
-          'MichiDoro divide el tiempo pendiente en bloques de enfoque y descansos, sin alargar el último bloque.',
-          'MichiDoro divides remaining work into focus and break blocks without extending the final block.',
+          'Trabaja solo el tiempo que falta, continúa después de cerrar la app y usa máxima concentración en modo claro u OLED. Si autorizas Android, también puede silenciar interrupciones.',
+          'Work only for the remaining time, continue after closing the app, and use maximum concentration in Clear or OLED mode. If you authorize Android, it can also silence interruptions.',
         ),
         supportingText: context.tr(
-          'Continúa exactamente donde lo dejaste',
-          'Continue exactly where you stopped',
+          'Tu avance se conserva automáticamente',
+          'Your progress is saved automatically',
         ),
+        supportingIcon: Icons.check_circle_outline_rounded,
         visual: _OnboardingVisual.focus,
       ),
       _OnboardingData(
-        title: context.tr('Entiende tu progreso', 'Understand your progress'),
+        title: context.tr(
+          'Tus datos siguen siendo tuyos',
+          'Your data stays yours',
+        ),
         description: context.tr(
-          'Consulta minutos enfocados, Pomodoros, tareas completadas y reportes locales para mejorar tu planificación.',
-          'Review focused minutes, Pomodoros, completed tasks, and local reports to improve your planning.',
+          'Elige dónde guardar tus datos. Puedes mantenerlos solo en este teléfono o enlazar varios dispositivos mediante archivos cifrados y Syncthing.',
+          'Choose where to store your data. Keep it only on this phone or link several devices using encrypted files and Syncthing.',
         ),
         supportingText: context.tr(
-          'Progreso medible y datos bajo tu control',
-          'Measurable progress and data under your control',
+          'Conflictos visibles, sin sobrescribir a ciegas',
+          'Visible conflicts, no blind overwrites',
         ),
-        visual: _OnboardingVisual.progress,
+        supportingIcon: Icons.lock_rounded,
+        visual: _OnboardingVisual.sync,
       ),
       _OnboardingData(
-        title: context.tr('Hazlo tuyo', 'Make it yours'),
+        title: context.tr(
+          'Mide, dicta y personaliza',
+          'Measure, dictate, and personalize',
+        ),
         description: context.tr(
-          'Personaliza idioma, tema, tipografía, sonidos y vibración. Todo funciona de forma local y privada.',
-          'Personalize language, theme, typography, sounds, and vibration. Everything works locally and privately.',
+          'Revisa estadísticas, exporta reportes y tu horario semanal, dicta campos de texto y elige tema, colores, tipografía, sonidos y vibración.',
+          'Review statistics, export reports and your weekly schedule, dictate text fields, and choose your theme, colors, typography, sounds, and vibration.',
         ),
         supportingText: context.tr(
-          'Sin cuenta · Sin conexión obligatoria',
-          'No account · No required connection',
+          'Sin cuenta y con funcionamiento local',
+          'No account and works locally',
         ),
-        visual: _OnboardingVisual.personalize,
+        supportingIcon: Icons.offline_bolt_rounded,
+        visual: _OnboardingVisual.customize,
       ),
     ];
   }
@@ -280,12 +314,14 @@ class _OnboardingData {
     required this.title,
     required this.description,
     required this.supportingText,
+    required this.supportingIcon,
     required this.visual,
   });
 
   final String title;
   final String description;
   final String supportingText;
+  final IconData supportingIcon;
   final _OnboardingVisual visual;
 }
 
@@ -337,22 +373,38 @@ class _OnboardingStep extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          data.supportingText,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: palette.primary,
-                                fontWeight: FontWeight.w900,
-                              ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.primaryMuted,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          data.supportingIcon,
+                          color: palette.primary,
+                          size: 19,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            data.supportingText,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: palette.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -364,7 +416,7 @@ class _OnboardingStep extends StatelessWidget {
   }
 }
 
-enum _OnboardingVisual { organize, focus, progress, personalize }
+enum _OnboardingVisual { plan, focus, sync, customize }
 
 class _FeatureVisual extends StatelessWidget {
   const _FeatureVisual({required this.type});
@@ -378,35 +430,36 @@ class _FeatureVisual extends StatelessWidget {
     return Semantics(
       excludeSemantics: true,
       child: Container(
+        key: const Key('onboarding-feature-visual'),
         width: double.infinity,
         constraints: const BoxConstraints(maxWidth: 430),
         height: 238,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: palette.surface.withValues(alpha: 0.9),
+          color: palette.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: palette.neutralSoft),
           boxShadow: [
             BoxShadow(
-              color: palette.textPrimary.withValues(alpha: 0.08),
+              color: palette.primary.withValues(alpha: 0.14),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
           ],
         ),
         child: switch (type) {
-          _OnboardingVisual.organize => _OrganizeVisual(palette: palette),
+          _OnboardingVisual.plan => _PlanVisual(palette: palette),
           _OnboardingVisual.focus => _FocusVisual(palette: palette),
-          _OnboardingVisual.progress => _ProgressVisual(palette: palette),
-          _OnboardingVisual.personalize => _PersonalizeVisual(palette: palette),
+          _OnboardingVisual.sync => _SyncVisual(palette: palette),
+          _OnboardingVisual.customize => _CustomizeVisual(palette: palette),
         },
       ),
     );
   }
 }
 
-class _OrganizeVisual extends StatelessWidget {
-  const _OrganizeVisual({required this.palette});
+class _PlanVisual extends StatelessWidget {
+  const _PlanVisual({required this.palette});
 
   final AppPalette palette;
 
@@ -416,55 +469,121 @@ class _OrganizeVisual extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.calendar_month_rounded, color: palette.primary),
-            const SizedBox(width: 10),
-            Expanded(child: Container(height: 10, color: palette.primaryMuted)),
-            const SizedBox(width: 30),
+            Icon(Icons.today_rounded, color: palette.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                context.tr('Tu planificación', 'Your plan'),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: palette.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            _VisualTag(
+              label: context.tr('Hoy', 'Today'),
+              color: palette.primary,
+              background: palette.primaryMuted,
+            ),
           ],
         ),
         const SizedBox(height: 14),
-        for (final item in const [
-          (Icons.flag_rounded, 0.92, true),
-          (Icons.task_alt_rounded, 0.72, false),
-          (Icons.schedule_rounded, 0.84, false),
-        ]) ...[
-          Row(
+        Expanded(
+          child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: item.$3 ? palette.primaryMuted : palette.neutralSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  item.$1,
-                  size: 19,
-                  color: item.$3 ? palette.primary : palette.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FractionallySizedBox(
-                      widthFactor: item.$2,
-                      child: Container(height: 9, color: palette.textPrimary),
+                    Expanded(
+                      child: _VisualFeatureTile(
+                        icon: Icons.task_alt_rounded,
+                        label: context.tr('Tareas', 'Tasks'),
+                        color: palette.primary,
+                        background: palette.primaryMuted,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    FractionallySizedBox(
-                      widthFactor: 0.52,
-                      child: Container(height: 7, color: palette.neutralSoft),
+                    Expanded(
+                      child: _VisualFeatureTile(
+                        icon: Icons.repeat_rounded,
+                        label: context.tr('Rutinas', 'Routines'),
+                        color: palette.secondary,
+                        background: palette.secondarySoft,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: _VisualFeatureTile(
+                        icon: Icons.flag_rounded,
+                        label: context.tr('Objetivos', 'Goals'),
+                        color: palette.tertiary,
+                        background: palette.accentPeach,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: _VisualFeatureTile(
+                        icon: Icons.sticky_note_2_rounded,
+                        label: context.tr('Notas', 'Notes'),
+                        color: palette.primary,
+                        background: palette.neutralSoft,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-        ],
+        ),
       ],
+    );
+  }
+}
+
+class _VisualFeatureTile extends StatelessWidget {
+  const _VisualFeatureTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: context.palette.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -476,58 +595,97 @@ class _FocusVisual extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        SizedBox.square(
-          dimension: 172,
-          child: Stack(
-            alignment: Alignment.center,
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox.square(
-                dimension: 164,
-                child: CircularProgressIndicator(
-                  value: 0.62,
-                  strokeWidth: 12,
-                  strokeCap: StrokeCap.round,
-                  backgroundColor: palette.neutralSoft,
-                  color: palette.primary,
+                dimension: 126,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.square(
+                      dimension: 118,
+                      child: CircularProgressIndicator(
+                        value: 0.8,
+                        strokeWidth: 10,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: palette.neutralSoft,
+                        color: palette.primary,
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '05:00',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: palette.textPrimary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        Text(
+                          context.tr('restantes', 'remaining'),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: palette.textSecondary,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 18),
               Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    '45:00',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: palette.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  _FocusModeIcon(
+                    icon: Icons.light_mode_rounded,
+                    color: palette.primary,
+                    background: palette.primaryMuted,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '45 / 120 min',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: palette.textSecondary,
-                    ),
+                  Container(width: 2, height: 12, color: palette.neutralSoft),
+                  _FocusModeIcon(
+                    icon: Icons.dark_mode_rounded,
+                    color: palette.secondary,
+                    background: palette.secondarySoft,
+                  ),
+                  Container(width: 2, height: 12, color: palette.neutralSoft),
+                  _FocusModeIcon(
+                    icon: Icons.notifications_off_rounded,
+                    color: palette.tertiary,
+                    background: palette.accentPeach,
                   ),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(width: 22),
-        Column(
+        const SizedBox(height: 8),
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _VisualPhaseDot(color: palette.primary, icon: Icons.bolt_rounded),
-            Container(width: 2, height: 22, color: palette.neutralSoft),
-            _VisualPhaseDot(
-              color: palette.secondary,
-              icon: Icons.coffee_rounded,
+            Flexible(
+              child: _VisualTag(
+                label: context.tr('Avance guardado', 'Progress saved'),
+                color: palette.primary,
+                background: palette.primaryMuted,
+                icon: Icons.save_rounded,
+              ),
             ),
-            Container(width: 2, height: 22, color: palette.neutralSoft),
-            _VisualPhaseDot(color: palette.tertiary, icon: Icons.flag_rounded),
+            const SizedBox(width: 8),
+            Flexible(
+              child: _VisualTag(
+                label: context.tr('Modo OLED', 'OLED mode'),
+                color: palette.secondary,
+                background: palette.secondarySoft,
+                icon: Icons.battery_saver_rounded,
+              ),
+            ),
           ],
         ),
       ],
@@ -535,118 +693,199 @@ class _FocusVisual extends StatelessWidget {
   }
 }
 
-class _VisualPhaseDot extends StatelessWidget {
-  const _VisualPhaseDot({required this.color, required this.icon});
+class _FocusModeIcon extends StatelessWidget {
+  const _FocusModeIcon({
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
 
-  final Color color;
   final IconData icon;
+  final Color color;
+  final Color background;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: Icon(icon, size: 20, color: Colors.white),
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      child: Icon(icon, size: 18, color: color),
     );
   }
 }
 
-class _ProgressVisual extends StatelessWidget {
-  const _ProgressVisual({required this.palette});
+class _SyncVisual extends StatelessWidget {
+  const _SyncVisual({required this.palette});
 
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    final values = [0.36, 0.58, 0.46, 0.78, 0.66, 0.9, 0.72];
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _DeviceVisual(
+                icon: Icons.phone_android_rounded,
+                label: context.tr('Teléfono A', 'Phone A'),
+                color: palette.primary,
+                background: palette.primaryMuted,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_rounded, color: palette.tertiary, size: 25),
+                    const SizedBox(height: 5),
+                    Icon(
+                      Icons.sync_alt_rounded,
+                      color: palette.primary,
+                      size: 32,
+                    ),
+                  ],
+                ),
+              ),
+              _DeviceVisual(
+                icon: Icons.phone_iphone_rounded,
+                label: context.tr('Teléfono B', 'Phone B'),
+                color: palette.secondary,
+                background: palette.secondarySoft,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
-              child: _MetricVisual(value: '12', color: palette.primary),
+              child: _VisualTag(
+                label: context.tr('Cifrado', 'Encrypted'),
+                color: palette.primary,
+                background: palette.primaryMuted,
+                icon: Icons.lock_rounded,
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
-              child: _MetricVisual(value: '285', color: palette.secondary),
+              child: _VisualTag(
+                label: context.tr('Conflictos', 'Conflicts'),
+                color: palette.secondary,
+                background: palette.secondarySoft,
+                icon: Icons.rule_rounded,
+              ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MetricVisual(value: '84%', color: palette.tertiary),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DeviceVisual extends StatelessWidget {
+  const _DeviceVisual({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 82,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 34),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: context.palette.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomizeVisual extends StatelessWidget {
+  const _CustomizeVisual({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _MetricVisual(
+              icon: Icons.timer_outlined,
+              value: '285',
+              color: palette.primary,
+              background: palette.primaryMuted,
+            ),
+            const SizedBox(width: 8),
+            _MetricVisual(
+              icon: Icons.task_alt_rounded,
+              value: '84%',
+              color: palette.secondary,
+              background: palette.secondarySoft,
+            ),
+            const SizedBox(width: 8),
+            _MetricVisual(
+              icon: Icons.picture_as_pdf_rounded,
+              value: 'PDF',
+              color: palette.tertiary,
+              background: palette.accentPeach,
             ),
           ],
         ),
         const Spacer(),
-        SizedBox(
-          height: 112,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: palette.neutralSoft.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              for (var index = 0; index < values.length; index++) ...[
-                Expanded(
-                  child: FractionallySizedBox(
-                    heightFactor: values[index],
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: index == values.length - 2
-                            ? palette.primary
-                            : palette.primaryMuted,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
-                        ),
-                      ),
-                    ),
+              Icon(Icons.mic_rounded, color: palette.primary, size: 21),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context.tr('Dictado para escribir', 'Voice typing'),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (index < values.length - 1) const SizedBox(width: 8),
-              ],
+              ),
+              Icon(Icons.translate_rounded, color: palette.secondary, size: 21),
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _MetricVisual extends StatelessWidget {
-  const _MetricVisual({required this.value, required this.color});
-
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        value,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _PersonalizeVisual extends StatelessWidget {
-  const _PersonalizeVisual({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+        const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -657,53 +896,114 @@ class _PersonalizeVisual extends StatelessWidget {
               palette.accentPeach,
             ]) ...[
               Container(
-                width: 42,
-                height: 42,
+                width: 31,
+                height: 31,
                 decoration: BoxDecoration(
                   color: color,
                   shape: BoxShape.circle,
                   border: Border.all(color: palette.surface, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.textPrimary.withValues(alpha: 0.08),
+                      blurRadius: 5,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 9),
             ],
-          ],
-        ),
-        const SizedBox(height: 26),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: palette.primaryMuted,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.translate_rounded, color: palette.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Español  /  English',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: palette.textPrimary,
-                  ),
-                ),
-              ),
-              Icon(Icons.vibration_rounded, color: palette.secondary),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Icon(Icons.text_fields_rounded, color: palette.textSecondary),
-            const SizedBox(width: 12),
-            Expanded(child: Container(height: 9, color: palette.textPrimary)),
-            const SizedBox(width: 12),
-            Icon(Icons.volume_up_rounded, color: palette.textSecondary),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _MetricVisual extends StatelessWidget {
+  const _MetricVisual({
+    required this.icon,
+    required this.value,
+    required this.color,
+    required this.background,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        height: 58,
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: context.palette.textPrimary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisualTag extends StatelessWidget {
+  const _VisualTag({
+    required this.label,
+    required this.color,
+    required this.background,
+    this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 15),
+            const SizedBox(width: 5),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: context.palette.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

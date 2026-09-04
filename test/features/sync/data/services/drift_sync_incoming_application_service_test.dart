@@ -40,7 +40,7 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('applies encrypted task and routine operations exactly once', () async {
+  test('applies encrypted task, routine, and note operations once', () async {
     discovered = [
       await _encrypt(
         crypto,
@@ -70,6 +70,30 @@ void main() {
         crypto,
         SyncOperation(
           groupId: _groupId,
+          operationId: _operationId('3'),
+          originDeviceId: _remoteId,
+          originCounter: 3,
+          entityType: 'quickNote',
+          entityId: 'quick-note-remote',
+          parentVersion: const {},
+          changedFields: {
+            'text': 'Nota desde el otro celular',
+            'isCompleted': false,
+            'colorArgb': 0xFF446688,
+            'localDate': '2026-08-15',
+            'priority': 'medium',
+            'position': 100,
+            'createdAt': now.millisecondsSinceEpoch,
+            'updatedAt': now.millisecondsSinceEpoch,
+          },
+          operationKind: 'create',
+          createdAtEpochMillis: now.millisecondsSinceEpoch,
+        ),
+      ),
+      await _encrypt(
+        crypto,
+        SyncOperation(
+          groupId: _groupId,
           operationId: _operationId('2'),
           originDeviceId: _remoteId,
           originCounter: 2,
@@ -82,6 +106,9 @@ void main() {
               'description': null,
               'iconKey': 'sun',
               'colorKey': 'mint',
+              'customColorArgb': 0xFF7C3AED,
+              'validFromLocalDate': '2026-08-15',
+              'validUntilLocalDate': '2026-12-31',
               'status': 'active',
               'pausedUntilLocalDate': null,
               'archivedAt': null,
@@ -126,21 +153,28 @@ void main() {
       clearKey: _clearKey,
     );
 
-    expect(first.applied, 2);
+    expect(first.applied, 3);
     expect(first.rejected, 0);
-    expect(second.duplicates, 2);
+    expect(second.duplicates, 3);
     expect(
       (await TasksDao(database).findById('task-remote'))?.title,
       'Preparar informe',
     );
-    expect(
-      (await RoutinesDao(database).findRoutineById('routine-remote'))?.name,
-      'Mañana tranquila',
-    );
+    final routine = await RoutinesDao(
+      database,
+    ).findRoutineById('routine-remote');
+    expect(routine?.name, 'Mañana tranquila');
+    expect(routine?.customColorArgb, 0xFF7C3AED);
+    expect(routine?.validFromLocalDate, '2026-08-15');
+    expect(routine?.validUntilLocalDate, '2026-12-31');
     expect(
       await RoutinesDao(database).getItemsForRoutine('routine-remote'),
       hasLength(1),
     );
+    final note = await QuickNotesDao(database).findById('quick-note-remote');
+    expect(note?.textContent, 'Nota desde el otro celular');
+    expect(note?.priority, 'medium');
+    expect(note?.localDate, '2026-08-15');
   });
 }
 

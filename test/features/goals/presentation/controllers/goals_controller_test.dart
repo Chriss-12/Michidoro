@@ -201,6 +201,45 @@ void main() {
         expect(scheduledGoals.single.title, 'Con fecha');
       },
     );
+
+    test('exposes only dated goals from the requested local day onward', () {
+      final controller = GoalsController(repository: _MemoryGoalsRepository())
+        ..goals.value = [
+          ProductivityGoal(
+            id: 'past',
+            title: 'Objetivo pasado',
+            targetSessions: 1,
+            createdAt: DateTime(2026, 8),
+            targetDate: DateTime(2026, 8, 29, 23, 59),
+          ),
+          ProductivityGoal(
+            id: 'today',
+            title: 'Objetivo de hoy',
+            targetSessions: 1,
+            createdAt: DateTime(2026, 8),
+            targetDate: DateTime(2026, 8, 30),
+          ),
+          ProductivityGoal(
+            id: 'future',
+            title: 'Objetivo futuro',
+            targetSessions: 1,
+            createdAt: DateTime(2026, 8),
+            targetDate: DateTime(2026, 9, 2),
+          ),
+          ProductivityGoal(
+            id: 'undated',
+            title: 'Objetivo sin fecha',
+            targetSessions: 1,
+            createdAt: DateTime(2026, 8),
+          ),
+        ];
+
+      final available = controller.goalsOnOrAfter(
+        DateTime(2026, 8, 30, 18),
+      );
+
+      expect(available.map((goal) => goal.id), ['today', 'future']);
+    });
   });
 }
 

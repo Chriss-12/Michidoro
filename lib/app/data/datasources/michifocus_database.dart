@@ -155,6 +155,9 @@ class RoutineRecords extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get iconKey => text().withDefault(const Constant('routine'))();
   TextColumn get colorKey => text().withDefault(const Constant('primary'))();
+  IntColumn get customColorArgb => integer().nullable()();
+  TextColumn get validFromLocalDate => text().nullable()();
+  TextColumn get validUntilLocalDate => text().nullable()();
   TextColumn get status => text().withDefault(const Constant('active'))();
   TextColumn get pausedUntilLocalDate => text().nullable()();
   DateTimeColumn get archivedAt => dateTime().nullable()();
@@ -167,6 +170,10 @@ class RoutineRecords extends Table {
     '''CHECK (status IN ('active', 'paused', 'archived'))''',
     'CHECK (length(trim(name)) BETWEEN 1 AND 80)',
     'CHECK (description IS NULL OR length(trim(description)) <= 500)',
+    'CHECK (custom_color_argb IS NULL OR custom_color_argb BETWEEN 4278190080 AND 4294967295)',
+    '''CHECK (valid_from_local_date IS NULL OR valid_from_local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')''',
+    '''CHECK (valid_until_local_date IS NULL OR valid_until_local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')''',
+    'CHECK (valid_from_local_date IS NULL OR valid_until_local_date IS NULL OR valid_from_local_date <= valid_until_local_date)',
     '''CHECK (paused_until_local_date IS NULL OR paused_until_local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')''',
     '''CHECK ((status = 'active' AND paused_until_local_date IS NULL AND archived_at IS NULL) OR (status = 'paused' AND archived_at IS NULL) OR (status = 'archived' AND paused_until_local_date IS NULL AND archived_at IS NOT NULL))''',
   ];
@@ -270,6 +277,7 @@ class RoutineRunRecords extends Table {
   TextColumn get nameSnapshot => text()();
   TextColumn get iconKeySnapshot => text()();
   TextColumn get colorKeySnapshot => text()();
+  IntColumn get customColorArgbSnapshot => integer().nullable()();
   IntColumn get scheduledStartMinuteSnapshot => integer()();
   DateTimeColumn get startedAt => dateTime().nullable()();
   DateTimeColumn get completedAt => dateTime().nullable()();
@@ -283,6 +291,7 @@ class RoutineRunRecords extends Table {
     'CHECK (routine_id IS NULL OR routine_id = source_routine_id)',
     '''CHECK (local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')''',
     '''CHECK (status IN ('scheduled', 'inProgress', 'completed', 'skipped', 'missed'))''',
+    'CHECK (custom_color_argb_snapshot IS NULL OR custom_color_argb_snapshot BETWEEN 4278190080 AND 4294967295)',
     'CHECK (scheduled_start_minute_snapshot BETWEEN 0 AND 1439)',
     '''CHECK ((status = 'completed' AND completed_at IS NOT NULL AND skipped_at IS NULL) OR (status = 'skipped' AND skipped_at IS NOT NULL AND completed_at IS NULL) OR (status NOT IN ('completed', 'skipped') AND completed_at IS NULL AND skipped_at IS NULL))''',
   ];
@@ -378,6 +387,32 @@ class CalendarEventRecords extends Table {
   Set<Column<Object>> get primaryKey => {id};
   @override
   String get tableName => 'calendar_events';
+}
+
+@TableIndex(name: 'quick_notes_position_idx', columns: {#position})
+@TableIndex(name: 'quick_notes_local_date_idx', columns: {#localDate})
+@TableIndex(name: 'quick_notes_updated_at_idx', columns: {#updatedAt})
+class QuickNoteRecords extends Table {
+  TextColumn get id => text()();
+  TextColumn get textContent => text().named('text_content')();
+  BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
+  IntColumn get colorArgb => integer()();
+  TextColumn get localDate => text().nullable()();
+  TextColumn get priority => text().nullable()();
+  IntColumn get position => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(trim(text_content)) BETWEEN 1 AND 500)',
+    'CHECK (color_argb BETWEEN 4278190080 AND 4294967295)',
+    '''CHECK (local_date IS NULL OR local_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')''',
+    "CHECK (priority IS NULL OR priority IN ('high', 'medium', 'low'))",
+  ];
+  @override
+  String get tableName => 'quick_notes';
 }
 
 class SyncLocalStateRecords extends Table {
@@ -940,7 +975,8 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
       var createdRuns = 0;
       var createdTasks = 0;
       for (final routine in activeRoutines) {
-        if (!(daysByRoutine[routine.id]?.contains(day.weekday) ?? false)) {
+        if (!_isRoutineValidOn(routine, localDate) ||
+            !(daysByRoutine[routine.id]?.contains(day.weekday) ?? false)) {
           continue;
         }
         final items = itemsByRoutine[routine.id] ?? const <RoutineItemRecord>[];
@@ -965,6 +1001,7 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
             nameSnapshot: routine.name,
             iconKeySnapshot: routine.iconKey,
             colorKeySnapshot: routine.colorKey,
+            customColorArgbSnapshot: Value(routine.customColorArgb),
             scheduledStartMinuteSnapshot: firstMinute,
             createdAt: reconciledAt,
             updatedAt: reconciledAt,
@@ -1059,10 +1096,19 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
       final items = itemsByRoutine[routine.id] ?? const <RoutineItemRecord>[];
       if (weekdays.isEmpty || items.isEmpty) continue;
 
-      final activeStart = _dateOnly(routine.updatedAt);
-      if (activeStart.isAfter(elapsedEnd)) continue;
+      final activeStart = routine.validFromLocalDate == null
+          ? _dateOnly(routine.updatedAt)
+          : DateTime.parse(routine.validFromLocalDate!);
+      final configuredEnd = routine.validUntilLocalDate == null
+          ? null
+          : DateTime.parse(routine.validUntilLocalDate!);
+      final effectiveEnd =
+          configuredEnd != null && configuredEnd.isBefore(elapsedEnd)
+          ? configuredEnd
+          : elapsedEnd;
+      if (activeStart.isAfter(effectiveEnd)) continue;
       final startLocalDate = _dateToStorage(activeStart);
-      final endLocalDate = _dateToStorage(elapsedEnd);
+      final endLocalDate = _dateToStorage(effectiveEnd);
       final existingRuns =
           await (select(routineRunRecords)..where(
                 (row) =>
@@ -1075,7 +1121,7 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
 
       for (
         var occurrenceDay = activeStart;
-        !occurrenceDay.isAfter(elapsedEnd);
+        !occurrenceDay.isAfter(effectiveEnd);
         occurrenceDay = DateTime(
           occurrenceDay.year,
           occurrenceDay.month,
@@ -1102,6 +1148,7 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
             nameSnapshot: routine.name,
             iconKeySnapshot: routine.iconKey,
             colorKeySnapshot: routine.colorKey,
+            customColorArgbSnapshot: Value(routine.customColorArgb),
             scheduledStartMinuteSnapshot: firstMinute,
             createdAt: reconciledAt,
             updatedAt: reconciledAt,
@@ -1238,6 +1285,16 @@ class RoutinesDao extends DatabaseAccessor<MichiFocusDatabase>
           );
       return updated == 1;
     });
+  }
+
+  bool _isRoutineValidOn(RoutineRecord routine, String localDate) {
+    final startsInTime =
+        routine.validFromLocalDate == null ||
+        routine.validFromLocalDate!.compareTo(localDate) <= 0;
+    final hasNotEnded =
+        routine.validUntilLocalDate == null ||
+        routine.validUntilLocalDate!.compareTo(localDate) >= 0;
+    return startsInTime && hasNotEnded;
   }
 
   String _dateToStorage(DateTime date) =>
@@ -1687,6 +1744,107 @@ class CalendarEventsDao extends DatabaseAccessor<MichiFocusDatabase>
     await into(calendarEventRecords).insert(companion);
     return (await findById(companion.id.value))!;
   }
+}
+
+@DriftAccessor(tables: [QuickNoteRecords])
+class QuickNotesDao extends DatabaseAccessor<MichiFocusDatabase>
+    with _$QuickNotesDaoMixin {
+  QuickNotesDao(super.db);
+
+  Future<List<QuickNoteRecord>> getAllNotes() =>
+      (select(quickNoteRecords)..orderBy([
+            (row) => OrderingTerm.asc(row.position),
+            (row) => OrderingTerm.asc(row.createdAt),
+            (row) => OrderingTerm.asc(row.id),
+          ]))
+          .get();
+
+  Future<QuickNoteRecord?> findById(String id) => (select(
+    quickNoteRecords,
+  )..where((row) => row.id.equals(id))).getSingleOrNull();
+
+  Future<int> nextPosition() async {
+    final maximum = quickNoteRecords.position.max();
+    final row = await (selectOnly(
+      quickNoteRecords,
+    )..addColumns([maximum])).getSingle();
+    const positionStep = 4294967296;
+    return (row.read(maximum) ?? -positionStep) + positionStep;
+  }
+
+  Future<QuickNoteRecord> insertNote(
+    QuickNoteRecordsCompanion companion,
+  ) async {
+    await into(quickNoteRecords).insert(companion);
+    return (await findById(companion.id.value))!;
+  }
+
+  Future<QuickNoteRecord?> updateDetails({
+    required String id,
+    required String textContent,
+    required int colorArgb,
+    required String? localDate,
+    required String? priority,
+    required DateTime updatedAt,
+  }) async {
+    await (update(quickNoteRecords)..where((row) => row.id.equals(id))).write(
+      QuickNoteRecordsCompanion(
+        textContent: Value(textContent),
+        colorArgb: Value(colorArgb),
+        localDate: Value(localDate),
+        priority: Value(priority),
+        updatedAt: Value(updatedAt),
+      ),
+    );
+    return findById(id);
+  }
+
+  Future<QuickNoteRecord?> updateCompletion({
+    required String id,
+    required bool isCompleted,
+    required DateTime updatedAt,
+  }) async {
+    await (update(quickNoteRecords)..where((row) => row.id.equals(id))).write(
+      QuickNoteRecordsCompanion(
+        isCompleted: Value(isCompleted),
+        updatedAt: Value(updatedAt),
+      ),
+    );
+    return findById(id);
+  }
+
+  Future<QuickNoteRecord?> updatePosition({
+    required String id,
+    required int position,
+    required DateTime updatedAt,
+  }) async {
+    await (update(quickNoteRecords)..where((row) => row.id.equals(id))).write(
+      QuickNoteRecordsCompanion(
+        position: Value(position),
+        updatedAt: Value(updatedAt),
+      ),
+    );
+    return findById(id);
+  }
+
+  Future<void> normalizePositions(DateTime updatedAt) async {
+    final notes = await getAllNotes();
+    await transaction(() async {
+      for (var index = 0; index < notes.length; index++) {
+        await (update(
+          quickNoteRecords,
+        )..where((row) => row.id.equals(notes[index].id))).write(
+          QuickNoteRecordsCompanion(
+            position: Value(index * 4294967296),
+            updatedAt: Value(updatedAt),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> deleteById(String id) =>
+      (delete(quickNoteRecords)..where((row) => row.id.equals(id))).go();
 }
 
 class ReportTaskCountsRecord {
@@ -2309,6 +2467,7 @@ class ReportsDao extends DatabaseAccessor<MichiFocusDatabase>
     RoutineRunRecords,
     RoutineItemRunRecords,
     CalendarEventRecords,
+    QuickNoteRecords,
     SyncLocalStateRecords,
     SyncOutboxRecords,
     SyncAppliedOperationRecords,
@@ -2324,6 +2483,7 @@ class ReportsDao extends DatabaseAccessor<MichiFocusDatabase>
     PomodoroRuntimeDao,
     RoutinesDao,
     CalendarEventsDao,
+    QuickNotesDao,
     ReportsDao,
   ],
 )
@@ -2331,7 +2491,7 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
   MichiFocusDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'michifocus'));
 
-  static const currentSchemaVersion = 7;
+  static const currentSchemaVersion = 9;
   @override
   int get schemaVersion => currentSchemaVersion;
   @override
@@ -2419,6 +2579,38 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
         await migrator.createIndex(syncAppliedOriginCounterUq);
         await migrator.createIndex(syncConflictsEntityStatusIdx);
       }
+      if (from >= 5 && from < 8) {
+        final routineColumns = (await customSelect(
+          'PRAGMA table_info(routines)',
+        ).get()).map((row) => row.read<String>('name')).toSet();
+        final runColumns = (await customSelect(
+          'PRAGMA table_info(routine_runs)',
+        ).get()).map((row) => row.read<String>('name')).toSet();
+        if (!routineColumns.contains('custom_color_argb')) {
+          await migrator.addColumn(
+            routineRecords,
+            routineRecords.customColorArgb,
+          );
+        }
+        if (!routineColumns.contains('valid_from_local_date')) {
+          await migrator.addColumn(
+            routineRecords,
+            routineRecords.validFromLocalDate,
+          );
+        }
+        if (!routineColumns.contains('valid_until_local_date')) {
+          await migrator.addColumn(
+            routineRecords,
+            routineRecords.validUntilLocalDate,
+          );
+        }
+        if (!runColumns.contains('custom_color_argb_snapshot')) {
+          await migrator.addColumn(
+            routineRunRecords,
+            routineRunRecords.customColorArgbSnapshot,
+          );
+        }
+      }
       if (from >= 6 && from < 7) {
         await migrator.addColumn(
           syncOutboxRecords,
@@ -2440,6 +2632,16 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
           syncTombstoneRecords,
           syncTombstoneRecords.originDeviceName,
         );
+      }
+      if (from < 9) {
+        await migrator.createTable(quickNoteRecords);
+        for (final statement in const [
+          'CREATE INDEX IF NOT EXISTS quick_notes_position_idx ON quick_notes (position)',
+          'CREATE INDEX IF NOT EXISTS quick_notes_local_date_idx ON quick_notes (local_date)',
+          'CREATE INDEX IF NOT EXISTS quick_notes_updated_at_idx ON quick_notes (updated_at)',
+        ]) {
+          await customStatement(statement);
+        }
       }
     },
     beforeOpen: (details) async {
@@ -2473,6 +2675,7 @@ class MichiFocusDatabase extends _$MichiFocusDatabase {
       await delete(taskRecords).go();
       await delete(goalRecords).go();
       await delete(calendarEventRecords).go();
+      await delete(quickNoteRecords).go();
       await delete(reportingMetadataRecords).go();
     });
   }

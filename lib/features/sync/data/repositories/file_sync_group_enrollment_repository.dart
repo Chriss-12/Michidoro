@@ -15,21 +15,24 @@ class FileSyncGroupEnrollmentRepository
   static const _fileName = 'michifocus-sync-group.json';
 
   final SyncGroupDirectoryProvider _directory;
+  SyncGroupEnrollment? _cached;
+  bool _hasCachedValue = false;
 
   @override
   Future<SyncGroupEnrollment?> load() async {
+    if (_hasCachedValue) return _cached;
     try {
       final file = await _file();
-      if (!file.existsSync()) return null;
+      if (!file.existsSync()) return _cache(null);
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
-        return null;
+        return _cache(null);
       }
-      return SyncGroupEnrollment.fromJson(decoded);
+      return _cache(SyncGroupEnrollment.fromJson(decoded));
     } on FormatException {
-      return null;
+      return _cache(null);
     } on FileSystemException {
-      return null;
+      return _cache(null);
     }
   }
 
@@ -44,6 +47,7 @@ class FileSyncGroupEnrollmentRepository
     await temporary.writeAsString(jsonEncode(enrollment.toJson()), flush: true);
     try {
       await temporary.rename(destination.path);
+      _cache(enrollment);
     } on Object {
       if (temporary.existsSync()) temporary.deleteSync();
       rethrow;
@@ -70,6 +74,7 @@ class FileSyncGroupEnrollmentRepository
       await destination.rename(previous.path);
       await temporary.rename(destination.path);
       await previous.delete();
+      _cache(enrollment);
     } on Object {
       if (!destination.existsSync() && previous.existsSync()) {
         await previous.rename(destination.path);
@@ -77,6 +82,12 @@ class FileSyncGroupEnrollmentRepository
       if (temporary.existsSync()) await temporary.delete();
       rethrow;
     }
+  }
+
+  SyncGroupEnrollment? _cache(SyncGroupEnrollment? value) {
+    _cached = value;
+    _hasCachedValue = true;
+    return value;
   }
 
   Future<File> _file() async {

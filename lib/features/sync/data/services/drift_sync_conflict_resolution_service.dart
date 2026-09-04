@@ -337,6 +337,7 @@ class DriftSyncConflictResolutionService
       'task' => _taskFields(database, entityId),
       'calendarEvent' => _calendarFields(database, entityId),
       'routine' => _routineFields(database, entityId),
+      'quickNote' => _quickNoteFields(database, entityId),
       _ => Future.value(),
     };
   }
@@ -419,6 +420,9 @@ class DriftSyncConflictResolutionService
         'description': routine.description,
         'iconKey': routine.iconKey,
         'colorKey': routine.colorKey,
+        'customColorArgb': routine.customColorArgb,
+        'validFromLocalDate': routine.validFromLocalDate,
+        'validUntilLocalDate': routine.validUntilLocalDate,
         'status': routine.status,
         'pausedUntilLocalDate': routine.pausedUntilLocalDate,
         'archivedAt': routine.archivedAt?.millisecondsSinceEpoch,
@@ -448,6 +452,26 @@ class DriftSyncConflictResolutionService
     };
   }
 
+  Future<Map<String, Object?>?> _quickNoteFields(
+    MichiFocusDatabase database,
+    String id,
+  ) async {
+    final row = await (database.select(
+      database.quickNoteRecords,
+    )..where((item) => item.id.equals(id))).getSingleOrNull();
+    if (row == null) return null;
+    return {
+      'text': row.textContent,
+      'isCompleted': row.isCompleted,
+      'colorArgb': row.colorArgb,
+      'localDate': row.localDate,
+      'priority': row.priority,
+      'position': row.position,
+      'createdAt': row.createdAt.millisecondsSinceEpoch,
+      'updatedAt': row.updatedAt.millisecondsSinceEpoch,
+    };
+  }
+
   Future<void> _deleteEntity(
     MichiFocusDatabase database,
     String entityType,
@@ -469,6 +493,10 @@ class DriftSyncConflictResolutionService
       case 'routine':
         await (database.delete(
           database.routineRecords,
+        )..where((row) => row.id.equals(entityId))).go();
+      case 'quickNote':
+        await (database.delete(
+          database.quickNoteRecords,
         )..where((row) => row.id.equals(entityId))).go();
       default:
         throw StateError('Unsupported synchronization entity type.');
@@ -492,6 +520,12 @@ class DriftSyncConflictResolutionService
         createIfMissing,
       ),
       'routine' => _applyRoutine(database, entityId, fields, createIfMissing),
+      'quickNote' => _applyQuickNote(
+        database,
+        entityId,
+        fields,
+        createIfMissing,
+      ),
       _ => throw StateError('Unsupported synchronization entity type.'),
     };
   }
@@ -672,6 +706,13 @@ class DriftSyncConflictResolutionService
           description: Value(_nullableString(aggregate['description'])),
           iconKey: Value(_string(aggregate, 'iconKey')),
           colorKey: Value(_string(aggregate, 'colorKey')),
+          customColorArgb: Value(_nullableInt(aggregate['customColorArgb'])),
+          validFromLocalDate: Value(
+            _nullableString(aggregate['validFromLocalDate']),
+          ),
+          validUntilLocalDate: Value(
+            _nullableString(aggregate['validUntilLocalDate']),
+          ),
           status: Value(_string(aggregate, 'status')),
           pausedUntilLocalDate: Value(
             _nullableString(aggregate['pausedUntilLocalDate']),
@@ -734,6 +775,77 @@ class DriftSyncConflictResolutionService
           fields,
           'archivedAt',
           () => _dateOrNull(fields['archivedAt']),
+        ),
+        updatedAt: _valueIf(
+          fields,
+          'updatedAt',
+          () => _date(fields, 'updatedAt'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _applyQuickNote(
+    MichiFocusDatabase database,
+    String id,
+    Map<String, Object?> fields,
+    bool create,
+  ) async {
+    final existing = await (database.select(
+      database.quickNoteRecords,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (existing == null) {
+      if (!create) throw StateError('Quick note no longer exists.');
+      await database
+          .into(database.quickNoteRecords)
+          .insert(
+            QuickNoteRecordsCompanion.insert(
+              id: id,
+              textContent: _string(fields, 'text'),
+              isCompleted: Value(_bool(fields, 'isCompleted')),
+              colorArgb: _int(fields, 'colorArgb'),
+              localDate: Value(_nullableString(fields['localDate'])),
+              priority: Value(_nullableString(fields['priority'])),
+              position: _int(fields, 'position'),
+              createdAt: _date(fields, 'createdAt'),
+              updatedAt: _date(fields, 'updatedAt'),
+            ),
+          );
+      return;
+    }
+    await (database.update(
+      database.quickNoteRecords,
+    )..where((row) => row.id.equals(id))).write(
+      QuickNoteRecordsCompanion(
+        textContent: _valueIf(
+          fields,
+          'text',
+          () => _string(fields, 'text'),
+        ),
+        isCompleted: _valueIf(
+          fields,
+          'isCompleted',
+          () => _bool(fields, 'isCompleted'),
+        ),
+        colorArgb: _valueIf(
+          fields,
+          'colorArgb',
+          () => _int(fields, 'colorArgb'),
+        ),
+        localDate: _nullableValueIf(
+          fields,
+          'localDate',
+          () => _nullableString(fields['localDate']),
+        ),
+        priority: _nullableValueIf(
+          fields,
+          'priority',
+          () => _nullableString(fields['priority']),
+        ),
+        position: _valueIf(
+          fields,
+          'position',
+          () => _int(fields, 'position'),
         ),
         updatedAt: _valueIf(
           fields,

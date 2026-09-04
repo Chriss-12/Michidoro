@@ -12,12 +12,16 @@ import 'package:pomodoro_app_v1/app/state/routine_reminder_scheduler.dart';
 import 'package:pomodoro_app_v1/app/state/scheduled_task_reminder_controller.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/controllers/focus_silence_controller.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/data/services/android_screen_awake_platform.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/pomodoro/presentation/widgets/pomodoro_screen_awake_coordinator.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/controllers/quick_notes_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/entities/statistics_report_file.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
-import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/features/settings/data/repositories/file_settings_repository.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:pomodoro_app_v1/features/splash/presentation/pages/splash_page.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/android_local_device_authenticator.dart';
@@ -50,12 +54,14 @@ Future<void> main() async {
 class AppBootstrap extends StatefulWidget {
   const AppBootstrap({
     this.startupAuthenticator,
+    this.loadStartupPreferences,
     this.initializeApp,
     this.initializedApp,
     super.key,
   });
 
   final LocalDeviceAuthenticator? startupAuthenticator;
+  final Future<void> Function()? loadStartupPreferences;
   final Future<void> Function()? initializeApp;
   final Widget? initializedApp;
 
@@ -98,12 +104,30 @@ class _AppBootstrapState extends State<AppBootstrap> {
     }
 
     if (!mounted) return;
+    if (authenticated) {
+      final loadStartupPreferences =
+          widget.loadStartupPreferences ??
+          (widget.initializeApp == null ? _loadStartupPreferences : null);
+      try {
+        await loadStartupPreferences?.call();
+      } on Object {
+        // Startup remains available with the safe default appearance.
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
       _isAuthenticating = false;
       if (authenticated) {
         _initialization = _startInitialization();
       }
     });
+  }
+
+  Future<void> _loadStartupPreferences() {
+    return appSettingsController.loadTimerPreferences(
+      const FileSettingsRepository(),
+    );
   }
 
   Future<void> _initializeApp() async {
@@ -116,14 +140,16 @@ class _AppBootstrapState extends State<AppBootstrap> {
     await serviceLocator<DeviceIdentityController>().initialize();
     await serviceLocator<SyncGroupEnrollmentController>().load();
     final routinesController = serviceLocator<RoutinesController>();
-    final reconciliation = await routinesController.reconcileToday();
+    final reconciliationFuture = routinesController.reconcileToday();
+    await Future.wait<void>([
+      reconciliationFuture.then<void>((_) {}),
+      serviceLocator<TasksController>().loadTasks(),
+      serviceLocator<QuickNotesController>().load(),
+    ]);
+    final reconciliation = await reconciliationFuture;
     if (reconciliation == null) {
       throw StateError('Routine reconciliation failed during startup.');
     }
-    await serviceLocator<TasksController>().loadTasks();
-    await appSettingsController.loadTimerPreferences(
-      serviceLocator<SettingsRepository>(),
-    );
     serviceLocator<PomodoroController>().setFocusMinutes(
       appSettingsController.focusMinutes.value,
     );
@@ -181,7 +207,7 @@ class _StartupAuthenticationApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       onGenerateTitle: (context) => context.l10n.appTitle,
-      theme: AppTheme.fromPreset(AppThemePreset.natureFocus, isDark: false),
+      theme: _startupTheme(),
       home: LocalAppLockGate(
         isLocked: true,
         onUnlockRequested: isAuthenticating ? null : onUnlockRequested,
@@ -202,7 +228,7 @@ class _StartupSplashApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       onGenerateTitle: (context) => context.l10n.appTitle,
-      theme: AppTheme.fromPreset(AppThemePreset.natureFocus, isDark: false),
+      theme: _startupTheme(),
       home: const SplashPage(autoNavigate: false),
     );
   }
@@ -215,10 +241,7 @@ class _StartupFailureApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.fromPreset(
-      AppThemePreset.natureFocus,
-      isDark: false,
-    );
+    final theme = _startupTheme();
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -265,6 +288,15 @@ class _StartupFailureApp extends StatelessWidget {
   }
 }
 
+ThemeData _startupTheme() {
+  return AppTheme.fromPreset(
+    appSettingsController.themePreset.value,
+    isDark: appSettingsController.isDarkMode.value,
+    fontScale: appSettingsController.fontScale.value,
+    typographyPreset: appSettingsController.typographyPreset.value,
+  );
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({
     this.localAppLockController,
@@ -291,6 +323,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final DeviceIdentityController _deviceIdentityController;
   late final SyncGroupEnrollmentController _syncGroupEnrollmentController;
   late final SyncStorageController _syncStorageController;
+  FocusSilenceController? _focusSilenceController;
 
   @override
   void initState() {
@@ -313,10 +346,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         (serviceLocator.isRegistered<SyncGroupEnrollmentController>()
             ? serviceLocator<SyncGroupEnrollmentController>()
             : SyncGroupEnrollmentController());
+    final pomodoroController = serviceLocator<PomodoroController>();
+    if (serviceLocator.isRegistered<FocusSilenceController>()) {
+      final focusSilenceController = serviceLocator<FocusSilenceController>();
+      _focusSilenceController = focusSilenceController;
+      pomodoroController.onRuntimeStateChanged = () => unawaited(
+        focusSilenceController.reconcilePomodoro(pomodoroController),
+      );
+      unawaited(
+        focusSilenceController.reconcilePomodoro(pomodoroController),
+      );
+    }
     WidgetsBinding.instance.addObserver(this);
     _scheduledTaskReminders = ScheduledTaskReminderController(
       settingsController: appSettingsController,
       tasksController: serviceLocator<TasksController>(),
+      goalsController: serviceLocator<GoalsController>(),
     )..start();
     if (serviceLocator.isRegistered<RoutinesController>()) {
       final routinesController = serviceLocator<RoutinesController>();
@@ -333,6 +378,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    final focusSilenceController = _focusSilenceController;
+    if (focusSilenceController != null) {
+      unawaited(
+        focusSilenceController.setAppForeground(isForeground: false),
+      );
+    }
     WidgetsBinding.instance.removeObserver(this);
     _scheduledTaskReminders.stop();
     _routineRolloverTimer?.cancel();
@@ -342,16 +393,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final pomodoroController = serviceLocator<PomodoroController>();
+    _localAppLockController.onLifecycleStateChanged(state);
     if (state != AppLifecycleState.resumed) {
-      _localAppLockController.onBackgrounded();
+      final focusSilenceController = _focusSilenceController;
+      if (focusSilenceController != null) {
+        unawaited(
+          focusSilenceController.setAppForeground(isForeground: false),
+        );
+      }
       unawaited(pomodoroController.checkpointRuntime());
       return;
     }
 
-    _localAppLockController.onResumed();
-    unawaited(pomodoroController.synchronizeWithClock());
+    unawaited(_resumePomodoro(pomodoroController));
     unawaited(_reconcileRoutineTasks());
     _scheduleRoutineRollover();
+  }
+
+  Future<void> _resumePomodoro(PomodoroController pomodoroController) async {
+    await pomodoroController.synchronizeWithClock();
+    final focusSilenceController = _focusSilenceController;
+    if (focusSilenceController == null) return;
+    await focusSilenceController.refreshCapability();
+    await focusSilenceController.setAppForeground(isForeground: true);
+    await focusSilenceController.reconcilePomodoro(pomodoroController);
   }
 
   Future<void> _reconcileRoutineTasks() async {
@@ -440,275 +505,282 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 themePreset,
                 isDark: isDarkMode,
               ),
-              child: ResponsiveBreakpoints.builder(
-                child: SignalBuilder(
-                  builder: (context) {
-                    if (isLocallyLocked) {
-                      return LocalAppLockGate(
-                        isLocked: true,
-                        onUnlockRequested: () => unawaited(
-                          _requestLocalUnlock(),
-                        ),
-                        child: const SizedBox.shrink(),
-                      );
-                    }
-
-                    final settingsScope = AppSettingsScope(
-                      themePreset: controller.themePreset.value,
-                      isDarkMode: controller.isDarkMode.value,
-                      fontScale: controller.fontScale.value,
-                      profileName: controller.profileName.value,
-                      profileEmail: controller.profileEmail.value,
-                      profileImagePath: controller.profileImagePath.value,
-                      avatarIndex: controller.avatarIndex.value,
-                      typographyPreset: controller.typographyPreset.value,
-                      language: controller.language.value,
-                      completedOnboardingVersion:
-                          controller.completedOnboardingVersion.value,
-                      focusMinutes: controller.focusMinutes.value,
-                      shortBreakMinutes: controller.shortBreakMinutes.value,
-                      longBreakMinutes: controller.longBreakMinutes.value,
-                      longBreakFrequency: controller.longBreakFrequency.value,
-                      completionSound: controller.completionSound.value,
-                      completionVibrationEnabled:
-                          controller.completionVibrationEnabled.value,
-                      completionVibrationPattern:
-                          controller.completionVibrationPattern.value,
-                      autoStartBreak: controller.autoStartBreak.value,
-                      autoStartFocus: controller.autoStartFocus.value,
-                      notificationsEnabled:
-                          controller.notificationsEnabled.value,
-                      breakAlertsEnabled: controller.breakAlertsEnabled.value,
-                      focusAlertsEnabled: controller.focusAlertsEnabled.value,
-                      completedTasks: controller.completedTasks.value,
-                      totalTasks: controller.totalTasks.value,
-                      lastReportPath: controller.lastReportPath.value,
-                      reportsDirectoryPath:
-                          controller.reportsDirectoryPath.value,
-                      enabledStatisticsCharts:
-                          controller.enabledStatisticsCharts.value,
-                      notifications: controller.notifications.value,
-                      onThemeChanged: (value) {
-                        controller.themePreset.value = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onDarkModeChanged: (value) {
-                        controller.isDarkMode.value = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onFontScaleChanged: (value) {
-                        controller.fontScale.value =
-                            SettingsController.normalizeFontScale(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onProfileNameChanged: (value) {
-                        controller.setProfileName(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onProfileEmailChanged: (value) {
-                        controller.setProfileEmail(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onProfileImagePathChanged: (value) {
-                        controller.setProfileImagePath(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onAvatarChanged: (value) {
-                        controller.setAvatarIndex(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onTypographyPresetChanged: (value) {
-                        controller.selectedTypographyPreset = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onLanguageChanged: (value) {
-                        controller.language.value = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onCompleteOnboarding: controller.completeOnboarding,
-                      onFocusMinutesChanged: (value) {
-                        controller.setFocusMinutes(value);
-                        pomodoroController.setFocusMinutes(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onShortBreakMinutesChanged: (value) {
-                        controller.setShortBreakMinutes(value);
-                        _syncPomodoroBreakSettings(
-                          pomodoroController: pomodoroController,
-                          settingsController: controller,
-                        );
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onLongBreakMinutesChanged: (value) {
-                        controller.setLongBreakMinutes(value);
-                        _syncPomodoroBreakSettings(
-                          pomodoroController: pomodoroController,
-                          settingsController: controller,
-                        );
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onLongBreakFrequencyChanged: (value) {
-                        controller.setLongBreakFrequency(value);
-                        _syncPomodoroBreakSettings(
-                          pomodoroController: pomodoroController,
-                          settingsController: controller,
-                        );
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onCompletionSoundChanged: (value) {
-                        controller.selectedCompletionSound = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onPreviewCompletionSound:
-                          controller.previewCompletionSound,
-                      onCompletionVibrationChanged: (value) {
-                        controller.isCompletionVibrationEnabled = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onCompletionVibrationPatternChanged: (value) {
-                        controller.selectedCompletionVibrationPattern = value;
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onPreviewCompletionVibration:
-                          controller.previewCompletionVibration,
-                      onAutoStartBreakChanged: (value) {
-                        controller.autoStartBreak.value = value;
-                        _syncPomodoroBreakSettings(
-                          pomodoroController: pomodoroController,
-                          settingsController: controller,
-                        );
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onAutoStartFocusChanged: (value) {
-                        controller.autoStartFocus.value = value;
-                        _syncPomodoroBreakSettings(
-                          pomodoroController: pomodoroController,
-                          settingsController: controller,
-                        );
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onReportsDirectoryPathChanged: (value) {
-                        controller.setReportsDirectoryPath(value);
-                        unawaited(controller.saveTimerPreferences());
-                      },
-                      onUseDefaultReportsDirectory:
-                          controller.useDefaultReportsDirectory,
-                      onStatisticsChartVisibilityChanged:
-                          (chart, {required enabled}) {
-                            controller.setStatisticsChartEnabled(
-                              chart,
-                              enabled: enabled,
-                            );
-                            unawaited(controller.saveTimerPreferences());
-                          },
-                      onNotificationsEnabledChanged: (value) {
-                        controller.notificationsEnabled.value = value;
-                        unawaited(_routineReminders?.synchronize());
-                      },
-                      onBreakAlertsEnabledChanged: (value) =>
-                          controller.breakAlertsEnabled.value = value,
-                      onFocusAlertsEnabledChanged: (value) {
-                        controller.focusAlertsEnabled.value = value;
-                        unawaited(_routineReminders?.synchronize());
-                      },
-                      onDownloadReport: () => _downloadStatisticsPdf(
-                        settingsController: controller,
-                        request: const StatisticsReportRequest(
-                          period: StatisticsReportPeriod.month,
-                        ),
-                      ),
-                      onDownloadStatisticsPdf: (request) =>
-                          _downloadStatisticsPdf(
-                            settingsController: controller,
-                            request: request,
+              child: PomodoroScreenAwakeCoordinator(
+                controller: pomodoroController,
+                platform: const AndroidScreenAwakePlatform().setEnabled,
+                child: ResponsiveBreakpoints.builder(
+                  child: SignalBuilder(
+                    builder: (context) {
+                      if (isLocallyLocked) {
+                        return LocalAppLockGate(
+                          isLocked: true,
+                          onUnlockRequested: () => unawaited(
+                            _requestLocalUnlock(),
                           ),
-                      onOpenReport: controller.openReport,
-                      onExportDatabaseBackup: () async {
-                        await pomodoroController.checkpointRuntime();
-                        return controller.exportDatabaseBackup(
-                          createDatabaseSnapshot:
-                              serviceLocator<MichiFocusDatabase>()
-                                  .createBackupSnapshot,
+                          child: const SizedBox.shrink(),
                         );
-                      },
-                      onImportDatabaseBackup:
-                          controller.stageDatabaseBackupImport,
-                      onDeleteAllDatabaseData: _deleteAllDatabaseData,
-                      onTestNotification: controller.sendTestNotification,
-                      onClearNotifications: controller.clearNotifications,
-                      child: SyncStorageScope(
-                        controller: _syncStorageController,
-                        child: SyncGroupEnrollmentScope(
-                          controller: _syncGroupEnrollmentController,
-                          child: DeviceIdentityScope(
-                            controller: _deviceIdentityController,
-                            child: LocalAppLockScope(
-                              controller: _localAppLockController,
-                              child: routeChild,
+                      }
+
+                      final settingsScope = AppSettingsScope(
+                        themePreset: controller.themePreset.value,
+                        isDarkMode: controller.isDarkMode.value,
+                        fontScale: controller.fontScale.value,
+                        profileName: controller.profileName.value,
+                        profileEmail: controller.profileEmail.value,
+                        profileImagePath: controller.profileImagePath.value,
+                        avatarIndex: controller.avatarIndex.value,
+                        typographyPreset: controller.typographyPreset.value,
+                        language: controller.language.value,
+                        completedOnboardingVersion:
+                            controller.completedOnboardingVersion.value,
+                        focusMinutes: controller.focusMinutes.value,
+                        shortBreakMinutes: controller.shortBreakMinutes.value,
+                        longBreakMinutes: controller.longBreakMinutes.value,
+                        longBreakFrequency: controller.longBreakFrequency.value,
+                        completionSound: controller.completionSound.value,
+                        completionVibrationEnabled:
+                            controller.completionVibrationEnabled.value,
+                        completionVibrationPattern:
+                            controller.completionVibrationPattern.value,
+                        autoStartBreak: controller.autoStartBreak.value,
+                        autoStartFocus: controller.autoStartFocus.value,
+                        notificationsEnabled:
+                            controller.notificationsEnabled.value,
+                        breakAlertsEnabled: controller.breakAlertsEnabled.value,
+                        focusAlertsEnabled: controller.focusAlertsEnabled.value,
+                        completedTasks: controller.completedTasks.value,
+                        totalTasks: controller.totalTasks.value,
+                        lastReportPath: controller.lastReportPath.value,
+                        reportsDirectoryPath:
+                            controller.reportsDirectoryPath.value,
+                        enabledStatisticsCharts:
+                            controller.enabledStatisticsCharts.value,
+                        notifications: controller.notifications.value,
+                        onThemeChanged: (value) {
+                          controller.themePreset.value = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onDarkModeChanged: (value) {
+                          controller.isDarkMode.value = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onFontScaleChanged: (value) {
+                          controller.fontScale.value =
+                              SettingsController.normalizeFontScale(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onProfileNameChanged: (value) {
+                          controller.setProfileName(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onProfileEmailChanged: (value) {
+                          controller.setProfileEmail(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onProfileImagePathChanged: (value) {
+                          controller.setProfileImagePath(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onAvatarChanged: (value) {
+                          controller.setAvatarIndex(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onTypographyPresetChanged: (value) {
+                          controller.selectedTypographyPreset = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onLanguageChanged: (value) {
+                          controller.language.value = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onCompleteOnboarding: controller.completeOnboarding,
+                        onFocusMinutesChanged: (value) {
+                          controller.setFocusMinutes(value);
+                          pomodoroController.setFocusMinutes(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onShortBreakMinutesChanged: (value) {
+                          controller.setShortBreakMinutes(value);
+                          _syncPomodoroBreakSettings(
+                            pomodoroController: pomodoroController,
+                            settingsController: controller,
+                          );
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onLongBreakMinutesChanged: (value) {
+                          controller.setLongBreakMinutes(value);
+                          _syncPomodoroBreakSettings(
+                            pomodoroController: pomodoroController,
+                            settingsController: controller,
+                          );
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onLongBreakFrequencyChanged: (value) {
+                          controller.setLongBreakFrequency(value);
+                          _syncPomodoroBreakSettings(
+                            pomodoroController: pomodoroController,
+                            settingsController: controller,
+                          );
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onCompletionSoundChanged: (value) {
+                          controller.selectedCompletionSound = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onPreviewCompletionSound:
+                            controller.previewCompletionSound,
+                        onCompletionVibrationChanged: (value) {
+                          controller.isCompletionVibrationEnabled = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onCompletionVibrationPatternChanged: (value) {
+                          controller.selectedCompletionVibrationPattern = value;
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onPreviewCompletionVibration:
+                            controller.previewCompletionVibration,
+                        onAutoStartBreakChanged: (value) {
+                          controller.autoStartBreak.value = value;
+                          _syncPomodoroBreakSettings(
+                            pomodoroController: pomodoroController,
+                            settingsController: controller,
+                          );
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onAutoStartFocusChanged: (value) {
+                          controller.autoStartFocus.value = value;
+                          _syncPomodoroBreakSettings(
+                            pomodoroController: pomodoroController,
+                            settingsController: controller,
+                          );
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onReportsDirectoryPathChanged: (value) {
+                          controller.setReportsDirectoryPath(value);
+                          unawaited(controller.saveTimerPreferences());
+                        },
+                        onUseDefaultReportsDirectory:
+                            controller.useDefaultReportsDirectory,
+                        onStatisticsChartVisibilityChanged:
+                            (chart, {required enabled}) {
+                              controller.setStatisticsChartEnabled(
+                                chart,
+                                enabled: enabled,
+                              );
+                              unawaited(controller.saveTimerPreferences());
+                            },
+                        onNotificationsEnabledChanged: (value) {
+                          controller.notificationsEnabled.value = value;
+                          unawaited(_routineReminders?.synchronize());
+                        },
+                        onBreakAlertsEnabledChanged: (value) =>
+                            controller.breakAlertsEnabled.value = value,
+                        onFocusAlertsEnabledChanged: (value) {
+                          controller.focusAlertsEnabled.value = value;
+                          unawaited(_routineReminders?.synchronize());
+                        },
+                        onDownloadReport: () => _downloadStatisticsPdf(
+                          settingsController: controller,
+                          request: const StatisticsReportRequest(
+                            period: StatisticsReportPeriod.month,
+                          ),
+                        ),
+                        onDownloadStatisticsPdf: (request) =>
+                            _downloadStatisticsPdf(
+                              settingsController: controller,
+                              request: request,
+                            ),
+                        onOpenReport: controller.openReport,
+                        onExportDatabaseBackup: () async {
+                          await pomodoroController.checkpointRuntime();
+                          return controller.exportDatabaseBackup(
+                            createDatabaseSnapshot:
+                                serviceLocator<MichiFocusDatabase>()
+                                    .createBackupSnapshot,
+                          );
+                        },
+                        onImportDatabaseBackup:
+                            controller.stageDatabaseBackupImport,
+                        onDeleteAllDatabaseData: _deleteAllDatabaseData,
+                        onTestNotification: controller.sendTestNotification,
+                        onClearNotifications: controller.clearNotifications,
+                        child: SyncStorageScope(
+                          controller: _syncStorageController,
+                          child: SyncGroupEnrollmentScope(
+                            controller: _syncGroupEnrollmentController,
+                            child: DeviceIdentityScope(
+                              controller: _deviceIdentityController,
+                              child: LocalAppLockScope(
+                                controller: _localAppLockController,
+                                child: routeChild,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
+                      );
 
-                    return SignalBuilder(
-                      builder: (context) {
-                        return PomodoroRuntimeScope(
-                          isRunning: pomodoroController.isRunning.value,
-                          phase: pomodoroController.phase.value,
-                          remainingSeconds:
-                              pomodoroController.remainingSeconds.value,
-                          currentPhaseSeconds:
-                              pomodoroController.currentPhaseSeconds,
-                          timerProgress: pomodoroController.timerProgress,
-                          completedPomodoros:
-                              pomodoroController.completedPomodoros.value,
-                          totalFocusSeconds:
-                              pomodoroController.totalFocusSeconds.value,
-                          hasActiveRuntime:
-                              pomodoroController.hasActiveRuntime.value,
-                          hasStartedRuntime:
-                              pomodoroController.hasStartedRuntime.value,
-                          planMode: pomodoroController.planMode.value,
-                          currentBlockIndex:
-                              pomodoroController.currentBlockIndex.value,
-                          totalBlocks: pomodoroController.totalBlocks.value,
-                          taskFocusedSeconds:
-                              pomodoroController.elapsedTaskFocusSeconds,
-                          taskEstimatedSeconds: pomodoroController
-                              .activeTaskEstimatedSeconds
-                              .value,
-                          cadenceBreakMinutes:
-                              pomodoroController.cadenceBreakMinutes,
-                          onPlayPause: () {
-                            if (pomodoroController.isRunning.value) {
-                              pomodoroController.pause();
-                              return;
-                            }
-                            pomodoroController.start();
-                          },
-                          onReset: pomodoroController.reset,
-                          onDiscard: pomodoroController.discardSession,
-                          onRestart: pomodoroController.restartSession,
-                          onFinishEarly: pomodoroController.finishEarly,
-                          onStopForNow: pomodoroController.stopForNow,
-                          child: settingsScope,
-                        );
-                      },
-                    );
-                  },
+                      return SignalBuilder(
+                        builder: (context) {
+                          return PomodoroRuntimeScope(
+                            isRunning: pomodoroController.isRunning.value,
+                            phase: pomodoroController.phase.value,
+                            remainingSeconds:
+                                pomodoroController.remainingSeconds.value,
+                            currentPhaseSeconds:
+                                pomodoroController.currentPhaseSeconds,
+                            timerProgress: pomodoroController.timerProgress,
+                            completedPomodoros:
+                                pomodoroController.completedPomodoros.value,
+                            completedPlanPomodoros:
+                                pomodoroController.completedPlanPomodoros.value,
+                            totalFocusSeconds:
+                                pomodoroController.totalFocusSeconds.value,
+                            hasActiveRuntime:
+                                pomodoroController.hasActiveRuntime.value,
+                            hasStartedRuntime:
+                                pomodoroController.hasStartedRuntime.value,
+                            planMode: pomodoroController.planMode.value,
+                            currentBlockIndex:
+                                pomodoroController.currentBlockIndex.value,
+                            totalBlocks: pomodoroController.totalBlocks.value,
+                            taskFocusedSeconds:
+                                pomodoroController.elapsedTaskFocusSeconds,
+                            taskEstimatedSeconds: pomodoroController
+                                .activeTaskEstimatedSeconds
+                                .value,
+                            cadenceBreakMinutes:
+                                pomodoroController.cadenceBreakMinutes,
+                            onPlayPause: () {
+                              if (pomodoroController.isRunning.value) {
+                                pomodoroController.pause();
+                                return;
+                              }
+                              pomodoroController.start();
+                            },
+                            onReset: pomodoroController.reset,
+                            onDiscard: pomodoroController.discardSession,
+                            onRestart: pomodoroController.restartSession,
+                            onFinishEarly: pomodoroController.finishEarly,
+                            onStopForNow: pomodoroController.stopForNow,
+                            child: settingsScope,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  breakpoints: const [
+                    Breakpoint(start: 0, end: 450, name: MOBILE),
+                    Breakpoint(start: 451, end: 800, name: TABLET),
+                    Breakpoint(start: 801, end: 1920, name: DESKTOP),
+                    Breakpoint(start: 1921, end: double.infinity, name: '4K'),
+                  ],
                 ),
-                breakpoints: const [
-                  Breakpoint(start: 0, end: 450, name: MOBILE),
-                  Breakpoint(start: 451, end: 800, name: TABLET),
-                  Breakpoint(start: 801, end: 1920, name: DESKTOP),
-                  Breakpoint(start: 1921, end: double.infinity, name: '4K'),
-                ],
               ),
             );
           },
           debugShowCheckedModeBanner: false,
           onGenerateTitle: (context) => context.l10n.appTitle,
+          themeAnimationDuration: Duration.zero,
           theme: AppTheme.fromPreset(
             themePreset,
             isDark: isDarkMode,

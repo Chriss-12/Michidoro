@@ -65,6 +65,17 @@ class DriftRoutinesRepository implements RoutinesRepository {
           description: Value(_trimmedOrNull(routine.description)),
           iconKey: Value(routine.iconKey),
           colorKey: Value(routine.colorKey),
+          customColorArgb: Value(routine.customColorArgb),
+          validFromLocalDate: Value(
+            routine.validFromDate == null
+                ? null
+                : _dateToStorage(routine.validFromDate!),
+          ),
+          validUntilLocalDate: Value(
+            routine.validUntilDate == null
+                ? null
+                : _dateToStorage(routine.validUntilDate!),
+          ),
           status: Value(routine.status.name),
           pausedUntilLocalDate: Value(
             routine.pausedUntilDate == null
@@ -205,6 +216,13 @@ class DriftRoutinesRepository implements RoutinesRepository {
     'description': _trimmedOrNull(routine.description),
     'iconKey': routine.iconKey,
     'colorKey': routine.colorKey,
+    'customColorArgb': routine.customColorArgb,
+    'validFromLocalDate': routine.validFromDate == null
+        ? null
+        : _dateToStorage(routine.validFromDate!),
+    'validUntilLocalDate': routine.validUntilDate == null
+        ? null
+        : _dateToStorage(routine.validUntilDate!),
     'status': routine.status.name,
     'pausedUntilLocalDate': routine.pausedUntilDate == null
         ? null
@@ -301,6 +319,7 @@ class DriftRoutinesRepository implements RoutinesRepository {
         nameSnapshot: run.nameSnapshot,
         iconKeySnapshot: run.iconKeySnapshot,
         colorKeySnapshot: run.colorKeySnapshot,
+        customColorArgbSnapshot: Value(run.customColorArgbSnapshot),
         scheduledStartMinuteSnapshot: run.scheduledStartMinuteSnapshot,
         startedAt: Value(run.startedAt),
         completedAt: Value(run.completedAt),
@@ -388,6 +407,13 @@ class DriftRoutinesRepository implements RoutinesRepository {
       description: record.description,
       iconKey: record.iconKey,
       colorKey: record.colorKey,
+      customColorArgb: record.customColorArgb,
+      validFromDate: record.validFromLocalDate == null
+          ? null
+          : DateTime.parse(record.validFromLocalDate!),
+      validUntilDate: record.validUntilLocalDate == null
+          ? null
+          : DateTime.parse(record.validUntilLocalDate!),
       status: _routineStatus(record.status),
       pausedUntilDate: record.pausedUntilLocalDate == null
           ? null
@@ -429,6 +455,7 @@ class DriftRoutinesRepository implements RoutinesRepository {
       nameSnapshot: record.nameSnapshot,
       iconKeySnapshot: record.iconKeySnapshot,
       colorKeySnapshot: record.colorKeySnapshot,
+      customColorArgbSnapshot: record.customColorArgbSnapshot,
       scheduledStartMinuteSnapshot: record.scheduledStartMinuteSnapshot,
       startedAt: record.startedAt,
       completedAt: record.completedAt,
@@ -476,6 +503,16 @@ class DriftRoutinesRepository implements RoutinesRepository {
         routine.iconKey.trim().isEmpty ||
         routine.colorKey.trim().isEmpty) {
       throw ArgumentError('Routine identity is invalid.');
+    }
+    _validateCustomColor(routine.customColorArgb);
+    if ((routine.validFromDate != null &&
+            !_isCanonicalLocalDate(routine.validFromDate!)) ||
+        (routine.validUntilDate != null &&
+            !_isCanonicalLocalDate(routine.validUntilDate!)) ||
+        (routine.validFromDate != null &&
+            routine.validUntilDate != null &&
+            routine.validFromDate!.isAfter(routine.validUntilDate!))) {
+      throw ArgumentError('Routine validity range is invalid.');
     }
     final descriptionLength = routine.description?.trim().length;
     if (descriptionLength != null && descriptionLength > 500) {
@@ -541,6 +578,7 @@ class DriftRoutinesRepository implements RoutinesRepository {
         run.scheduledStartMinuteSnapshot > 1439) {
       throw ArgumentError('Routine run is invalid.');
     }
+    _validateCustomColor(run.customColorArgbSnapshot);
     _validateTerminalState(
       status: run.status,
       completedAt: run.completedAt,
@@ -634,6 +672,19 @@ class DriftRoutinesRepository implements RoutinesRepository {
     'missed' => RoutineRunStatus.missed,
     _ => throw StateError('Unknown routine run status: $value'),
   };
+
+  void _validateCustomColor(int? color) {
+    if (color != null && (color < 0xFF000000 || color > 0xFFFFFFFF)) {
+      throw ArgumentError('Routine custom color must be opaque ARGB.');
+    }
+  }
+
+  bool _isCanonicalLocalDate(DateTime date) =>
+      date.hour == 0 &&
+      date.minute == 0 &&
+      date.second == 0 &&
+      date.millisecond == 0 &&
+      date.microsecond == 0;
 
   String _dateToStorage(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'

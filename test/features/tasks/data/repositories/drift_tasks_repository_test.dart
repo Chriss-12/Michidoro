@@ -24,7 +24,10 @@ void main() {
         }
       });
 
-      final createdTask = await repository.createTask('Persistir M2');
+      final createdTask = await repository.createTask(
+        'Persistir M2',
+        durationMinutes: 25,
+      );
       await database.close();
 
       database = MichiFocusDatabase(NativeDatabase(file));
@@ -39,6 +42,7 @@ void main() {
       expect(tasks.single.isCompleted, isFalse);
       expect(tasks.single.scheduledDate, isNull);
       expect(tasks.single.goalId, isNull);
+      expect(tasks.single.durationMinutes, 25);
     });
 
     test('persists planned task schedule and goal assignment', () async {

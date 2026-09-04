@@ -47,11 +47,20 @@ Checklist:
 
 Acceptance criteria:
 - [x] Home and Settings scroll performance is tracked as a first-class milestone.
+- [x] Color-theme selection avoids a multi-frame global transition across
+      retained inactive tabs.
 - [x] App-level signal rebuilds do not unnecessarily rebuild `MaterialApp.router` during timer or settings updates.
 - [ ] Home and Settings should scroll smoothly on high-end Android hardware such as Samsung Galaxy S23 Ultra.
 - [ ] Required checks before moving to `Verified`: `flutter analyze`, full `flutter test`, and manual/profile-mode scroll verification on Android.
 
 Notes:
+- 2026-09-03: The persistent indexed tab shell amplified Flutter's default
+  whole-app theme animation because every retained themed branch repainted on
+  each transition frame. Theme selection now applies with one immediate update;
+  local persistence remains asynchronous.
+- The debug APK compiled with Java 17 and installed and launched successfully
+  on the Realme RMX3301 without clearing local data. Physical theme-switch
+  timing remains a user-visible confirmation rather than an automated claim.
 - Captured after user reported repeated scroll jank in Home and Settings on a Samsung Galaxy S23 Ultra.
 - Initial code review found the app-level `SignalBuilder` wrapping `MaterialApp.router` while reading frequently changing signals, including Pomodoro timer state.
 - M11 implementation reduced rebuild scope so `MaterialApp.router` depends only on theme-related signals; high-frequency app/timer signals now rebuild the scoped route content.

@@ -61,7 +61,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('continue-routine')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Días'), findsOneWidget);
+    expect(find.text('Repetición'), findsOneWidget);
+    expect(find.text('Vigencia'), findsOneWidget);
+    expect(find.text('Fecha de inicio'), findsOneWidget);
+    expect(find.text('Sin fecha de finalización'), findsOneWidget);
     await expectLater(
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/routine_editor_step_2.png'),
@@ -98,6 +101,10 @@ void main() {
     expect(find.text('Revisión'), findsOneWidget);
     expect(find.text('Enfoque'), findsOneWidget);
     expect(find.text('30 min'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.textContaining('cruce(s) de horario'),
+      180,
+    );
     expect(find.textContaining('cruce(s) de horario'), findsOneWidget);
     await expectLater(
       find.byType(Scaffold).first,
@@ -125,7 +132,13 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Morning routine');
     await tester.tap(find.byKey(const ValueKey('continue-routine')));
     await tester.pumpAndSettle();
-    expect(find.text('Days'), findsOneWidget);
+    expect(find.text('Recurrence'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('routine-valid-from')),
+      180,
+    );
+    expect(find.text('Validity'), findsOneWidget);
+    expect(find.text('Start date'), findsOneWidget);
     await Scrollable.ensureVisible(
       tester.element(find.byKey(const ValueKey('routine-weekday-1'))),
       alignment: 0.5,
@@ -139,6 +152,80 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-routine-item')));
     await tester.pumpAndSettle();
     expect(find.text('New activity'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('selects a custom routine color from the broad picker', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_editorApp(locale: const Locale('es')));
+    await tester.pumpAndSettle();
+
+    final customize = find.byKey(
+      const ValueKey('routine-custom-color-button'),
+    );
+    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(customize);
+    await tester.tap(customize);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personalizar color'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('routine-color-preview')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('routine-color-hue')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('routine-color-saturation')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('routine-color-lightness')),
+      findsOneWidget,
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('routine-color-hue')),
+      const Offset(80, 0),
+    );
+    await tester.tap(find.byKey(const ValueKey('routine-color-apply')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('routine-color-preview')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('allows an optional routine end date', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_editorApp(locale: const Locale('es')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Rutina temporal');
+    await tester.tap(find.byKey(const ValueKey('continue-routine')));
+    await tester.pumpAndSettle();
+
+    final noEnd = find.byKey(const ValueKey('routine-no-end-date'));
+    expect(noEnd, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('routine-valid-until')),
+      findsNothing,
+    );
+    await tester.ensureVisible(noEnd);
+    await tester.tap(noEnd);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('routine-valid-until')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -285,6 +372,9 @@ void main() {
 
     expect(find.text('Actividad'), findsOneWidget);
     expect(find.text('Iniciar actividad'), findsOneWidget);
+    expect(find.text('Hoy: Pendiente'), findsOneWidget);
+    expect(find.text('0/1'), findsOneWidget);
+    expect(find.text('0/0'), findsNothing);
     expect(
       find.byKey(const ValueKey('start-routine-item-item-run-active')),
       findsOneWidget,
@@ -457,7 +547,9 @@ Routine _routine({required String id, required RoutineStatus status}) {
     name: 'Rutina $id',
     iconKey: 'sun',
     colorKey: 'primary',
+    customColorArgb: 0xFF7C3AED,
     status: status,
+    validFromDate: DateTime(2026, 8, 7),
     createdAt: now,
     updatedAt: now,
     weekdays: const [DateTime.friday],

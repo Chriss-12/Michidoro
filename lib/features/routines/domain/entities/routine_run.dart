@@ -27,6 +27,7 @@ class RoutineRun {
     required this.createdAt,
     required this.updatedAt,
     this.routineId,
+    this.customColorArgbSnapshot,
     this.startedAt,
     this.completedAt,
     this.skippedAt,
@@ -40,6 +41,7 @@ class RoutineRun {
   final String nameSnapshot;
   final String iconKeySnapshot;
   final String colorKeySnapshot;
+  final int? customColorArgbSnapshot;
   final int scheduledStartMinuteSnapshot;
   final DateTime? startedAt;
   final DateTime? completedAt;

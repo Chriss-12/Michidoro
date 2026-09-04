@@ -254,3 +254,21 @@ Remaining before `Verified`:
   consecutive calendar dates, avoiding penalties for weekends or weekly gaps.
 - `flutter analyze`, 202 automated tests, debug APK build, data-preserving install,
   launch, and portrait Home inspection passed on RMX3301 / Android 15.
+
+## Weekly planning export - 2026-08-27
+
+- Weekly planning PDF is a separate bounded export, not a statistics report. It
+  receives an immutable snapshot of only the selected Monday-Sunday week.
+- The offline renderer produces one US Letter landscape page with seven day
+  columns, a time axis, dated-goal progress, activity titles, routine identity,
+  time ranges, state labels, routine colors, and a visible overlap marker.
+- Rendering has no database or Android dependency. File handling owns folder
+  selection, collision-resistant naming, atomic fallback writes, the displayed
+  destination, and the technical reference used by `Abrir`.
+- Android uses the existing Storage Access Framework folder and file bridge, so
+  the user selects the destination and the app does not require broad storage
+  access.
+- Automated checks cover landscape geometry, Spanish WinAnsi text, unsupported
+  glyph fallback, unique repeated exports, compact 320 px layout, the optional
+  grid, collapsible goals, and the UI export request. Android folder/save/open
+  and printed-page visual inspection remain physical release gates.

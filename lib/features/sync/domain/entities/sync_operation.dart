@@ -74,6 +74,7 @@ class SyncOperation {
           'task',
           'calendarEvent',
           'routine',
+          'quickNote',
         }.contains(entityType) ||
         entityId.trim().isEmpty ||
         entityId.length > 256 ||

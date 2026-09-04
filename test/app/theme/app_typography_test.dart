@@ -88,4 +88,29 @@ void main() {
       );
     }
   });
+
+  test('every preset themes shared surfaces and semantic status colors', () {
+    final statusSignatures = <(int, int, int, int)>{};
+
+    for (final preset in AppThemePreset.values) {
+      final palette = AppPalette.fromPreset(preset, isDark: false);
+      final theme = AppTheme.fromPreset(preset, isDark: false);
+
+      expect(theme.dialogTheme.backgroundColor, palette.surface);
+      expect(theme.bottomSheetTheme.backgroundColor, palette.surface);
+      expect(theme.popupMenuTheme.color, palette.surface);
+      expect(theme.snackBarTheme.backgroundColor, palette.surface);
+      expect(theme.snackBarTheme.actionTextColor, palette.primary);
+      expect(theme.chipTheme.selectedColor, palette.primaryMuted);
+      expect(theme.progressIndicatorTheme.color, palette.primary);
+      statusSignatures.add((
+        palette.statusDanger.toARGB32(),
+        palette.statusWarning.toARGB32(),
+        palette.statusSuccess.toARGB32(),
+        palette.statusSuccessStrong.toARGB32(),
+      ));
+    }
+
+    expect(statusSignatures, hasLength(AppThemePreset.values.length));
+  });
 }

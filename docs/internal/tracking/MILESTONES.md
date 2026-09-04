@@ -1971,6 +1971,13 @@ Planning notes:
 Verification evidence:
 - `main.dart` now limits the outer `SignalBuilder` to theme preset, dark mode, and font scale.
 - App/timer/settings values now rebuild `AppSettingsScope` around the routed child instead of rebuilding `MaterialApp.router`.
+- 2026-09-03: Color-theme selection disables MaterialApp's global theme
+  animation, avoiding repeated repaint of all branches retained by the indexed
+  tab shell. The integrated widget test locks the transition duration to zero;
+  focused analysis/test and the complete 495-test suite pass.
+- The Java 17 debug APK installed and launched on the wireless RMX3301 while
+  preserving its existing data; final perceived-latency confirmation remains
+  physical.
 - `dart format lib test` passed.
 - `flutter analyze` passed.
 - Full `flutter test` passed with 34 total tests.
@@ -2330,14 +2337,16 @@ Product distinction:
   installation.
 - Do not present onboarding again after either `Omitir` or successful completion.
 
-Proposed sequence:
-1. **Organiza tu día** - tasks, goals, planning, and calendar in one local flow.
-2. **Enfócate con intención** - task estimates, automatic focus/break blocks,
-   continuation, and maximum concentration.
-3. **Entiende tu progreso** - completion progress, local statistics, reports,
-   backup/export, and offline-first privacy.
-4. **Hazlo tuyo** - language, theme, typography, sounds, and vibration, followed
-   by `Empezar a usar MichiDoro`.
+Current sequence:
+1. **Todo tu día, en un lugar** - tasks, goals, routines, notes, date filters,
+   and daily/weekly planning.
+2. **Enfoque que se adapta a ti** - exact remaining time, persisted progress,
+   Clear/OLED maximum concentration, and optional Android silence.
+3. **Tus datos siguen siendo tuyos** - selectable local storage, encrypted
+   Syncthing exchange, multiple phones, and visible conflict review.
+4. **Mide, dicta y personaliza** - statistics, report/PDF export, dictation,
+   language, palette, typography, sound, and vibration, followed by
+   `Empezar a usar Michi Focus`.
 
 Interaction requirements:
 - [x] Show a clear progress indicator and concise Spanish/English copy.
@@ -2349,6 +2358,8 @@ Interaction requirements:
 - [x] Use responsive, accessible layouts with no clipped text at supported font
       scales.
 - [x] Use theme and typography settings already loaded at startup.
+- [x] Resolve onboarding surfaces, illustrations, text, icons, and controls from
+      the selected light or dark theme palette.
 
 Persistence and migration decision:
 - Store a versioned local marker such as `completedOnboardingVersion` in
@@ -2369,6 +2380,9 @@ Quality gates:
 - [x] Controller/repository tests cover missing, completed, invalid, and future
       marker values.
 - [x] `dart format`, `flutter analyze`, and full `flutter test` pass.
+- [x] The 2026-08-31 maintenance refresh passed five focused onboarding tests,
+      four updated golden baselines, explicit light/dark palette coverage, and
+      the complete 489-test suite.
 - [x] Release APK build/install and Android fresh/returning-install inspection
       pass without erasing the user's real data.
 
@@ -3095,6 +3109,8 @@ Deliverables:
       requires successful user authentication.
 - [x] Gate every cold start with the existing Android system authenticator before
       any bootstrap/loading work, then run the percentage loading exactly once.
+- [x] Route directly to onboarding or Home after bootstrap so the percentage
+      loading is not replayed from 0 to 100.
 - [ ] Add system-prompt unlock, locked-content overlay, cancellation, retry,
       secure-key invalidation, and password/recovery rebind flows.
 - [ ] Defer incoming encrypted operation application while locked and resume it
@@ -3167,6 +3183,17 @@ Implementation evidence on 2026-08-15:
   suite is currently blocked by an unrelated pre-existing UTC/local-time assertion
   in `drift_sync_outbox_publication_service_test.dart`; full analysis retains only
   the unrelated temporary `sqlite3` dependency notice.
+
+Implementation evidence on 2026-09-01:
+- Corrected lifecycle classification so transient Android `inactive` events,
+  such as system overlays, do not begin the one-/five-minute grace period.
+- The first real `hidden` or `paused` event starts the monotonic interval;
+  repeated lifecycle events preserve that original instant and resume applies
+  the exact configured boundary.
+- Settings now explains that the interval counts only in the background and
+  that a fully closed process always requires cold-start authentication.
+- Twenty-one focused controller/widget checks and all 495 project tests pass;
+  physical Realme/Poco timeout verification remains pending.
 
 ### V11-M1 - Local storage mode, recovery folder, and sync metadata
 
@@ -3701,12 +3728,11 @@ Tracks:
 - `REQ-V11-009`
 - `REQ-V11-010`
 
-## Proposed roadmap - Productivity V12
+## Approved roadmap - Productivity V12
 
 Status:
-Proposed on 2026-08-26. The user authorized creating this milestone from the
-reviewed product concept. That authorization does not approve implementation;
-every V12 requirement remains `Proposed` until explicitly approved.
+Approved for implementation on 2026-08-26. V12-M0 and the persistence portion
+of V12-M1 are in progress; later milestones remain approved and pending.
 
 Objective:
 Add persistent custom routine colors and validity dates, a responsive weekly
@@ -3722,20 +3748,20 @@ unless the user explicitly reprioritizes.
 
 Priority: 1
 
-Status: Proposed
+Status: In Progress
 
 Objective:
 Freeze the routine-color, validity-range, quick-note, history, backup, and sync
 contracts before changing production persistence.
 
 Deliverables:
-- [ ] Approve all `REQ-V12` requirements for implementation.
-- [ ] Finalize canonical local-date and color-value storage.
-- [ ] Preserve existing routine `color_key` compatibility.
+- [x] Approve all `REQ-V12` requirements for implementation.
+- [x] Finalize canonical local-date and color-value storage.
+- [x] Preserve existing routine `color_key` compatibility.
 - [ ] Design forward-only routine additions, historical color snapshots, and
       the dedicated quick-note table and indexes.
 - [ ] Define V11 operation, conflict, recovery, import, export, and reset rules.
-- [ ] Define migration defaults for existing routines without inventing history.
+- [x] Define migration defaults for existing routines without inventing history.
 
 Quality gates:
 - [ ] Architecture and migration review pass.
@@ -3751,23 +3777,33 @@ Tracks:
 
 Priority: 2
 
-Status: Proposed
+Status: In Progress
 
 Objective:
 Persist routine custom colors and editable start/end validity, then expose them
 through the existing creation and editing workflow.
 
 Deliverables:
-- [ ] Add routine custom color and local validity fields through Drift.
-- [ ] Preserve historical execution snapshots and future-only edit semantics.
-- [ ] Add broad color selection and contrast-safe previews.
-- [ ] Add start date and optional end date to creation, editing, and review.
-- [ ] Recalculate future projections and reminders after valid edits.
+- [x] Add routine custom color and local validity fields through Drift.
+- [x] Preserve historical execution snapshots and future-only edit semantics.
+- [x] Add broad color selection and contrast-safe previews.
+- [x] Add start date and optional end date to creation, editing, and review.
+- [x] Recalculate future projections and reminders after valid edits.
 
 Quality gates:
-- [ ] Migration, repository, reminder, projection, and history tests pass.
-- [ ] Spanish/English, light/dark, large-text, keyboard, and narrow-phone checks pass.
-- [ ] Drift generation, formatting, clean analysis, and full tests pass.
+- [x] Migration, repository, reminder, projection, and history tests pass.
+- [x] Spanish/English, light/dark, large-text, keyboard, and narrow-phone widget checks pass.
+- [x] Drift generation, formatting, clean analysis, and full tests pass.
+
+- [ ] Physical Android inspection passes; the RMX3301 is connected, but the
+      local Gradle process cannot establish its loopback connection.
+
+Verification:
+- 2026-08-26: schema 8, repository/sync boundaries, color snapshots, validity
+  projection, reminder refresh, editor controls, bilingual responsive widgets,
+  and visual references passed focused coverage.
+- 2026-08-26: dart format, clean lib/test analysis, 19 focused editor and
+  controller tests, 19 repository tests, and all 428 tests passed.
 
 Tracks:
 - `REQ-V12-001`
@@ -3777,25 +3813,54 @@ Tracks:
 
 Priority: 3
 
-Status: Proposed
+Status: Verified
 
 Objective:
 Add a school-timetable-style weekly planning view for routine activities and
 dated objectives while preserving the existing monthly view and actions.
 
 Deliverables:
-- [ ] Add `Mes | Semana` inside `Objetivos/Planificación`.
-- [ ] Project only valid routine occurrences into time-positioned colored blocks.
-- [ ] Show objective task progress in an all-day area.
-- [ ] Show activity state and routine-level progress without redundant counts.
-- [ ] Preserve overlap visibility and existing routine/objective actions.
-- [ ] Provide responsive day navigation for phones and wider layouts.
+- [x] Add `Mes | Semana` inside `Objetivos/Planificación`.
+- [x] Project only valid routine occurrences into time-positioned colored blocks.
+- [x] Show objective task progress in an all-day area.
+- [x] Show activity state and routine-level progress without redundant counts.
+- [x] Preserve overlap visibility and existing routine/objective actions.
+- [x] Provide responsive day navigation for phones and wider layouts.
+- [x] Add a phone-first `Compacto | Cuadrícula` selector with all seven days in
+      readable vertical sections and collapsible weekly goals.
+- [x] Export the selected week offline as a uniquely named US Letter landscape
+      PDF that Android can save and open for print/share.
 
 Quality gates:
 - [ ] Boundary, indefinite-range, overlap, local-midnight, and edit tests pass.
 - [ ] Dense bilingual and accessibility widget checks pass.
 - [ ] Scrolling, projection, and repaint performance remain bounded.
 - [ ] Physical portrait inspection passes on a representative Android phone.
+- [ ] PDF structure, Letter-landscape geometry, Spanish text, unique naming,
+      Android save, and open smoke checks pass.
+
+Evidence:
+- 2026-08-26: bounded Monday-Sunday activity projection, inclusive routine
+  validity, immutable historical color snapshots, visible overlap lanes, and
+  the `Mes | Semana` planning selector were implemented without future task
+  materialization.
+- 2026-08-26: clean `lib`/`test` analysis, 10 focused schedule/calendar tests,
+  and all 433 project tests passed. The focused coverage includes local-midnight
+  ownership, while the widget check includes a dense
+  eight-way overlap at 320 px without overflow.
+- 2026-08-26: release generation and physical installation remain pending
+  because the local Java selector cannot establish Gradle's loopback connection;
+  Adoptium JDK 17, Android Studio JBR, IPv4-only, and no-daemon attempts failed
+  before Android compilation began.
+- 2026-08-27: the phone-first compact view now shows all seven days as vertical
+  sections, keeps the school grid as an explicit alternative, and collapses the
+  weekly goals without hiding their task-progress summary.
+- 2026-08-27: the selected week now renders offline as one US Letter landscape
+  PDF and reuses Android's folder picker, collision-resistant save, exact
+  destination, and open-file bridge. Renderer, unique-file, narrow-layout,
+  bilingual, goals-toggle, grid-switch, and UI export tests pass; the complete
+  project test suite also passes. Android save/open and printed-page inspection
+  remain the final verification gates.
 
 Tracks:
 - `REQ-V12-003`
@@ -3804,25 +3869,25 @@ Tracks:
 
 Priority: 4
 
-Status: Proposed
+Status: Implemented
 
 Objective:
 Create the independent offline-first quick-note entity and reliable checkbox
 workflow without reusing or changing ordinary tasks.
 
 Deliverables:
-- [ ] Add the dedicated quick-note Drift table, DAO, repository, domain entity,
+- [x] Add the dedicated quick-note Drift table, DAO, repository, domain entity,
       controller, DI, and forward migration.
-- [ ] Persist text, completion, color, optional date, optional priority, order,
+- [x] Persist text, completion, color, optional date, optional priority, order,
       and timestamps.
-- [ ] Add create, edit, check, uncheck, delete, and reorder behavior.
-- [ ] Include quick notes in reset, backup, import validation, recovery, and sync.
-- [ ] Prove quick notes do not affect Pomodoro, task statistics, or reports.
+- [x] Add create, edit, check, uncheck, delete, and reorder behavior.
+- [x] Include quick notes in reset, backup, import validation, recovery, and sync.
+- [x] Prove quick notes do not affect Pomodoro, task statistics, or reports.
 
 Quality gates:
-- [ ] Migration, persistence, ordering, validation, and restart tests pass.
-- [ ] Sync create/update/delete/completion idempotency tests pass.
-- [ ] Drift generation, formatting, clean analysis, and full tests pass.
+- [x] Migration, persistence, ordering, validation, and restart tests pass.
+- [x] Sync create/update/delete/completion idempotency tests pass.
+- [x] Drift generation, formatting, clean analysis, and full tests pass.
 
 Tracks:
 - `REQ-V12-004`
@@ -3832,24 +3897,55 @@ Tracks:
 
 Priority: 5
 
-Status: Proposed
+Status: Implemented
 
 Objective:
 Expose `Notas rápidas` with personalized colors, optional priority, flexible
 sorting, and compact selected-day visibility.
 
 Deliverables:
-- [ ] Add `Notas rápidas` inside the existing Tasks feature navigation.
-- [ ] Add native checkbox presentation with reversible completed treatment.
-- [ ] Add broad custom-color selection independent of priority.
-- [ ] Add optional high/medium/low priority and
+- [x] Add `Notas rápidas` inside the existing Tasks feature navigation.
+- [x] Add native checkbox presentation with reversible completed treatment.
+- [x] Add broad custom-color selection independent of priority.
+- [x] Add optional high/medium/low priority and
       manual/priority/date/recent/color sorting.
-- [ ] Keep undated notes discoverable and show dated notes in the day agenda.
+- [x] Keep undated notes discoverable and show dated notes in the day agenda.
 
 Quality gates:
 - [ ] Spanish/English, theme, large-text, keyboard, semantics, and narrow-phone checks pass.
-- [ ] Sorting remains stable after restart and synchronization.
-- [ ] Existing Tasks and Routines workflows have no regression.
+- [x] Sorting remains stable after restart and synchronization.
+- [x] Existing Tasks and Routines workflows have no regression.
+
+Implementation evidence on 2026-08-27:
+
+- Unified schema version 9 adds the independent `quick_notes` table with opaque
+  color, optional canonical date and priority, spaced manual position, and
+  timestamps. Reset and staged import validation cover the table and indexes.
+- Repository mutations create encrypted `quickNote` operations; initial
+  preparation, incoming application, duplicate rejection, conflict selection,
+  preserve-both, and controller refresh use the existing secure group model.
+- `Tareas | Rutinas | Notas` exposes the general checklist and selected-day
+  Planning shows only dated notes. New notes default to the current or supplied
+  planning day, while existing undated notes remain undated when edited.
+- The editor exposes a Paint-style hue and saturation/value selector with a hex
+  preview and presets. A 320 px dark-theme widget test covers custom color,
+  default date, creation, reversible completion, and compact cards without
+  overflow.
+- Secure synchronized mutations preserve validation and encryption while loading
+  the Android storage, enrollment, and device-identity prerequisites
+  sequentially with bounded reads. App-private values are cached after the
+  first read and refreshed by their own save/create/update operations, avoiding
+  three repeated filesystem reads for each note mutation.
+- A failed or timed-out prerequisite now re-enables `Guardar nota` and shows an
+  actionable message instead of leaving the editor in an indefinite loading
+  state.
+- Physical diagnosis found that production quick-note creation passed the
+  unsupported scope `quick_note` to the secure ID generator. It now uses the
+  valid `quick-note` scope, with repository coverage using the production
+  generator rather than the timestamp fallback.
+- Drift generation and clean `lib`/`test` analysis pass; all 448 project tests
+  pass. The 70.4 MB release APK builds, installs over the existing RMX3301 data,
+  and reaches the Android authentication prompt on 2026-08-27.
 
 Tracks:
 - `REQ-V12-005`
@@ -3858,7 +3954,7 @@ Tracks:
 
 Priority: 6
 
-Status: Proposed
+Status: Approved
 
 Objective:
 Verify V12 end to end before changing any requirement to `Verified`.
@@ -3885,3 +3981,536 @@ Tracks:
 - `REQ-V12-004`
 - `REQ-V12-005`
 - `REQ-V12-006`
+
+## V13 — Objetivos y notificaciones contextuales
+
+### V13-M0 — Contrato aprobado
+
+Status: Implemented
+
+Decisiones aprobadas por el usuario el 2026-08-28:
+- Agrupar las alertas de tareas por objetivo.
+- Mostrar pendientes, en progreso y completadas en cada alerta.
+- Abrir y revelar el objetivo desde su notificación.
+- Añadir creación contextual y objetivos desplegables.
+
+### V13-M1 — Implementación y verificación
+
+Status: Implemented
+
+- [x] Implementar el resumen estructurado por objetivo.
+- [x] Implementar navegación contextual y revelado del objetivo.
+- [x] Implementar el botón “+ Crear” y el detalle desplegable.
+- [x] Actualizar y ejecutar pruebas relevantes.
+- [x] Ejecutar análisis, suite completa, build release e instalación.
+- [ ] Validar visualmente los flujos tras la autenticación del dispositivo.
+
+Implementation evidence on 2026-08-28:
+- Clean `lib`/`test` analysis and all 450 project tests pass.
+- Focused reminder and planning tests cover grouping, counts, expansion,
+  contextual reveal, task highlighting, creation menu, theme, and layout.
+- The 70.5 MB release APK builds with Java 17, installs over the existing
+  RMX3301 application data, launches, and reaches the system authentication
+  prompt. Authenticated physical interaction remains pending.
+
+Tracks:
+- `REQ-V13-001`
+- `REQ-V13-002`
+
+### V13-M2 — Propiedad de la ejecución diaria
+
+Status: Implemented
+
+- [x] Enriquecer las tarjetas de la sección Tareas.
+- [x] Retirar la lista diaria duplicada de Objetivos.
+- [x] Preservar filtros, acciones y navegación contextual.
+- [x] Ejecutar pruebas enfocadas y puertas de calidad.
+
+Tracks:
+- `REQ-V13-003`
+
+## V20 — Silencio temporal de enfoque en Android
+
+### V20-M0 — Contrato y prueba de viabilidad nativa
+
+Status: In Progress
+
+Objective:
+Definir una experiencia honesta y demostrar qué interrupciones puede evitar
+Android antes de implementar el selector por aplicaciones.
+
+Deliverables:
+- [ ] Aprobar activación al iniciar enfoque, mantenimiento durante pausa,
+  desactivación en descanso/salida y acción independiente secundaria.
+- [ ] Aprobar perfiles, duraciones y excepciones.
+- [ ] Probar No molestar mediante una regla automática propia.
+- [ ] Probar supresión selectiva en Realme y Poco con sonido, vibración y aviso
+  emergente, pantalla encendida/apagada y app en primer/segundo plano.
+- [ ] Decidir `Silenciar aplicaciones` o `Ocultar notificaciones` según evidencia.
+- [ ] Confirmar la estrategia mínima de visibilidad de paquetes y excluir
+  `QUERY_ALL_PACKAGES`, Accesibilidad y administración del dispositivo.
+
+Tracks:
+- `REQ-V20-001`
+- `REQ-V20-002`
+- `REQ-V20-003`
+
+### V20-M1 — Ajustes, duración y selección
+
+Status: In Progress
+
+Deliverables:
+- [ ] Añadir la tarjeta `Silencio de enfoque` desactivada por defecto.
+- [ ] Añadir `Activar al iniciar un Pomodoro`; pausar o salir de la app siempre
+  debe restaurar las notificaciones.
+- [ ] Añadir en los tres puntos de Pomodoro el switch `Bloquear notificaciones
+  en este Pomodoro` para activar o desactivar solo el plan actual.
+- [ ] Hacer que cada nuevo plan herede Ajustes y limpiar su modificación temporal
+  al completar, descartar o cambiar de tarea.
+- [ ] Añadir perfiles seguros reutilizables en los Pomodoros.
+- [ ] Mostrar fin previsto, estado, contador y terminación manual.
+- [ ] Crear lista buscable con selección individual/múltiple, seleccionar todas
+  y quitar selección.
+- [ ] Mostrar el total seleccionado y reutilizar la lista sin preguntar antes de
+  cada Pomodoro.
+- [ ] Guardar perfil y paquetes solo en el celular actual.
+- [ ] Cubrir español, inglés, tema claro/oscuro, texto grande y 320 px.
+
+Tracks:
+- `REQ-V20-001`
+- `REQ-V20-002`
+
+### V20-M2 — Regla No molestar y autorizaciones Android
+
+Status: In Progress
+
+Deliverables:
+- [ ] Implementar el puente de capacidades y la regla automática propiedad de
+  Michi Focus sin sobrescribir reglas ajenas.
+- [ ] Abrir directamente el acceso a No molestar y actualizar el estado al
+  regresar.
+- [ ] Mostrar explicación previa, `Autorizar en Android`, estado `Listo` y
+  `Abrir ajustes de Android` sin pedir credenciales dentro de Michi Focus.
+- [ ] Desde el switch de Pomodoro sin autorización, abrir la explicación y el
+  acceso correcto; una cancelación conserva el switch apagado y el reloj activo.
+- [ ] Abrir ajustes de notificación por aplicación con alternativa segura.
+- [ ] Añadir el listener opcional solo si M0 aprueba el modo selectivo.
+- [ ] Tratar permiso denegado, revocado, actividad inexistente y perfil
+  administrado sin bloquear la productividad offline.
+- [ ] Validar comportamiento diferenciado de Android 23, 24–34 y 35 o posterior.
+
+Tracks:
+- `REQ-V20-002`
+- `REQ-V20-003`
+
+### V20-M3 — Caducidad, recuperación y aviso persistente
+
+Status: In Progress
+
+Deliverables:
+- [ ] Mantener una única sesión local con inicio, fin y regla propietaria.
+- [ ] Activar al comenzar realmente el contador de enfoque.
+- [ ] Retirar la regla al pausar o mandar la app a segundo plano y volver a
+  aplicarla al regresar solo si el contador continúa avanzando.
+- [ ] Aplicar o retirar inmediatamente la protección si el switch del plan cambia
+  durante un bloque de enfoque.
+- [ ] Durante el descanso, guardar el switch para el siguiente bloque sin
+  silenciar el descanso actual.
+- [ ] Mantener o retirar durante pausa según el switch y reactivar al reanudar.
+- [ ] Desactivar en descanso y reactivar en el siguiente bloque de enfoque.
+- [ ] Terminar de forma segura al completar, descartar, cambiar tarea, finalizar
+  el plan, agotar una duración secundaria o usar la acción manual.
+- [ ] Hacer que máxima concentración reutilice la sesión existente.
+- [ ] Recuperar proceso cerrado, reinicio, hora/zona cambiada y permiso revocado.
+- [ ] Mostrar una notificación activa con tiempo restante y `Terminar silencio`.
+- [ ] Garantizar idempotencia: iniciar o finalizar repetidamente no duplica reglas
+  ni deja estados huérfanos.
+- [ ] Confirmar que reset, backup y sincronización excluyen paquetes y sesión.
+
+Tracks:
+- `REQ-V20-001`
+- `REQ-V20-004`
+
+### V20-M4 — Modo selectivo condicionado por evidencia
+
+Status: Proposed
+
+Deliverables:
+- [ ] Implementar selección temporal solo con el nombre y garantía aprobados en
+  V20-M0.
+- [ ] No leer, guardar ni sincronizar títulos o contenido de notificaciones.
+- [ ] Excluir Michi Focus y componentes críticos de acciones masivas.
+- [ ] Explicar cualquier alerta que Android pueda emitir antes de ocultarla.
+- [ ] Permitir retirar el acceso opcional sin afectar el silencio global.
+
+Tracks:
+- `REQ-V20-002`
+- `REQ-V20-003`
+
+### V20-M5 — Verificación integral y entrega
+
+Status: Proposed
+
+Deliverables:
+- [ ] Ejecutar formato, análisis, pruebas enfocadas y suite Flutter completa.
+- [ ] Compilar APK debug/release e instalar en Realme y Poco.
+- [ ] Probar permisos concedidos/denegados/revocados, proceso cerrado, reinicio,
+  cambio horario y final anticipado.
+- [ ] Probar iniciar, pausar, reanudar, descansar, encadenar bloques, completar,
+  descartar y cambiar de tarea con ambos valores del switch de pausa.
+- [ ] Probar el switch de tres puntos activado/desactivado, herencia global,
+  permiso faltante, cancelación y limpieza al terminar el plan.
+- [ ] Comprobar llamadas, mensajes, alarmas, medios, notificaciones de terceros y
+  avisos de fin de Pomodoro para cada perfil.
+- [ ] Confirmar que ninguna regla propia queda activa después del fin.
+- [ ] Actualizar guías Android y cliente únicamente con conducta verificada.
+
+Definition of Done:
+- [ ] El silencio global temporal funciona sin modificar reglas ajenas.
+- [ ] Cada bloque de enfoque activa la protección configurada y cada descanso o
+  salida la restaura según el contrato.
+- [ ] El switch del plan responde inmediatamente y nunca altera silenciosamente
+  el valor general de Ajustes.
+- [ ] La interfaz nunca promete silencio selectivo sin evidencia física.
+- [ ] Seleccionar todas/quitar selección es reversible y local al dispositivo.
+- [ ] La app abre las pantallas correctas de Android y refleja el permiso real.
+- [ ] Realme y Poco superan la matriz física sin una sesión huérfana.
+
+Tracks:
+- `REQ-V20-001`
+- `REQ-V20-002`
+- `REQ-V20-003`
+- `REQ-V20-004`
+
+## V18 — Continuidad exacta del Pomodoro
+
+### V18-M0 — Continuidad exacta implementada
+
+Status: Verified
+
+- [x] Definir el tiempo pendiente en segundos.
+- [x] Prohibir la repetición de sesiones completas o parciales persistidas.
+- [x] Mantener el esquema y la sincronización sin cambios.
+- [x] Implementar reconciliación y limpieza esperada del runtime.
+- [x] Cubrir cierre, reapertura y último bloque reducido con pruebas.
+- [x] Ejecutar las puertas completas y la instalación física.
+
+Verification evidence through 2026-08-31:
+- 30 minutos completos más 25 parciales de una tarea de 60 producen un último
+  bloque de 5 minutos después de cerrar y preparar nuevamente la tarea.
+- Los runtimes antiguos completos y parciales se reconcilian sin repetir foco.
+- La entrada desde Tareas descarta sin guardar progreso un runtime antiguo que
+  exceda el resto persistido y recalcula el plan desde ese historial.
+- El análisis está limpio, las 485 pruebas pasan y el APK se instaló/abrió en
+  el Realme RMX3301 por depuración inalámbrica.
+- En el Realme, una tarea real de 55/60 mostró `faltan 5 min` y dejó el reloj
+  preparado en `05:00`, 0/1, sin iniciar el conteo.
+
+Tracks:
+- `REQ-V18-001`
+
+## V19 — Rendimiento de navegación y actualización
+
+### V19-M1 — Pestañas persistentes
+
+Status: Verified
+
+- [x] Conservar las cinco ramas principales con un shell indexado.
+- [x] Preservar estado local, filtros y desplazamiento al cambiar de pestaña.
+- [x] Mantener rutas contextuales y pantallas secundarias compatibles.
+
+### V19-M2 — Actualización coordinada
+
+Status: Verified
+
+- [x] Deduplicar recargas manuales y posteriores a sincronización.
+- [x] Añadir deslizar para actualizar en Inicio, Tareas y Objetivos.
+- [x] Evitar recargas por seleccionar de nuevo una vista ya activa.
+- [x] Cubrir navegación, conservación, concurrencia y regresiones.
+
+### V19-M3 — Precarga segura de productividad
+
+Status: Verified
+
+- [x] Iniciar Tareas, Rutinas y Notas únicamente después de la autenticación.
+- [x] Cargar los tres conjuntos en paralelo durante el único arranque.
+- [x] Retirar las cargas duplicadas de la configuración de dependencias.
+- [x] Compartir lecturas simultáneas de Tareas y Notas.
+- [x] Precargar solo la rama visual de Tareas.
+- [x] Cubrir autenticación, rama anticipada y concurrencia con pruebas.
+
+Implementation evidence on 2026-08-31:
+- Las 32 pruebas enfocadas pasaron.
+- `flutter analyze lib test` terminó limpio.
+- Las 482 pruebas del proyecto pasaron.
+- El APK compiló con Java 17 y se instaló/abrió en el Realme RMX3301.
+- Tareas, Rutinas y Notas aparecieron sin otra carga visible; la actualización
+  manual terminó sin error y la selección Notas sobrevivió al cambio de pestaña.
+
+Tracks:
+- `REQ-V19-001`
+
+## V17 — Filtros temporales y creación accesible
+
+### V17-M1 — Notas, rutinas y Objetivos
+
+Status: Implemented
+
+- [x] Compartir Hoy/Día/Semana/Mes/Año/Todas entre Notas y Rutinas.
+- [x] Filtrar rutinas por recurrencia y vigencia sin mezclar progreso de hoy.
+- [x] Mantener accesibles las notas sin fecha mediante Todas.
+- [x] Mover Crear a la parte superior de la tarjeta de Objetivos.
+- [x] Cubrir límites temporales, controladores, vista estrecha y regresiones.
+- [x] Ejecutar formato, análisis limpio y suite completa.
+
+Implementation evidence on 2026-08-30:
+- Los filtros reutilizan un modelo único de periodos locales e inclusivos.
+- El análisis de `lib` y `test` está limpio y las 472 pruebas pasan.
+- La referencia visual de Rutinas incluye el nuevo control.
+- El APK de depuración compiló con Java 17 y se instaló/abrió por ADB
+  inalámbrico en el Realme RMX3301.
+
+Tracks:
+- `REQ-V12-007`
+- `REQ-V13-002`
+
+## V16 — Visualización de enfoque
+
+### V16-M0 — Contrato aprobado
+
+Status: Approved
+
+- [x] Definir los estilos Claro y OLED y conservar OLED como inicial.
+- [x] Delimitar estilo/protección efímeros y opacidad AMOLED local persistente.
+- [x] Definir el conteo de Pomodoros completados por fase.
+
+Tracks:
+- `REQ-V16-001`
+- `REQ-V16-002`
+
+### V16-M2 — Pantalla activa durante el Pomodoro
+
+Status: Implemented
+
+- [x] Añadir el switch al menú de visualización normal y de Máxima concentración.
+- [x] Activarlo automáticamente al entrar en Máxima concentración.
+- [x] Permitir desactivarlo sin modificar la sesión.
+- [x] Aplicar y liberar `FLAG_KEEP_SCREEN_ON` según el contador esté corriendo.
+- [x] Cubrir el estado, el coordinador y la interfaz con pruebas.
+- [x] Ejecutar formato, análisis y suite completa.
+
+Implementation evidence on 2026-09-03:
+- El análisis completo de `lib` y `test` está limpio y las 497 pruebas pasan.
+- El APK de depuración compiló con Java 17 y se instaló/abrió por ADB
+  inalámbrico en el Realme RMX3301 sin borrar sus datos.
+- La inspección física del tiempo de espera queda pendiente antes de promover
+  el requisito a `Verified`.
+
+Tracks:
+- `REQ-V16-003`
+
+### V16-M1 — Implementación y verificación
+
+Status: Implemented
+
+- [x] Añadir la selección Claro/OLED al menú de Máxima concentración.
+- [x] Restaurar los grises OLED originales y añadir opacidad AMOLED regulable.
+- [x] Mantener sólido el menú de tres puntos en Máxima concentración.
+- [x] Añadir Protección AMOLED con movimiento vertical de todo el contenido.
+- [x] Mostrar check más X/Y fuera del reloj en las tres presentaciones.
+- [x] Cubrir selección, colores, conteo y salida segura con pruebas.
+- [x] Ejecutar análisis, suite completa, APK e instalación física.
+
+Implementation evidence on 2026-08-30:
+- El análisis completo de `lib` y `test`, las pruebas enfocadas de ajustes y
+  controlador, la prueba integral visual y las 468 pruebas del proyecto pasan.
+- El APK de depuración compiló con Java 17 y se instaló/abrió por ADB
+  inalámbrico en el Realme RMX3301.
+- La inspección física de legibilidad y movimiento queda pendiente antes de
+  `Verified`.
+
+Tracks:
+- `REQ-V16-001`
+- `REQ-V16-002`
+
+## V15 — Objetivo al crear una tarea
+
+### V15-M0 — Contrato aprobado
+
+Status: Approved
+
+- [x] Definir “Sin objetivo” como valor inicial.
+- [x] Limitar opciones a objetivos fechados desde hoy.
+- [x] Definir búsqueda por teclado y dictado local.
+- [x] Definir que la tarea hereda la fecha del objetivo elegido.
+
+### V15-M1 — Implementación y verificación
+
+Status: Implemented
+
+- [x] Añadir el selector buscable al formulario de Tareas.
+- [x] Reutilizar el dictado local en la búsqueda.
+- [x] Crear la tarea rápida o planificada según la selección.
+- [x] Cubrir fechas, búsqueda, selección y creación con pruebas.
+- [x] Ejecutar análisis, suite completa, APK e instalación física.
+
+Implementation evidence on 2026-08-30:
+- El análisis enfocado está limpio y las 467 pruebas del proyecto pasan.
+- El APK de depuración compiló con Java 17, se instaló y se abrió por ADB
+  inalámbrico en el Realme RMX3301.
+- La inspección visual y el dictado de una frase quedan como puerta física para
+  promover el requisito a `Verified`.
+
+Tracks:
+- `REQ-V15-001`
+
+### V15-M2 — Duración al crear tareas
+
+Status: Implemented
+
+- [x] Aprobar el valor inicial y las seis duraciones disponibles.
+- [x] Añadir el selector adaptable debajo del objetivo.
+- [x] Persistir duración en tareas rápidas y planificadas.
+- [x] Cubrir selección, reinicio y ambos tipos de creación con pruebas.
+- [x] Ejecutar análisis, suite completa, APK e instalación física.
+
+Implementation evidence on 2026-08-30:
+- El análisis enfocado está limpio y las 467 pruebas pasan.
+- Build Runner completó sin cambios de esquema.
+- El APK de depuración compiló con Java 17 y se instaló/abrió por ADB
+  inalámbrico en el Realme RMX3301.
+- La inspección visual física queda pendiente antes de `Verified`.
+
+Tracks:
+- `REQ-V15-002`
+
+## V14 — Dictado opcional en campos de texto
+
+### V14-M0 — Contrato y arquitectura
+
+Status: Implemented
+
+Objective:
+Permitir que el micrófono rellene únicamente campos escritos, manteniendo la
+edición manual y el guardado explícito.
+
+Deliverables:
+- [x] Delimitar tareas, objetivos, rutinas, actividades y notas rápidas.
+- [x] Excluir comandos, autoguardado, audio persistente y campos estructurados.
+- [x] Aprobar la dependencia, el permiso Android y el servicio compartido.
+
+### V14-M1 — Implementación y verificación Android
+
+Status: Implemented
+
+Deliverables:
+- [x] Integrar reconocimiento de frases cortas con un único coordinador.
+- [x] Añadir una acción de micrófono reutilizable a los campos aprobados.
+- [x] Cubrir inserción, cancelación, errores y exclusión mutua con pruebas.
+- [x] Ejecutar formato, análisis y pruebas relevantes.
+- [x] Compilar e instalar en el Realme por depuración inalámbrica.
+- [ ] Validar una frase hablada en el Realme tras la autorización del usuario.
+
+Implementation evidence on 2026-08-29:
+- 463 automated tests pass and static analysis reports no issues after adding
+  the current Calendar/Goals forms and the Android start-result guard.
+- Debug APK built with Java 17 and installed successfully on RMX3301 at
+  ``192.168.100.43:39669``; the application launcher opened it.
+- The first physical dictation remains a manual check because Android requires
+  the user to grant microphone access and may require biometric unlocking.
+- Follow-up on 2026-08-29 restored local-only recognition, removed the false
+  start failure caused by the package's void return, and added Android's
+  official local-model download request for the active locale.
+- Follow-up on 2026-08-30 changed dictation to user-controlled stop, with a
+  five-minute safety limit, sixty-second silence tolerance, and guarded language
+  preparation status.
+- RMX3301 logs confirmed Android `LANGUAGE_PACK_ERROR 12` for `es-BO`; local
+  preparation and recognition now use the compatible `es-ES` model together.
+- Follow-up on 2026-08-30 exposes Android's model state as scheduled, live
+  percentage when supported, ready, or failed, and creates a fresh on-device
+  recognizer after preparation. Nine focused tests, all 465 project tests,
+  scoped analysis, Android compilation, and wireless RMX3301 installation pass;
+  speaking and observing the real model transition remain a manual physical
+  check. Full-project analysis reports only the pre-existing temporary SQLite
+  verification-script dependency notice.
+- Physical logs then identified a provider mismatch: Google TTS owned the
+  downloaded `es-ES` pack while the on-device constructor selected AiAi and
+  returned `LANGUAGE_PACK_ERROR 13`. Download and recognition now share
+  Android's configured recognition service. Android compilation, nine focused
+  tests, wireless RMX3301 installation, and clean focused diff checks pass;
+  one spoken phrase remains the final physical verification.
+- Poco M4 Pro inspection on 2026-08-31 confirmed Android 13/API 33 cannot report
+  model-download progress to the app. Scheduled state now stops indefinite
+  progress, checks installed/pending support, and offers the real Google voice
+  language manager plus retry. The manager resolved and displayed the explicit
+  49.31 MB Spanish (Spain) download; 11 focused and all 491 tests, Android
+  compilation, and Poco ADB installation pass. Package acceptance and one spoken
+  phrase remain manual.
+- On 2026-09-01, all twelve dictation-enabled fields were aligned to one
+  multiline contract: word wrapping, one-to-two visible lines, fixed height
+  after line two, vertical cursor scrolling, newline on Enter, and explicit
+  save actions. Scoped analysis, updated Routine visual references, all 495
+  tests, the Java 17 debug build, and wireless RMX3301 installation pass.
+- The same twelve fields now place a themed clear-all eraser immediately after
+  the microphone. It is disabled for empty content and clears both the text
+  controller and the form or search state through the existing change callback.
+- Follow-up verification passes clean full analysis, 19 focused tests, all 495
+  project tests, Java 17 Android compilation, and wireless RMX3301 installation
+  and launch without clearing existing application data.
+- Creation and editing now share the same microphone and eraser behavior for
+  tasks, goals, routines, routine activities, and quick notes. Empty and
+  one-line labels stay vertically centered instead of using permanent
+  multiline top alignment.
+- Final follow-up verification passes clean full analysis, 23 focused tests,
+  all 495 project tests, Java 17 compilation, and wireless RMX3301 installation
+  and launch while preserving local application data.
+- User-requested visual rollback on 2026-09-03 restores the previous label
+  alignment in Tasks, Routines, and Quick Notes without removing dictation,
+  clear-all, or one-to-two-line wrapping. Goals keeps its centered label.
+- The rollback passes scoped analysis, 20 focused tests, Java 17 compilation,
+  and wireless RMX3301 installation and launch without clearing local data.
+
+Tracks:
+- `REQ-V14-001`
+
+### V13-M4 — Creación integrada en Objetivos
+
+Status: Implemented
+
+- [x] Mover Crear al pie de la tarjeta de Objetivos.
+- [x] Dar al botón el ancho completo disponible.
+- [x] Retirar la tarjeta independiente de agenda y sus acciones duplicadas.
+- [x] Preservar Nueva tarea y Nuevo objetivo dentro del menú Crear.
+- [x] Ejecutar pruebas enfocadas y puertas de calidad.
+
+Tracks:
+- `REQ-V13-002`
+
+### V13-M5 — Filtro de tareas por objetivo
+
+Status: Implemented
+
+- [x] Aprobar el comportamiento y el valor inicial.
+- [x] Componer objetivo, período y estado en el controlador.
+- [x] Añadir el selector de objetivo en Tareas.
+- [x] Ejecutar pruebas enfocadas y puertas de calidad.
+
+Implementation evidence on 2026-08-28:
+- “Todos los objetivos” es el valor inicial e incluye tareas sin objetivo.
+- Los recuentos de estado se recalculan para el objetivo y período activos.
+- El análisis enfocado, 23 pruebas enfocadas y la suite completa pasan.
+
+Tracks:
+- `REQ-V13-004`
+
+### V13-M3 — Propiedad de la ejecución de rutinas
+
+Status: Implemented
+
+- [x] Retirar las tarjetas de rutina de la agenda de Objetivos.
+- [x] Conservar las rutinas como bloques del horario semanal.
+- [x] Mostrar estado y progreso diario en Tareas → Rutinas sin `0/0`.
+- [x] Ejecutar pruebas enfocadas y puertas de calidad.
+
+Tracks:
+- `REQ-V13-003`

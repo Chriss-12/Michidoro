@@ -9,6 +9,7 @@ import 'package:pomodoro_app_v1/features/sync/domain/entities/sync_storage_confi
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/device_identity_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_group_enrollment_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/repositories/sync_storage_config_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/sync_mutation_failure.dart';
 
 class ConfiguredSyncMutationCoordinator {
   ConfiguredSyncMutationCoordinator({
@@ -47,6 +48,7 @@ class ConfiguredSyncMutationCoordinator {
   )?
   _readCurrentFields;
   final DateTime Function() _clock;
+  static const _configurationReadTimeout = Duration(seconds: 5);
 
   Future<T> call<T>({
     required String entityType,
@@ -55,24 +57,42 @@ class ConfiguredSyncMutationCoordinator {
     required Map<String, Object?> changedFields,
     required Future<T> Function() mutate,
   }) async {
-    final storage = await _storageRepository.load();
+    final storage = await _runStage(
+      SyncMutationFailureStage.storageConfiguration,
+      _storageRepository.load,
+      timeout: _configurationReadTimeout,
+    );
     if (storage.mode != SyncStorageMode.multipleDevices) return mutate();
-    final enrollment = await _enrollmentRepository.load();
-    final identity = await _identityRepository.load();
+    final enrollment = await _runStage(
+      SyncMutationFailureStage.enrollment,
+      _enrollmentRepository.load,
+      timeout: _configurationReadTimeout,
+    );
+    final identity = await _runStage(
+      SyncMutationFailureStage.deviceIdentity,
+      _identityRepository.load,
+      timeout: _configurationReadTimeout,
+    );
     if (enrollment == null || !identity.isInitialized) return mutate();
 
     final now = _sqliteDateTime(_clock().toUtc());
-    await _exchangeRepository.initializeLocalState(
-      groupId: enrollment.groupId,
-      installationId: identity.installationId,
-      protocolVersion: enrollment.manifest.protocolVersion,
-      now: now,
+    await _runStage(
+      SyncMutationFailureStage.localState,
+      () => _exchangeRepository.initializeLocalState(
+        groupId: enrollment.groupId,
+        installationId: identity.installationId,
+        protocolVersion: enrollment.manifest.protocolVersion,
+        now: now,
+      ),
     );
     final database = _database;
     final reader = _readCurrentFields;
     final previousSnapshot = database == null || reader == null
         ? null
-        : await reader(database, entityType, entityId);
+        : await _runStage(
+            SyncMutationFailureStage.currentSnapshot,
+            () => reader(database, entityType, entityId),
+          );
     final entitySnapshot = operationKind == 'delete'
         ? previousSnapshot ?? const <String, Object?>{}
         : <String, Object?>{
@@ -80,45 +100,48 @@ class ConfiguredSyncMutationCoordinator {
             ...changedFields,
           };
     late T result;
-    await _exchangeRepository.commitLocalMutation(
-      groupId: enrollment.groupId,
-      installationId: identity.installationId,
-      entityType: entityType,
-      entityId: entityId,
-      now: now,
-      buildOperation: (counter, parentVersion) async {
-        final operation = SyncOperation(
-          groupId: enrollment.groupId,
-          operationId: _idGenerator.create('operation'),
-          originDeviceId: identity.installationId,
-          originCounter: counter,
-          entityType: entityType,
-          entityId: entityId,
-          parentVersion: parentVersion,
-          changedFields: changedFields,
-          operationKind: operationKind,
-          createdAtEpochMillis: now.millisecondsSinceEpoch,
-          originDeviceName: identity.friendlyName,
-          entitySnapshot: entitySnapshot,
-        );
-        final digest = await Sha256().hash(operation.canonicalBytes());
-        return LocalSyncOperationDraft(
-          operationId: operation.operationId,
-          entityType: entityType,
-          entityId: entityId,
-          parentVersionJson: _canonicalJson(parentVersion),
-          changedFieldsJson: _canonicalJson(changedFields),
-          operationKind: operationKind,
-          payloadSha256: digest.bytes
-              .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-              .join(),
-          originDeviceName: identity.friendlyName,
-          entitySnapshotJson: _canonicalJson(entitySnapshot),
-        );
-      },
-      mutate: (_) async {
-        result = await mutate();
-      },
+    await _runStage(
+      SyncMutationFailureStage.localCommit,
+      () => _exchangeRepository.commitLocalMutation(
+        groupId: enrollment.groupId,
+        installationId: identity.installationId,
+        entityType: entityType,
+        entityId: entityId,
+        now: now,
+        buildOperation: (counter, parentVersion) async {
+          final operation = SyncOperation(
+            groupId: enrollment.groupId,
+            operationId: _idGenerator.create('operation'),
+            originDeviceId: identity.installationId,
+            originCounter: counter,
+            entityType: entityType,
+            entityId: entityId,
+            parentVersion: parentVersion,
+            changedFields: changedFields,
+            operationKind: operationKind,
+            createdAtEpochMillis: now.millisecondsSinceEpoch,
+            originDeviceName: identity.friendlyName,
+            entitySnapshot: entitySnapshot,
+          );
+          final digest = await Sha256().hash(operation.canonicalBytes());
+          return LocalSyncOperationDraft(
+            operationId: operation.operationId,
+            entityType: entityType,
+            entityId: entityId,
+            parentVersionJson: _canonicalJson(parentVersion),
+            changedFieldsJson: _canonicalJson(changedFields),
+            operationKind: operationKind,
+            payloadSha256: digest.bytes
+                .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                .join(),
+            originDeviceName: identity.friendlyName,
+            entitySnapshotJson: _canonicalJson(entitySnapshot),
+          );
+        },
+        mutate: (_) async {
+          result = await mutate();
+        },
+      ),
     );
     return result;
   }
@@ -133,4 +156,20 @@ class ConfiguredSyncMutationCoordinator {
         (value.millisecondsSinceEpoch ~/ 1000) * 1000,
         isUtc: true,
       );
+
+  Future<T> _runStage<T>(
+    SyncMutationFailureStage stage,
+    Future<T> Function() action, {
+    Duration? timeout,
+  }) async {
+    try {
+      final pending = action();
+      return await (timeout == null ? pending : pending.timeout(timeout));
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        SyncMutationFailure(stage: stage, cause: error),
+        stackTrace,
+      );
+    }
+  }
 }

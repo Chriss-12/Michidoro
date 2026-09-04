@@ -9,6 +9,7 @@ import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,6 +19,7 @@ import android.media.RingtoneManager
 import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.CancellationSignal
@@ -26,8 +28,15 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.DocumentsContract
 import android.util.Log
+import android.view.WindowManager
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.speech.ModelDownloadListener
+import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
@@ -55,6 +64,9 @@ class MainActivity : FlutterActivity() {
     private val localAuthChannelName = "michifocus/local_auth"
     private val deviceIdentityChannelName = "michifocus/device_identity"
     private val groupKeystoreChannelName = "michifocus/group_keystore"
+    private val localSpeechChannelName = "michifocus/local_speech"
+    private val focusSilenceChannelName = "michifocus/focus_silence"
+    private val screenAwakeChannelName = "michifocus/screen_awake"
     private val pickProfileImageRequest = 4101
     private val pickFolderRequest = 4102
     private val pickBackupImportFolderRequest = 4103
@@ -73,6 +85,10 @@ class MainActivity : FlutterActivity() {
     private var pendingRequestCode: Int? = null
     private var pendingLocalAuthResult: MethodChannel.Result? = null
     private var localAuthCancellationSignal: CancellationSignal? = null
+    private lateinit var localSpeechChannel: MethodChannel
+    private var localSpeechRecognizer: SpeechRecognizer? = null
+    private var localSpeechDownloadRecognizer: SpeechRecognizer? = null
+    private var localSpeechDownloadActive = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -104,6 +120,387 @@ class MainActivity : FlutterActivity() {
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, groupKeystoreChannelName)
             .setMethodCallHandler { call, result -> handleGroupKeystoreCall(call, result) }
+        localSpeechChannel =
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, localSpeechChannelName)
+        localSpeechChannel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "downloadModel" -> downloadLocalSpeechModel(call, result)
+                    "openLanguageSettings" -> openLocalSpeechLanguageSettings(call, result)
+                    "startListening" -> startLocalSpeech(call, result)
+                    "stopListening" -> stopLocalSpeech(result)
+                    "cancelListening" -> cancelLocalSpeech(result)
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, focusSilenceChannelName)
+            .setMethodCallHandler { call, result ->
+                val focusSilence = FocusSilenceNative(applicationContext)
+                try {
+                    when (call.method) {
+                        "getCapability" -> result.success(focusSilence.capability())
+                        "openPolicyAccessSettings" -> {
+                            focusSilence.openPolicyAccessSettings()
+                            result.success(null)
+                        }
+                        "setActive" -> result.success(
+                            focusSilence.setActive(
+                                active = call.argument<Boolean>("active") == true,
+                                profile = call.argument<String>("profile") ?: "alarmsOnly",
+                                endsAtEpochMillis = call.argument<Number>("endsAtEpochMillis")?.toLong(),
+                            ),
+                        )
+                        else -> result.notImplemented()
+                    }
+                } catch (error: Exception) {
+                    result.error(
+                        "focus_silence_failed",
+                        error.message ?: "No se pudo cambiar No molestar.",
+                        null,
+                    )
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, screenAwakeChannelName)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "setEnabled") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                if (call.argument<Boolean>("enabled") == true) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                result.success(null)
+            }
+    }
+
+    private fun startLocalSpeech(call: MethodCall, result: MethodChannel.Result) {
+        if (!SpeechRecognizer.isRecognitionAvailable(applicationContext)) {
+            result.error("local_speech_unavailable", "El reconocimiento local no está disponible.", null)
+            return
+        }
+        val localeId = localSpeechLocale(call)
+        localSpeechRecognizer?.destroy()
+        val recognizer = createConfiguredLocalSpeechRecognizer()
+        localSpeechRecognizer = recognizer
+        recognizer.setRecognitionListener(
+            object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    sendLocalSpeechEvent("speechStatus", "listening")
+                }
+
+                override fun onBeginningOfSpeech() = Unit
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+                override fun onEndOfSpeech() = Unit
+
+                override fun onError(error: Int) {
+                    sendLocalSpeechEvent("speechError", localSpeechError(error))
+                    finishLocalSpeech()
+                }
+
+                override fun onResults(results: Bundle?) {
+                    sendLocalSpeechResult(results, true)
+                    finishLocalSpeech()
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    sendLocalSpeechResult(partialResults, false)
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            },
+        )
+        val intent = localSpeechIntent(localeId)
+        recognizer.startListening(intent)
+        Log.i("MichiFocusSpeech", "Configured local recognizer started for $localeId")
+        result.success(true)
+    }
+
+    private fun stopLocalSpeech(result: MethodChannel.Result) {
+        localSpeechRecognizer?.stopListening()
+        result.success(true)
+    }
+
+    private fun cancelLocalSpeech(result: MethodChannel.Result) {
+        localSpeechRecognizer?.cancel()
+        finishLocalSpeech()
+        result.success(true)
+    }
+
+    private fun finishLocalSpeech() {
+        localSpeechRecognizer?.destroy()
+        localSpeechRecognizer = null
+        sendLocalSpeechEvent("speechStatus", "done")
+    }
+
+    private fun sendLocalSpeechResult(bundle: Bundle?, isFinal: Boolean) {
+        val text = bundle
+            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.firstOrNull()
+            .orEmpty()
+        if (text.isNotBlank()) {
+            sendLocalSpeechEvent(
+                "speechResult",
+                mapOf("text" to text, "final" to isFinal),
+            )
+        }
+    }
+
+    private fun sendLocalSpeechEvent(method: String, value: Any) {
+        Handler(Looper.getMainLooper()).post {
+            localSpeechChannel.invokeMethod(method, value)
+        }
+    }
+
+    private fun localSpeechError(error: Int): String = when (error) {
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "error_permission"
+        SpeechRecognizer.ERROR_NO_MATCH -> "error_no_match"
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "error_speech_timeout"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "error_busy"
+        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "error_language_not_supported"
+        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "error_language_unavailable"
+        else -> "error_unknown"
+    }
+
+    private fun localSpeechLocale(call: MethodCall): String =
+        call.argument<String>("localeId")
+            ?.trim()
+            ?.replace('_', '-')
+            ?.ifBlank { "es-ES" }
+            ?: "es-ES"
+
+    private fun localSpeechIntent(localeId: String): Intent =
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeId)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 60_000)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 60_000)
+        }
+
+    private fun createConfiguredLocalSpeechRecognizer(): SpeechRecognizer {
+        val configuredService = Settings.Secure.getString(
+            contentResolver,
+            "voice_recognition_service",
+        )
+        val component = configuredService
+            ?.takeIf { it.isNotBlank() }
+            ?.let(ComponentName::unflattenFromString)
+        Log.i(
+            "MichiFocusSpeech",
+            "Using configured recognition service: ${component ?: "system default"}",
+        )
+        return if (component == null) {
+            SpeechRecognizer.createSpeechRecognizer(applicationContext)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(applicationContext, component)
+        }
+    }
+
+    private fun downloadLocalSpeechModel(call: MethodCall, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.error(
+                "local_speech_unsupported",
+                "Android no admite la descarga local desde esta aplicación.",
+                null,
+            )
+            return
+        }
+        val localeId = localSpeechLocale(call)
+        if (localSpeechDownloadActive) {
+            result.success("downloading")
+            return
+        }
+        Log.i("MichiFocusSpeech", "Preparing local model for $localeId")
+        val recognizer = createConfiguredLocalSpeechRecognizer()
+        localSpeechDownloadRecognizer = recognizer
+        localSpeechDownloadActive = true
+        val intent = localSpeechIntent(localeId)
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.TIRAMISU) {
+            recognizer.checkRecognitionSupport(
+                intent,
+                mainExecutor,
+                object : RecognitionSupportCallback {
+                    override fun onSupportResult(support: RecognitionSupport) {
+                        when {
+                            supportsLocale(support.installedOnDeviceLanguages, localeId) -> {
+                                sendLocalSpeechEvent(
+                                    "modelState",
+                                    mapOf("phase" to "ready", "progress" to 100),
+                                )
+                                finishLocalSpeechDownload()
+                                result.success("downloaded")
+                            }
+                            supportsLocale(support.pendingOnDeviceLanguages, localeId) -> {
+                                sendScheduledModelState()
+                                finishLocalSpeechDownload()
+                                result.success("scheduled")
+                            }
+                            else -> triggerLegacyModelDownload(
+                                recognizer,
+                                intent,
+                                localeId,
+                                result,
+                            )
+                        }
+                    }
+
+                    override fun onError(error: Int) {
+                        triggerLegacyModelDownload(
+                            recognizer,
+                            intent,
+                            localeId,
+                            result,
+                        )
+                    }
+                },
+            )
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            recognizer.triggerModelDownload(
+                intent,
+                mainExecutor,
+                object : ModelDownloadListener {
+                    override fun onProgress(completedPercent: Int) {
+                        sendLocalSpeechEvent(
+                            "modelState",
+                            mapOf("phase" to "downloading", "progress" to completedPercent),
+                        )
+                    }
+
+                    override fun onSuccess() {
+                        Log.i("MichiFocusSpeech", "Local model status: downloaded ($localeId)")
+                        sendLocalSpeechEvent(
+                            "modelState",
+                            mapOf("phase" to "ready", "progress" to 100),
+                        )
+                        finishLocalSpeechDownload()
+                    }
+
+                    override fun onScheduled() {
+                        sendScheduledModelState()
+                        finishLocalSpeechDownload()
+                    }
+
+                    override fun onError(error: Int) {
+                        Log.e(
+                            "MichiFocusSpeech",
+                            "Local model failed: $error ($localeId)",
+                        )
+                        sendLocalSpeechEvent(
+                            "modelState",
+                            mapOf("phase" to "failed", "error" to error),
+                        )
+                        finishLocalSpeechDownload()
+                    }
+                },
+            )
+            result.success("started")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun triggerLegacyModelDownload(
+        recognizer: SpeechRecognizer,
+        intent: Intent,
+        localeId: String,
+        result: MethodChannel.Result,
+    ) {
+        try {
+            recognizer.triggerModelDownload(intent)
+            Log.i("MichiFocusSpeech", "Local model scheduled ($localeId)")
+            sendScheduledModelState()
+            result.success("scheduled")
+        } catch (error: Exception) {
+            Log.e("MichiFocusSpeech", "Could not schedule local model ($localeId)", error)
+            sendLocalSpeechEvent(
+                "modelState",
+                mapOf("phase" to "failed"),
+            )
+            result.error(
+                "local_speech_download_failed",
+                error.message ?: "Android no pudo programar el idioma.",
+                null,
+            )
+        } finally {
+            finishLocalSpeechDownload()
+        }
+    }
+
+    private fun sendScheduledModelState() {
+        sendLocalSpeechEvent(
+            "modelState",
+            mapOf("phase" to "scheduled", "requiresManualAction" to true),
+        )
+    }
+
+    private fun supportsLocale(locales: List<String>, localeId: String): Boolean {
+        val target = localeId.replace('_', '-').lowercase()
+        return locales.any {
+            val candidate = it.replace('_', '-').lowercase()
+            candidate == target ||
+                (!candidate.contains('-') && target.startsWith("$candidate-"))
+        }
+    }
+
+    private fun openLocalSpeechLanguageSettings(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val localeId = localSpeechLocale(call)
+        val configuredService = Settings.Secure.getString(
+            contentResolver,
+            "voice_recognition_service",
+        )
+        val servicePackage = configuredService
+            ?.takeIf { it.isNotBlank() }
+            ?.let(ComponentName::unflattenFromString)
+            ?.packageName
+        val languageManager = Intent(
+            "com.google.recognition.action.DOWNLOAD_LANGUAGE",
+        ).apply {
+            if (servicePackage != null) {
+                setPackage(servicePackage)
+            }
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeId)
+        }
+        val fallback = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+        val target = if (
+            packageManager.resolveActivity(
+                languageManager,
+                PackageManager.MATCH_DEFAULT_ONLY,
+            ) != null
+        ) {
+            languageManager
+        } else {
+            fallback
+        }
+        try {
+            startActivity(target)
+            result.success(true)
+        } catch (error: ActivityNotFoundException) {
+            result.error(
+                "local_speech_settings_unavailable",
+                "Android no ofrece una pantalla para administrar idiomas de voz.",
+                null,
+            )
+        }
+    }
+
+    private fun finishLocalSpeechDownload() {
+        localSpeechDownloadRecognizer?.destroy()
+        localSpeechDownloadRecognizer = null
+        localSpeechDownloadActive = false
     }
 
     private fun handleGroupKeystoreCall(call: MethodCall, result: MethodChannel.Result) {

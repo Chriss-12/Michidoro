@@ -36,7 +36,7 @@ void main() {
         protocolVersion: 1,
       );
 
-      expect(report.queued, 4);
+      expect(report.queued, 5);
       expect(report.skipped, 0);
       final outbox = await database.select(database.syncOutboxRecords).get();
       outbox.sort(
@@ -47,6 +47,7 @@ void main() {
         'routine',
         'task',
         'calendarEvent',
+        'quickNote',
       ]);
       expect(outbox.map((row) => row.operationKind), everyElement('create'));
       expect(outbox.map((row) => row.parentVersionJson), everyElement('{}'));
@@ -60,6 +61,9 @@ void main() {
           jsonDecode(outbox[1].changedFieldsJson) as Map<String, dynamic>;
       final aggregate = routine['aggregate'] as Map<String, dynamic>;
       expect(aggregate['weekdays'], [1, 3]);
+      expect(aggregate['customColorArgb'], 0xFF7C3AED);
+      expect(aggregate['validFromLocalDate'], '2026-08-15');
+      expect(aggregate['validUntilLocalDate'], '2026-12-31');
       final items = (aggregate['items'] as List).cast<Map<String, dynamic>>();
       expect(items.single['title'], 'First item');
     },
@@ -77,17 +81,17 @@ void main() {
       protocolVersion: 1,
     );
 
-    expect(first.queued, 4);
+    expect(first.queued, 5);
     expect(second.queued, 0);
-    expect(second.skipped, 4);
+    expect(second.skipped, 5);
     expect(
       await database.select(database.syncOutboxRecords).get(),
-      hasLength(4),
+      hasLength(5),
     );
     final state = await database
         .select(database.syncLocalStateRecords)
         .getSingle();
-    expect(state.logicalCounter, 4);
+    expect(state.logicalCounter, 5);
   });
 
   test('repairs an entity that only has a pre-bootstrap local update', () async {
@@ -129,7 +133,7 @@ void main() {
               ..orderBy([(row) => OrderingTerm.asc(row.originCounter)]))
             .get();
 
-    expect(report.queued, 4);
+    expect(report.queued, 5);
     expect(goalOutbox.map((row) => row.operationKind), ['update', 'create']);
     expect(
       jsonDecode(goalOutbox.last.changedFieldsJson),
@@ -166,6 +170,9 @@ Future<void> _seedExistingData(
         RoutineRecordsCompanion.insert(
           id: 'routine-existing',
           name: 'Existing routine',
+          customColorArgb: const Value(0xFF7C3AED),
+          validFromLocalDate: const Value('2026-08-15'),
+          validUntilLocalDate: const Value('2026-12-31'),
           createdAt: now.subtract(const Duration(days: 2)),
           updatedAt: now,
         ),
@@ -217,6 +224,20 @@ Future<void> _seedExistingData(
           scheduledAt: now.add(const Duration(days: 1)),
           durationMinutes: 30,
           createdAt: now,
+        ),
+      );
+  await database
+      .into(database.quickNoteRecords)
+      .insert(
+        QuickNoteRecordsCompanion.insert(
+          id: 'quick-note-existing',
+          textContent: 'Existing note',
+          colorArgb: 0xFF446688,
+          localDate: const Value('2026-08-15'),
+          priority: const Value('high'),
+          position: 100,
+          createdAt: now,
+          updatedAt: now,
         ),
       );
 }

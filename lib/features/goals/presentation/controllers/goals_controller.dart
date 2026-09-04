@@ -157,6 +157,26 @@ class GoalsController {
         .toList(growable: false);
   }
 
+  List<ProductivityGoal> goalsOnOrAfter(DateTime day) {
+    final firstAllowedDay = DateTime(day.year, day.month, day.day);
+    return _sortGoals(
+      goals.value
+          .where((goal) {
+            final targetDate = goal.targetDate;
+            if (targetDate == null) {
+              return false;
+            }
+            final normalizedTarget = DateTime(
+              targetDate.year,
+              targetDate.month,
+              targetDate.day,
+            );
+            return !normalizedTarget.isBefore(firstAllowedDay);
+          })
+          .toList(growable: false),
+    );
+  }
+
   ProductivityGoal? goalById(String? id) {
     if (id == null) {
       return null;

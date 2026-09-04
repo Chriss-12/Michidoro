@@ -79,10 +79,10 @@ void main() {
       MyApp(localAppLockController: LocalAppLockController()),
     );
 
-    expect(find.text('MichiDoro'), findsOneWidget);
-    expect(find.text('0%'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
+
+    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(materialApp.themeAnimationDuration, Duration.zero);
 
     expect(find.text('Hola, Chriss'), findsOneWidget);
     expect(find.text('Planificación'), findsNothing);
@@ -92,6 +92,14 @@ void main() {
     expect(find.text('Chriss'), findsOneWidget);
     await tester.tap(find.text('Chriss'));
     await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const ValueKey('profile-pending-task-count')),
+          )
+          .data,
+      '1',
+    );
     expect(find.text('Día'), findsWidgets);
     expect(find.text('Día del mes actual'), findsOneWidget);
     await tester.tap(find.text('Mes').last);
@@ -100,6 +108,14 @@ void main() {
     await tester.tap(find.text('Año').last);
     await tester.pumpAndSettle();
     expect(find.text('Año'), findsWidgets);
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const ValueKey('profile-pending-task-count')),
+          )
+          .data,
+      '1',
+    );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
@@ -116,9 +132,13 @@ void main() {
     await tester.tap(find.text('Objetivos').last);
     await tester.pumpAndSettle();
     expect(find.text('Planificación'), findsOneWidget);
-    expect(find.byKey(const ValueKey('goal-period-card')), findsOneWidget);
+    final goalPeriodCard = find.byKey(const ValueKey('goal-period-card'));
+    expect(goalPeriodCard, findsOneWidget);
     expect(find.text('Todos'), findsOneWidget);
-    expect(find.text('Semana'), findsOneWidget);
+    expect(
+      find.descendant(of: goalPeriodCard, matching: find.text('Semana')),
+      findsOneWidget,
+    );
     expect(find.text('Rango'), findsOneWidget);
     await tester.ensureVisible(find.text('Rango'));
     await tester.tap(find.text('Rango'));
@@ -139,47 +159,70 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('Mes siguiente'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Más acciones'));
+    final planningCreateButton = find.byKey(
+      const ValueKey('planning-create-button'),
+    );
+    await tester.ensureVisible(planningCreateButton);
+    await tester.tap(planningCreateButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Crear objetivo'));
+    await tester.tap(find.text('Nuevo objetivo'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Objetivo para'), findsOneWidget);
     expect(find.textContaining('pomodoros'), findsNothing);
     await tester.enterText(find.byType(TextField).last, 'Objetivo V2');
-    await tester.tap(find.text('Crear'));
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Crear')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Objetivo V2'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(planningCreateButton);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Nueva tarea'));
     await tester.pumpAndSettle();
     expect(find.text('Crear nueva tarea'), findsOneWidget);
     expect(find.text('Duración'), findsOneWidget);
     await tester.enterText(find.byType(TextField).last, 'Tarea V2');
-    await tester.tap(find.text('Crear'));
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Crear')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Tarea V2'), findsOneWidget);
-    expect(find.text('Pendiente'), findsOneWidget);
-    expect(find.text('25 min'), findsOneWidget);
-    expect(find.text('0/1'), findsOneWidget);
-    await tester.tap(find.text('0/1'));
-    await tester.pumpAndSettle();
-    expect(find.text('En progreso'), findsWidgets);
-    expect(find.text('Completada'), findsWidgets);
-    await tester.tap(find.text('Pendiente').last);
-    await tester.pumpAndSettle();
+    expect(find.text('Tarea V2'), findsNothing);
+    expect(find.text('Tareas del día'), findsNothing);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byTooltip('Más acciones'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Asignar tarea rápida'));
-    await tester.pumpAndSettle();
-    expect(find.text('Asignar tarea rápida'), findsOneWidget);
-    await tester.tap(find.text('Asignar'));
-    await tester.pumpAndSettle();
-    expect(find.text('Tarea rapida V2'), findsOneWidget);
-    expect(find.text('0/2'), findsOneWidget);
+    expect(find.text('Tarea rapida V2'), findsNothing);
     expect(tester.takeException(), isNull);
+
+    final today = DateTime.now();
+    final quickTask = tasksController.tasks.value.firstWhere(
+      (task) => task.title == 'Tarea rapida V2',
+    );
+    await tasksController.moveTaskToDay(
+      id: quickTask.id,
+      scheduledDate: DateTime(today.year, today.month, today.day),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tareas').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Tarea V2'), findsOneWidget);
+    expect(find.text('Tarea rapida V2'), findsOneWidget);
+    expect(find.text('Pendiente'), findsNWidgets(2));
+    expect(find.text('25 min'), findsNWidgets(2));
+    expect(find.text('Sin objetivo'), findsNWidgets(3));
+
+    final taskDraftField = find.byKey(const ValueKey('task-create-title'));
+    await tester.ensureVisible(taskDraftField);
+    await tester.enterText(taskDraftField, 'Borrador persistente');
+    tester.testTextInput.hide();
+    await tester.tap(find.text('Objetivos').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tareas').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Borrador persistente'), findsOneWidget);
+    await tester.enterText(taskDraftField, '');
 
     await tester.ensureVisible(find.byTooltip('Opciones de tarea').first);
     await tester.tap(find.byTooltip('Opciones de tarea').first);
@@ -193,6 +236,8 @@ void main() {
     expect(find.text('Tarea rapida V2'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.text('Objetivos').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Opciones de objetivo'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar objetivo'));
@@ -206,6 +251,8 @@ void main() {
     expect(find.text('Objetivo V2'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.text('Tareas').last);
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Opciones de tarea').first);
     await tester.tap(find.byTooltip('Opciones de tarea').first);
     await tester.pumpAndSettle();
@@ -230,8 +277,13 @@ void main() {
     expect(find.text('Pomodoro personalizado'), findsOneWidget);
     expect(find.text('Solo este Pomodoro'), findsOneWidget);
     expect(find.text('Usar para todo el plan'), findsOneWidget);
-    await tester.enterText(find.byType(TextField).first, '45');
-    await tester.enterText(find.byType(TextField).last, '10');
+    final customPlanDialog = find.byType(AlertDialog);
+    final customPlanFields = find.descendant(
+      of: customPlanDialog,
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(customPlanFields.first, '45');
+    await tester.enterText(customPlanFields.last, '10');
     await tester.pumpAndSettle();
     expect(find.textContaining('3 bloques: 45 + 45 + 30 min'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -269,6 +321,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Empezar Pomodoro'), findsNothing);
     expect(pomodoroController.hasActiveRuntime.value, isTrue);
+    final activePlanTotal = pomodoroController.totalBlocks.value;
+    expect(activePlanTotal, greaterThan(0));
     expect(
       AppRouter.router.routeInformationProvider.value.uri.path,
       '/pomodoro',
@@ -276,6 +330,10 @@ void main() {
     expect(find.text('25:00'), findsOneWidget);
     expect(find.text('MODO ENFOQUE'), findsOneWidget);
     expect(find.text('Enfoque actual'), findsOneWidget);
+    expect(
+      find.text('0/$activePlanTotal'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Tarea'), findsWidgets);
     expect(find.byTooltip('Opciones de visualización'), findsOneWidget);
     await tester.tap(find.byTooltip('Opciones de visualización'));
@@ -287,6 +345,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('25:00'), findsOneWidget);
+    expect(
+      find.text('0/$activePlanTotal'),
+      findsOneWidget,
+    );
     expect(find.byTooltip('Opciones de visualización'), findsOneWidget);
     await tester.tap(find.byTooltip('Opciones de visualización'));
     await tester.pumpAndSettle();
@@ -304,12 +366,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Máxima concentración'), findsOneWidget);
     expect(
-      tester.widget<Switch>(find.byType(Switch)).value,
+      tester
+          .widget<Switch>(find.byKey(const Key('maximumConcentrationSwitch')))
+          .value,
       isFalse,
     );
     await tester.tap(find.text('Máxima concentración'));
     await tester.pumpAndSettle();
     expect(pomodoroController.maximumConcentrationEnabled.value, isTrue);
+    expect(pomodoroController.keepScreenAwake, isTrue);
+    expect(
+      pomodoroController.maximumConcentrationDisplayStyle,
+      MaximumConcentrationStyle.oled,
+    );
     expect(pomodoroController.hasStartedRuntime.value, isFalse);
     expect(find.byKey(const Key('maximumConcentrationSurface')), findsNothing);
 
@@ -332,10 +401,102 @@ void main() {
       const Color(0xFF000000),
     );
     expect(find.byTooltip('Ver detalles del plan'), findsNothing);
+    expect(
+      find.text('0/$activePlanTotal'),
+      findsOneWidget,
+    );
+    expect(pomodoroController.amoledProtection, isTrue);
+    final oledTimerColor = tester
+        .widget<Text>(find.byKey(const Key('pomodoroTimeLabel')))
+        .style!
+        .color!;
+    expect(oledTimerColor, const Color(0xFFC8C8C8));
     await expectLater(
       find.byKey(const Key('maximumConcentrationSurface')),
       matchesGoldenFile('goldens/maximum_concentration.png'),
     );
+
+    await tester.tap(find.byTooltip('Opciones de visualización'));
+    await tester.pumpAndSettle();
+    expect(find.text('Claro'), findsOneWidget);
+    expect(find.text('OLED'), findsOneWidget);
+    expect(find.text('Mantener pantalla encendida'), findsOneWidget);
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const Key('keepScreenAwakeSwitch')))
+          .value,
+      isTrue,
+    );
+    await tester.tap(find.text('Claro'));
+    await tester.pumpAndSettle();
+    expect(
+      pomodoroController.maximumConcentrationDisplayStyle,
+      MaximumConcentrationStyle.clear,
+    );
+    expect(
+      tester
+          .widget<ColoredBox>(
+            find.byKey(const Key('maximumConcentrationSurface')),
+          )
+          .color,
+      const Color(0xFFFFFFFF),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('pomodoroTimeLabel')))
+          .style
+          ?.color,
+      const Color(0xFF000000),
+    );
+
+    await tester.tap(find.byTooltip('Opciones de visualización'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OLED'));
+    await tester.pumpAndSettle();
+    expect(
+      pomodoroController.maximumConcentrationDisplayStyle,
+      MaximumConcentrationStyle.oled,
+    );
+    expect(
+      tester
+          .widget<ColoredBox>(
+            find.byKey(const Key('maximumConcentrationSurface')),
+          )
+          .color,
+      const Color(0xFF000000),
+    );
+
+    await tester.tap(find.byTooltip('Opciones de visualización'));
+    await tester.pumpAndSettle();
+    final opacitySlider = find.byKey(
+      const Key('maximumConcentrationOpacitySlider'),
+    );
+    expect(opacitySlider, findsOneWidget);
+    expect(appSettingsController.maximumConcentrationOpacity.value, 1);
+    final initialMenuForeground = tester
+        .widget<Text>(find.text('OLED'))
+        .style
+        ?.color;
+    await tester.drag(opacitySlider, const Offset(-80, 0));
+    await tester.pumpAndSettle();
+    expect(
+      appSettingsController.maximumConcentrationOpacity.value,
+      lessThan(1),
+    );
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('pomodoroTimeLabel')))
+          .style
+          ?.color,
+      isNot(const Color(0xFFC8C8C8)),
+    );
+    expect(
+      tester.widget<Text>(find.text('OLED')).style?.color,
+      isNot(initialMenuForeground),
+    );
+    expect(find.text('OLED'), findsOneWidget);
+    await tester.tap(find.text('OLED'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.pause_rounded));
     await tester.pump();
@@ -344,6 +505,42 @@ void main() {
     expect(
       find.byKey(const Key('maximumConcentrationSurface')),
       findsOneWidget,
+    );
+    final initialProtectedOffset = tester
+        .widget<AnimatedSlide>(
+          find.byKey(const Key('amoledProtectedContent')),
+        )
+        .offset;
+    await tester.pump(const Duration(seconds: 60));
+    await tester.pump(const Duration(milliseconds: 700));
+    final movedProtectedOffset = tester
+        .widget<AnimatedSlide>(
+          find.byKey(const Key('amoledProtectedContent')),
+        )
+        .offset;
+    expect(movedProtectedOffset, isNot(initialProtectedOffset));
+
+    await tester.tap(find.byTooltip('Opciones de visualización'));
+    await tester.pumpAndSettle();
+    expect(find.text('Protección AMOLED'), findsOneWidget);
+    final protectionItem = find
+        .ancestor(
+          of: find.text('Protección AMOLED'),
+          matching: find.byType(Row),
+        )
+        .first;
+    await tester.tap(
+      find.descendant(of: protectionItem, matching: find.byType(Switch)),
+    );
+    await tester.pumpAndSettle();
+    expect(pomodoroController.amoledProtection, isFalse);
+    expect(
+      tester
+          .widget<AnimatedSlide>(
+            find.byKey(const Key('amoledProtectedContent')),
+          )
+          .offset,
+      Offset.zero,
     );
 
     final exitArea = find.byKey(const Key('maximumConcentrationExitArea'));
@@ -375,8 +572,18 @@ void main() {
     await tester.tap(find.byTooltip('Opciones de visualización'));
     await tester.pumpAndSettle();
     expect(find.text('Salir de pantalla completa'), findsNothing);
-    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
-    await tester.tap(find.byType(Switch));
+    final maximumSwitchRow = find
+        .ancestor(
+          of: find.text('Máxima concentración'),
+          matching: find.byType(Row),
+        )
+        .first;
+    final maximumSwitch = find.descendant(
+      of: maximumSwitchRow,
+      matching: find.byType(Switch),
+    );
+    expect(tester.widget<Switch>(maximumSwitch).value, isTrue);
+    await tester.tap(maximumSwitch);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(pomodoroController.maximumConcentrationEnabled.value, isFalse);
@@ -393,7 +600,7 @@ void main() {
     await expectLater(
       find
           .ancestor(
-            of: find.text('25:00'),
+            of: find.byKey(const Key('pomodoroTimeLabel')),
             matching: find.byType(AspectRatio),
           )
           .first,
@@ -415,7 +622,11 @@ void main() {
     await tester.pumpAndSettle();
     pomodoroController.pendingReflectionSessionId.value = 'test-reflection';
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Cierre de enfoque'));
+    await tester.scrollUntilVisible(
+      find.text('Cierre de enfoque'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(
       tester.getTopLeft(find.text('Cierre de enfoque')).dy,
       greaterThan(tester.getTopLeft(find.text('Terminar')).dy),
@@ -451,7 +662,13 @@ void main() {
     expect(find.byIcon(Icons.sentiment_neutral_rounded), findsOneWidget);
     expect(find.byIcon(Icons.sentiment_satisfied_rounded), findsOneWidget);
     expect(find.byIcon(Icons.sentiment_very_satisfied_rounded), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('focus-reflection-card')),
+        matching: find.text('1'),
+      ),
+      findsNothing,
+    );
     expect(find.text('Este Pomodoro suma a'), findsNothing);
     pomodoroController.pendingReflectionSessionId.value = null;
     await tester.pumpAndSettle();
@@ -463,12 +680,16 @@ void main() {
     expect(find.text('Planificación'), findsOneWidget);
     expect(find.byKey(const ValueKey('goal-period-card')), findsOneWidget);
     expect(find.text('Todos los objetivos'), findsOneWidget);
+    final createButton = find.byKey(
+      const ValueKey('planning-create-button'),
+    );
     await tester.scrollUntilVisible(
-      find.text('Nueva tarea'),
+      createButton,
       320,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Agenda local de planificación'), findsOneWidget);
+    expect(createButton, findsOneWidget);
+    expect(find.text('Agenda local de planificación'), findsNothing);
 
     await tester.tap(find.text('Ajustes'));
     await tester.pumpAndSettle();
@@ -495,7 +716,19 @@ void main() {
     ).extension<AppPalette>()!;
     expect(graphitePalette.background, isNot(lightPalette.background));
 
-    await tester.tap(find.text('Aurora soleada'));
+    await tester.tap(
+      find.byKey(const ValueKey('settings-theme-selector')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(
+            const ValueKey(
+              'settings-theme-option-sunshineAurora',
+            ),
+          )
+          .last,
+    );
     await tester.pumpAndSettle();
     final sunshineDarkPalette = Theme.of(
       tester.element(find.text('Apariencia')),
@@ -585,9 +818,14 @@ void main() {
     await tester.pumpAndSettle();
     appSettingsController
       ..addNotification(
-        title: 'Tarea programada para hoy',
-        body: 'Tienes 3 tareas pendientes. Empieza por: Preparar informe.',
-        routePath: '/tasks',
+        title: 'Preparar lanzamiento',
+        body: 'Revisar alcance',
+        routePath: '/goals?goalId=goal-1&taskId=task-1',
+        goalId: 'goal-1',
+        taskId: 'task-1',
+        pendingCount: 3,
+        inProgressCount: 1,
+        completedCount: 4,
       )
       ..addNotification(
         title: 'Rutina lista',
@@ -601,27 +839,57 @@ void main() {
     await tester.tap(find.byIcon(Icons.notifications_none_rounded));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('notification-kind-task')),
+      find.byKey(const ValueKey('notification-kind-goal')),
       findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('notification-kind-routine')),
       findsOneWidget,
     );
-    expect(find.text('Tareas pendientes'), findsOneWidget);
+    expect(find.text('Preparar lanzamiento'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('notification-task-count')),
+      find.byKey(const ValueKey('notification-goal-goal-1-listed')),
       findsOneWidget,
     );
-    expect(find.text('3'), findsOneWidget);
-    expect(find.textContaining('Empieza por:'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('notification-goal-goal-1-inProgress')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notification-goal-goal-1-completed')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('notification-goal-goal-1-listed')),
+        matching: find.text('3'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey('notification-goal-goal-1-inProgress'),
+        ),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('notification-goal-goal-1-completed')),
+        matching: find.text('4'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Revisar alcance'), findsNothing);
     expect(
       find.byWidgetPredicate(
         (widget) =>
             widget is Text &&
             RegExp(r'^\d{2}:\d{2}$').hasMatch(widget.data ?? ''),
       ),
-      findsNWidgets(2),
+      findsAtLeastNWidgets(2),
     );
     expect(
       find.byWidgetPredicate(
@@ -629,16 +897,16 @@ void main() {
             widget is Text &&
             RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(widget.data ?? ''),
       ),
-      findsNWidgets(2),
+      findsAtLeastNWidgets(2),
     );
-    final taskIcon = find.byKey(const ValueKey('notification-kind-task'));
-    final taskTime = find.byKey(const ValueKey('notification-time-task'));
-    final taskDate = find.byKey(const ValueKey('notification-date-task'));
-    final taskCard = find.byKey(const ValueKey('notification-card-task'));
-    expect(tester.getTopLeft(taskTime).dx, tester.getTopLeft(taskIcon).dx);
+    final goalIcon = find.byKey(const ValueKey('notification-kind-goal'));
+    final goalTime = find.byKey(const ValueKey('notification-time-goal'));
+    final goalDate = find.byKey(const ValueKey('notification-date-goal'));
+    final goalCard = find.byKey(const ValueKey('notification-card-goal'));
+    expect(tester.getTopLeft(goalTime).dx, tester.getTopLeft(goalIcon).dx);
     expect(
-      tester.getBottomRight(taskDate).dx,
-      closeTo(tester.getBottomRight(taskCard).dx - 12, 1.1),
+      tester.getBottomRight(goalDate).dx,
+      closeTo(tester.getBottomRight(goalCard).dx - 12, 1.1),
     );
     await tester.tapAt(const Offset(12, 700));
     await tester.pumpAndSettle();
@@ -702,7 +970,7 @@ void main() {
     );
     await tester.tap(find.text('Ver onboarding'));
     await tester.pumpAndSettle();
-    expect(find.text('Organiza tu día'), findsOneWidget);
+    expect(find.text('Todo tu día, en un lugar'), findsOneWidget);
     await tester.tap(find.text('Omitir'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ajustes'));
@@ -970,11 +1238,12 @@ class _MemoryTasksRepository implements TasksRepository {
   }
 
   @override
-  Future<Task> createTask(String title) async {
+  Future<Task> createTask(String title, {int? durationMinutes}) async {
     final task = Task(
       id: 'test-task-${_nextId++}',
       title: title,
       createdAt: DateTime.now(),
+      durationMinutes: durationMinutes,
     );
     _tasks.insert(0, task);
     return task;

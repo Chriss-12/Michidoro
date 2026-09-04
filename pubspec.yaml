@@ -49,6 +49,7 @@ dependencies:
   path_provider: ^2.1.5
   responsive_framework: ^1.5.1
   signals_flutter: ^7.1.0
+  speech_to_text: 7.4.0
   sqlite3_flutter_libs: ^0.5.42
   toastification: ^3.0.3
 

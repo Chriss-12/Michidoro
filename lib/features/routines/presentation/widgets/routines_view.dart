@@ -6,6 +6,7 @@ import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_identity_color.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/pages/routine_editor_page.dart';
@@ -13,6 +14,7 @@ import 'package:pomodoro_app_v1/features/routines/presentation/start_routine_foc
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/presentation/controllers/tasks_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
+import 'package:pomodoro_app_v1/shared/molecules/date_period_filter_control.dart';
 import 'package:pomodoro_app_v1/shared/molecules/glass_card.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -105,6 +107,9 @@ class RoutinesView extends StatelessWidget {
         final routines = controller.filteredRoutines.value;
         final isLoading = controller.isLoading.value;
         final error = controller.operationError.value;
+        final showTodayState = controller.selectedDateFilter.includes(
+          controller.currentLocalTime,
+        );
         final tasksById = {
           for (final task in tasksController?.tasks.value ?? const <Task>[])
             task.id: task,
@@ -117,6 +122,11 @@ class RoutinesView extends StatelessWidget {
               onPressed: () => _openEditor(context),
               icon: const Icon(Icons.add_rounded),
               label: Text(context.tr('Crear rutina', 'Create routine')),
+            ),
+            const SizedBox(height: 16),
+            DatePeriodFilterControl(
+              value: controller.selectedDateFilter,
+              onChanged: (value) => controller.selectedDateFilter = value,
             ),
             const SizedBox(height: 16),
             _RoutineFilterMenu(
@@ -135,7 +145,11 @@ class RoutinesView extends StatelessWidget {
                 _RoutineCard(
                   routine: routines[index],
                   now: controller.currentLocalTime,
-                  execution: _executionFor(routines[index], tasksById),
+                  execution: showTodayState
+                      ? _executionFor(routines[index], tasksById)
+                      : null,
+                  progress: controller.progressForToday(routines[index].id),
+                  showTodayState: showTodayState,
                   onEdit: () => _openEditor(
                     context,
                     routineId: routines[index].id,
@@ -377,6 +391,8 @@ class _RoutineCard extends StatelessWidget {
     required this.routine,
     required this.now,
     required this.execution,
+    required this.progress,
+    required this.showTodayState,
     required this.onEdit,
     required this.onAction,
     required this.onStartFocus,
@@ -386,6 +402,8 @@ class _RoutineCard extends StatelessWidget {
   final Routine routine;
   final DateTime now;
   final _RoutineExecution? execution;
+  final RoutineTodayProgress progress;
+  final bool showTodayState;
   final VoidCallback onEdit;
   final ValueChanged<_RoutineAction> onAction;
   final ValueChanged<_RoutineExecution> onStartFocus;
@@ -394,12 +412,21 @@ class _RoutineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final accent = _routineColor(palette, routine.colorKey);
+    final accent = _routineColor(
+      routine.colorKey,
+      customColorArgb: routine.customColorArgb,
+    );
     final firstMinute = routine.items.isEmpty
         ? null
         : routine.items
               .map((item) => item.scheduledMinute)
               .reduce((first, second) => first < second ? first : second);
+    final progressTotal = progress.totalRequiredItems > 0
+        ? progress.totalRequiredItems
+        : progress.totalItems;
+    final progressCompleted = progress.totalRequiredItems > 0
+        ? progress.completedRequiredItems
+        : progress.completedItems;
     return GlassCard(
       padding: AppCardPaddings.compact,
       child: Column(
@@ -470,6 +497,21 @@ class _RoutineCard extends StatelessWidget {
                       '${routine.items.length == 1 ? 'step' : 'steps'}',
                 ),
               ),
+              if (showTodayState && progress.run != null)
+                _InfoChip(
+                  icon: _runStatusIcon(progress.run!.status),
+                  label: context.tr(
+                    'Hoy: ${_runStatusLabel(context, progress.run!.status)}',
+                    'Today: ${_runStatusLabel(context, progress.run!.status)}',
+                  ),
+                  color: accent,
+                ),
+              if (showTodayState && progressTotal > 0)
+                _InfoChip(
+                  icon: Icons.donut_small_rounded,
+                  label: '$progressCompleted/$progressTotal',
+                  color: accent,
+                ),
             ],
           ),
           if (execution != null) ...[
@@ -933,6 +975,23 @@ IconData _statusIcon(RoutineStatus status) => switch (status) {
   RoutineStatus.archived => Icons.archive_outlined,
 };
 
+String _runStatusLabel(BuildContext context, RoutineRunStatus status) =>
+    switch (status) {
+      RoutineRunStatus.scheduled => context.tr('Pendiente', 'Pending'),
+      RoutineRunStatus.inProgress => context.tr('En progreso', 'In progress'),
+      RoutineRunStatus.completed => context.tr('Completada', 'Completed'),
+      RoutineRunStatus.skipped => context.tr('Omitida', 'Skipped'),
+      RoutineRunStatus.missed => context.tr('Perdida', 'Missed'),
+    };
+
+IconData _runStatusIcon(RoutineRunStatus status) => switch (status) {
+  RoutineRunStatus.scheduled => Icons.schedule_rounded,
+  RoutineRunStatus.inProgress => Icons.timelapse_rounded,
+  RoutineRunStatus.completed => Icons.check_circle_rounded,
+  RoutineRunStatus.skipped => Icons.skip_next_rounded,
+  RoutineRunStatus.missed => Icons.event_busy_rounded,
+};
+
 String _emptyTitle(BuildContext context, RoutineFilter filter) =>
     switch (filter) {
       RoutineFilter.active => context.tr(
@@ -973,10 +1032,12 @@ IconData _routineIcon(String key) => switch (key) {
   _ => Icons.event_repeat_rounded,
 };
 
-Color _routineColor(AppPalette palette, String key) => switch (key) {
-  'secondary' => palette.secondary,
-  'tertiary' => palette.tertiary,
-  'peach' => palette.accentPeach,
-  'neutral' => palette.neutral,
-  _ => palette.primary,
-};
+Color _routineColor(
+  String key, {
+  int? customColorArgb,
+}) => Color(
+  effectiveRoutineIdentityColorArgb(
+    colorKey: key,
+    customColorArgb: customColorArgb,
+  ),
+);

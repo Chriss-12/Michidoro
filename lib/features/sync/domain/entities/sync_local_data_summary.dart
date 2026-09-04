@@ -7,6 +7,7 @@ class SyncLocalDataSummary {
     required this.taskCompletionEvents,
     required this.routines,
     required this.routineRuns,
+    this.quickNotes = 0,
   });
 
   const SyncLocalDataSummary.empty()
@@ -16,7 +17,8 @@ class SyncLocalDataSummary {
       focusSessions = 0,
       taskCompletionEvents = 0,
       routines = 0,
-      routineRuns = 0;
+      routineRuns = 0,
+      quickNotes = 0;
 
   final int goals;
   final int tasks;
@@ -25,6 +27,7 @@ class SyncLocalDataSummary {
   final int taskCompletionEvents;
   final int routines;
   final int routineRuns;
+  final int quickNotes;
 
   int get totalRecords =>
       goals +
@@ -33,7 +36,8 @@ class SyncLocalDataSummary {
       focusSessions +
       taskCompletionEvents +
       routines +
-      routineRuns;
+      routineRuns +
+      quickNotes;
 
   bool get hasUserData => totalRecords > 0;
 }

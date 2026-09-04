@@ -28,6 +28,21 @@ void main() {
     expect(config.hasSelectedFolder, isFalse);
   });
 
+  test('reuses the loaded configuration without reopening its file', () async {
+    var directoryReads = 0;
+    final cachedRepository = FileSyncStorageConfigRepository(
+      directory: () async {
+        directoryReads++;
+        return directory;
+      },
+    );
+
+    await cachedRepository.load();
+    await cachedRepository.load();
+
+    expect(directoryReads, 1);
+  });
+
   test('round trips multiple-device mode and folder access', () async {
     await repository.save(
       const SyncStorageConfig(

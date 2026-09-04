@@ -27,28 +27,28 @@ void main() {
       ),
     );
 
-    expect(find.text('Organiza tu día'), findsOneWidget);
+    expect(find.text('Todo tu día, en un lugar'), findsOneWidget);
     expect(find.text('Omitir'), findsOneWidget);
     expect(find.bySemanticsLabel('Paso 1 de 4'), findsOneWidget);
 
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    expect(find.text('Enfócate con intención'), findsOneWidget);
+    expect(find.text('Enfoque que se adapta a ti'), findsOneWidget);
     expect(find.byTooltip('Atrás'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Atrás'));
     await tester.pumpAndSettle();
-    expect(find.text('Organiza tu día'), findsOneWidget);
+    expect(find.text('Todo tu día, en un lugar'), findsOneWidget);
 
     for (var index = 0; index < 3; index += 1) {
       await tester.tap(find.text('Continuar'));
       await tester.pumpAndSettle();
     }
 
-    expect(find.text('Hazlo tuyo'), findsOneWidget);
-    expect(find.text('Empezar a usar MichiDoro'), findsOneWidget);
+    expect(find.text('Mide, dicta y personaliza'), findsOneWidget);
+    expect(find.text('Empezar a usar Michi Focus'), findsOneWidget);
     expect(find.bySemanticsLabel('Paso 4 de 4'), findsOneWidget);
-    await tester.tap(find.text('Empezar a usar MichiDoro'));
+    await tester.tap(find.text('Empezar a usar Michi Focus'));
     await tester.pumpAndSettle();
 
     expect(find.text('HOME'), findsOneWidget);
@@ -73,7 +73,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Organize your day'), findsOneWidget);
+    expect(find.text('Your whole day, in one place'), findsOneWidget);
     expect(find.text('Skip'), findsOneWidget);
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
@@ -100,7 +100,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle();
-    expect(find.text('Organiza tu día'), findsOneWidget);
+    expect(find.text('Todo tu día, en un lugar'), findsOneWidget);
 
     appSettingsController.completedOnboardingVersion.value =
         AppSettingsController.currentOnboardingVersion;
@@ -139,6 +139,38 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('uses the selected palette in light and dark themes', (
+    tester,
+  ) async {
+    for (final isDark in [false, true]) {
+      const preset = AppThemePreset.sunsetTide;
+      final expected = AppPalette.fromPreset(preset, isDark: isDark);
+
+      await tester.pumpWidget(
+        _OnboardingTestApp(
+          themePreset: preset,
+          isDarkMode: isDark,
+          onComplete: () async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final header = tester.widget<Container>(
+        find.byKey(const Key('onboarding-header')),
+      );
+      final headerDecoration = header.decoration! as BoxDecoration;
+      expect(headerDecoration.color, expected.surface.withValues(alpha: 0.92));
+
+      final visual = tester.widget<Container>(
+        find.byKey(const Key('onboarding-feature-visual')),
+      );
+      final visualDecoration = visual.decoration! as BoxDecoration;
+      expect(visualDecoration.color, expected.surface);
+      expect(find.text('Michi Focus'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
 }
 
 class _OnboardingTestApp extends StatelessWidget {
@@ -147,12 +179,16 @@ class _OnboardingTestApp extends StatelessWidget {
     this.language = AppLanguage.spanish,
     this.textScale = 1,
     this.initialLocation = OnboardingPage.routePath,
+    this.themePreset = AppThemePreset.natureFocus,
+    this.isDarkMode = false,
   });
 
   final Future<void> Function() onComplete;
   final AppLanguage language;
   final double textScale;
   final String initialLocation;
+  final AppThemePreset themePreset;
+  final bool isDarkMode;
 
   @override
   Widget build(BuildContext context) {
@@ -180,13 +216,13 @@ class _OnboardingTestApp extends StatelessWidget {
       locale: language.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: AppTheme.fromPreset(AppThemePreset.natureFocus, isDark: false),
+      theme: AppTheme.fromPreset(themePreset, isDark: isDarkMode),
       routerConfig: router,
       builder: (context, child) {
         final mediaQuery = MediaQuery.of(context);
         return AppSettingsScope(
-          themePreset: AppThemePreset.natureFocus,
-          isDarkMode: false,
+          themePreset: themePreset,
+          isDarkMode: isDarkMode,
           fontScale: textScale,
           profileName: 'Test',
           profileEmail: '',

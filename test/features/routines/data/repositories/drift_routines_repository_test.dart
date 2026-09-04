@@ -39,6 +39,9 @@ void main() {
       await repository.saveRoutine(
         _routine(
           now: now,
+          customColorArgb: 0xFF7C3AED,
+          validFromDate: DateTime(2026, 8, 15),
+          validUntilDate: DateTime(2026, 12, 31),
           items: [
             _item(
               id: 'item-1',
@@ -60,6 +63,9 @@ void main() {
                   as Map<String, Object?>)['aggregate']!
               as Map<String, Object?>;
       expect(aggregate['weekdays'], [1, 2, 3, 4, 5]);
+      expect(aggregate['customColorArgb'], 0xFF7C3AED);
+      expect(aggregate['validFromLocalDate'], '2026-08-15');
+      expect(aggregate['validUntilLocalDate'], '2026-12-31');
       expect(aggregate['items'], hasLength(1));
       expect(operations.last['operationKind'], 'update');
     });
@@ -98,7 +104,12 @@ void main() {
       });
 
       await repository.saveRoutine(
-        _routine(now: now, items: [first, second]),
+        _routine(
+          now: now,
+          customColorArgb: 0xFF2563EB,
+          validFromDate: DateTime(2026, 8, 7),
+          items: [first, second],
+        ),
       );
       await expectLater(
         repository.deleteArchivedRoutine('routine-1'),
@@ -107,6 +118,8 @@ void main() {
       await repository.saveRoutine(
         _routine(
           now: now,
+          customColorArgb: 0xFF2563EB,
+          validFromDate: DateTime(2026, 8, 7),
           items: [
             _copyItem(second, position: 0),
             _copyItem(first, position: 1),
@@ -121,6 +134,9 @@ void main() {
 
       expect(routines, hasLength(1));
       expect(routines.single.name, 'Manana productiva');
+      expect(routines.single.customColorArgb, 0xFF2563EB);
+      expect(routines.single.validFromDate, DateTime(2026, 8, 7));
+      expect(routines.single.validUntilDate, isNull);
       expect(routines.single.weekdays, [1, 2, 3, 4, 5]);
       expect(
         routines.single.items.map((item) => item.id),
@@ -182,6 +198,114 @@ void main() {
       expect(routines.last.items.single.id, 'item-1');
     });
 
+    test(
+      'respects validity boundaries and snapshots the custom color',
+      () async {
+        final database = MichiFocusDatabase(NativeDatabase.memory());
+        final repository = DriftRoutinesRepository(RoutinesDao(database));
+        final validDay = DateTime(2026, 8, 7);
+
+        addTearDown(database.close);
+        await repository.saveRoutine(
+          _routine(
+            now: DateTime(2026, 8, 6),
+            weekdays: const [DateTime.friday],
+            customColorArgb: 0xFFDB2777,
+            validFromDate: validDay,
+            validUntilDate: validDay,
+            items: [
+              _item(
+                id: 'item-validity',
+                position: 0,
+                title: 'Solo hoy',
+                minute: 480,
+                now: validDay,
+              ),
+            ],
+          ),
+        );
+
+        expect(
+          (await repository.reconcileLocalDay(
+            DateTime(2026, 8, 6),
+          )).createdRuns,
+          0,
+        );
+        expect((await repository.reconcileLocalDay(validDay)).createdRuns, 1);
+        expect(
+          (await repository.reconcileLocalDay(
+            DateTime(2026, 8, 8),
+          )).createdRuns,
+          0,
+        );
+        final runs = await repository.loadRuns(
+          startDate: validDay,
+          endDate: validDay,
+        );
+        expect(runs.single.customColorArgbSnapshot, 0xFFDB2777);
+
+        final extendedDay = DateTime(2026, 8, 8);
+        await repository.saveRoutine(
+          _routine(
+            now: extendedDay,
+            weekdays: const [DateTime.saturday],
+            customColorArgb: 0xFF2563EB,
+            validFromDate: validDay,
+            validUntilDate: extendedDay,
+            items: [
+              _item(
+                id: 'item-validity',
+                position: 0,
+                title: 'Solo hoy',
+                minute: 480,
+                now: extendedDay,
+              ),
+            ],
+          ),
+        );
+
+        expect(
+          (await repository.reconcileLocalDay(extendedDay)).createdRuns,
+          1,
+        );
+        final extendedRuns = await repository.loadRuns(
+          startDate: validDay,
+          endDate: extendedDay,
+        );
+        expect(extendedRuns, hasLength(2));
+        expect(
+          extendedRuns.map((run) => run.customColorArgbSnapshot),
+          [0xFFDB2777, 0xFF2563EB],
+        );
+      },
+    );
+
+    test('rejects an inverted routine validity range', () async {
+      final database = MichiFocusDatabase(NativeDatabase.memory());
+      final repository = DriftRoutinesRepository(RoutinesDao(database));
+      final now = DateTime(2026, 8, 7);
+      addTearDown(database.close);
+
+      await expectLater(
+        repository.saveRoutine(
+          _routine(
+            now: now,
+            validFromDate: DateTime(2026, 8, 8),
+            validUntilDate: DateTime(2026, 8, 7),
+            items: [
+              _item(
+                id: 'item-invalid-range',
+                position: 0,
+                title: 'Invalid range',
+                minute: 480,
+                now: now,
+              ),
+            ],
+          ),
+        ),
+        throwsArgumentError,
+      );
+    });
     test(
       'materializes each due routine item as one ordinary task only once',
       () async {
@@ -1056,6 +1180,9 @@ Routine _routine({
   String name = 'Manana productiva',
   List<int> weekdays = const [1, 2, 3, 4, 5],
   RoutineStatus status = RoutineStatus.active,
+  int? customColorArgb,
+  DateTime? validFromDate,
+  DateTime? validUntilDate,
   DateTime? archivedAt,
 }) {
   return Routine(
@@ -1064,6 +1191,9 @@ Routine _routine({
     description: 'Inicio ordenado',
     iconKey: 'sun',
     colorKey: 'amber',
+    customColorArgb: customColorArgb,
+    validFromDate: validFromDate,
+    validUntilDate: validUntilDate,
     status: status,
     archivedAt: archivedAt,
     createdAt: now,

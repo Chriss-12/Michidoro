@@ -221,6 +221,96 @@ void main() {
   );
 
   testWidgets(
+    'edits the charts included in PDF reports and keeps one enabled',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(480, 3600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(
+        () => appSettingsController.enabledStatisticsCharts.value = {
+          ...StatisticsChartType.values,
+        },
+      );
+      appSettingsController.enabledStatisticsCharts.value = {
+        ...StatisticsChartType.values,
+      };
+
+      await tester.pumpWidget(
+        MyApp(localAppLockController: LocalAppLockController()),
+      );
+      await tester.pumpAndSettle();
+
+      final selector = find.byKey(
+        const PageStorageKey('report-chart-selector'),
+      );
+      await tester.ensureVisible(selector);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+
+      final circularChip = find.byKey(
+        const ValueKey('report-chart-circular'),
+      );
+      await tester.ensureVisible(circularChip);
+      await tester.tap(circularChip);
+      await tester.pumpAndSettle();
+
+      expect(
+        appSettingsController.enabledStatisticsCharts.value,
+        isNot(contains(StatisticsChartType.circular)),
+      );
+
+      appSettingsController.enabledStatisticsCharts.value = {
+        StatisticsChartType.circular,
+      };
+      await tester.pumpAndSettle();
+      await tester.tap(circularChip);
+      await tester.pumpAndSettle();
+
+      expect(appSettingsController.enabledStatisticsCharts.value, {
+        StatisticsChartType.circular,
+      });
+    },
+  );
+
+  testWidgets(
+    'separates report expansion state from Home scroll storage',
+    (tester) async {
+      final bucket = PageStorageBucket();
+
+      Widget buildHarness() {
+        return MaterialApp(
+          home: Scaffold(
+            body: PageStorage(
+              bucket: bucket,
+              child: ListView(
+                key: const PageStorageKey('home-scroll'),
+                children: const [
+                  ExpansionTile(
+                    key: PageStorageKey('report-chart-selector'),
+                    title: Text('Gráficas incluidas'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      final scrollableContext = tester.element(find.byType(ListView));
+      PageStorage.of(
+        scrollableContext,
+      ).writeState(scrollableContext, 240.0);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(buildHarness());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Gráficas incluidas'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'places energy first and fills weekly progress from planned tasks',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(480, 2600));
@@ -268,8 +358,10 @@ void main() {
         lessThan(tester.getTopLeft(taskStatusCard).dy),
       );
 
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.byKey(const ValueKey('home-weekly-progress-card')),
+        500,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
       var mondayFill = tester.widget<FractionallySizedBox>(
@@ -289,6 +381,12 @@ void main() {
               ? task.copyWith(status: TaskStatus.completed)
               : task,
       ];
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('home-weekly-progress-card')),
+        500,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       mondayFill = tester.widget<FractionallySizedBox>(
         find.byKey(const ValueKey('weekly-progress-fill-1')),

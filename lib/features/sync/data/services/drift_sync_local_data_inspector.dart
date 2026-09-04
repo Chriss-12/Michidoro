@@ -15,7 +15,8 @@ class DriftSyncLocalDataInspector {
         (SELECT COUNT(*) FROM pomodoro_sessions) AS focus_sessions_count,
         (SELECT COUNT(*) FROM task_completion_events) AS completion_events_count,
         (SELECT COUNT(*) FROM routines) AS routines_count,
-        (SELECT COUNT(*) FROM routine_runs) AS routine_runs_count
+        (SELECT COUNT(*) FROM routine_runs) AS routine_runs_count,
+        (SELECT COUNT(*) FROM quick_notes) AS quick_notes_count
     ''').getSingle();
 
     return SyncLocalDataSummary(
@@ -26,6 +27,7 @@ class DriftSyncLocalDataInspector {
       taskCompletionEvents: row.read<int>('completion_events_count'),
       routines: row.read<int>('routines_count'),
       routineRuns: row.read<int>('routine_runs_count'),
+      quickNotes: row.read<int>('quick_notes_count'),
     );
   }
 }

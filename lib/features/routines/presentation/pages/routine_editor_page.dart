@@ -6,8 +6,10 @@ import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/entities/productivity_goal.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
+import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_identity_color.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/controllers/routines_controller.dart';
 import 'package:pomodoro_app_v1/l10n/app_localizations_context.dart';
+import 'package:pomodoro_app_v1/shared/molecules/speech_dictation_button.dart';
 
 class RoutineEditorPage extends StatefulWidget {
   const RoutineEditorPage({super.key, this.routineId, this.onResult});
@@ -288,13 +290,13 @@ class _StepHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final titles = [
       context.tr('Información', 'Information'),
-      context.tr('Días', 'Days'),
+      context.tr('Repetición', 'Recurrence'),
       context.tr('Actividades', 'Activities'),
       context.tr('Revisión', 'Review'),
     ];
     final subtitles = [
       context.tr('Identidad de la rutina', 'Routine identity'),
-      context.tr('Frecuencia semanal', 'Weekly frequency'),
+      context.tr('Días y vigencia', 'Days and validity'),
       context.tr('Orden y horarios', 'Order and times'),
       context.tr('Resumen antes de guardar', 'Summary before saving'),
     ];
@@ -472,6 +474,19 @@ class _IdentityStep extends StatelessWidget {
   final TextEditingController descriptionController;
   final ValueChanged<RoutineEditorDraft> onChanged;
 
+  Future<void> _pickCustomColor(BuildContext context) async {
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => _RoutineColorDialog(
+        initialColorArgb:
+            draft.customColorArgb ?? context.palette.primary.toARGB32(),
+      ),
+    );
+    if (selected != null) {
+      onChanged(draft.copyWith(customColorArgb: selected));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     key: const ValueKey('routine-step-identity'),
@@ -491,13 +506,23 @@ class _IdentityStep extends StatelessWidget {
               controller: nameController,
               maxLength: 80,
               textCapitalization: TextCapitalization.sentences,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 2,
               decoration: InputDecoration(
+                alignLabelWithHint: true,
                 labelText: context.tr('Nombre', 'Name'),
                 hintText: context.tr(
                   'Ej. Mañana productiva',
                   'E.g. Productive morning',
                 ),
                 prefixIcon: const Icon(Icons.title_rounded),
+                suffixIcon: SpeechDictationFieldActions(
+                  fieldId: 'routine-name',
+                  textController: nameController,
+                  onChanged: (value) => onChanged(draft.copyWith(name: value)),
+                ),
               ),
               onChanged: (value) => onChanged(draft.copyWith(name: value)),
             ),
@@ -505,14 +530,26 @@ class _IdentityStep extends StatelessWidget {
             TextField(
               controller: descriptionController,
               maxLength: 500,
-              minLines: 2,
-              maxLines: 4,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 2,
               decoration: InputDecoration(
+                alignLabelWithHint: true,
                 labelText: context.tr(
                   'Descripción opcional',
                   'Optional description',
                 ),
                 prefixIcon: const Icon(Icons.notes_rounded),
+                suffixIcon: SpeechDictationFieldActions(
+                  fieldId: 'routine-description',
+                  textController: descriptionController,
+                  onChanged: (value) => onChanged(
+                    value.trim().isEmpty
+                        ? draft.copyWith(clearDescription: true)
+                        : draft.copyWith(description: value),
+                  ),
+                ),
               ),
               onChanged: (value) => onChanged(
                 value.trim().isEmpty
@@ -575,13 +612,27 @@ class _IdentityStep extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
-                for (final key in _routineColors)
+                for (final colorArgb in _routineCustomColors)
                   _ColorChoice(
-                    colorKey: key,
-                    selected: draft.colorKey == key,
-                    onPressed: () => onChanged(draft.copyWith(colorKey: key)),
+                    colorArgb: colorArgb,
+                    selected: draft.customColorArgb == colorArgb,
+                    onPressed: () => onChanged(
+                      draft.copyWith(customColorArgb: colorArgb),
+                    ),
                   ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('routine-custom-color-button'),
+                onPressed: () => _pickCustomColor(context),
+                icon: const Icon(Icons.colorize_rounded),
+                label: Text(
+                  context.tr('Personalizar color', 'Customize color'),
+                ),
+              ),
             ),
           ],
         ),
@@ -597,7 +648,7 @@ class _RoutinePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = _colorFor(context.palette, draft.colorKey);
+    final accent = _draftColor(draft);
     final name = draft.name.trim();
     final description = draft.description?.trim();
     return Container(
@@ -745,22 +796,23 @@ class _ChoiceIcon extends StatelessWidget {
 
 class _ColorChoice extends StatelessWidget {
   const _ColorChoice({
-    required this.colorKey,
+    required this.colorArgb,
     required this.selected,
     required this.onPressed,
   });
-  final String colorKey;
+  final int colorArgb;
   final bool selected;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(context.palette, colorKey);
+    final color = Color(colorArgb);
     return Semantics(
-      label: colorKey,
+      label: context.tr('Color de rutina', 'Routine color'),
       selected: selected,
       button: true,
       child: InkWell(
+        key: ValueKey('routine-color-$colorArgb'),
         onTap: onPressed,
         borderRadius: BorderRadius.circular(8),
         child: Container(
@@ -786,7 +838,7 @@ class _ColorChoice extends StatelessWidget {
                 : null,
           ),
           child: selected
-              ? const Icon(Icons.check_rounded, color: Colors.white)
+              ? Icon(Icons.check_rounded, color: _foregroundFor(color))
               : null,
         ),
       ),
@@ -794,10 +846,131 @@ class _ColorChoice extends StatelessWidget {
   }
 }
 
+class _RoutineColorDialog extends StatefulWidget {
+  const _RoutineColorDialog({required this.initialColorArgb});
+
+  final int initialColorArgb;
+
+  @override
+  State<_RoutineColorDialog> createState() => _RoutineColorDialogState();
+}
+
+class _RoutineColorDialogState extends State<_RoutineColorDialog> {
+  late HSLColor _selection;
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = HSLColor.fromColor(Color(widget.initialColorArgb));
+  }
+
+  Color get _color => _selection.toColor().withValues(alpha: 1);
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(context.tr('Color personalizado', 'Custom color')),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              key: const ValueKey('routine-color-preview'),
+              height: 72,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _color,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.event_repeat_rounded,
+                color: _foregroundFor(_color),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(context.tr('Tono', 'Hue')),
+            Slider(
+              key: const ValueKey('routine-color-hue'),
+              value: _selection.hue,
+              max: 360,
+              divisions: 72,
+              label: _selection.hue.round().toString(),
+              onChanged: (value) => setState(
+                () => _selection = _selection.withHue(value),
+              ),
+            ),
+            Text(context.tr('Intensidad', 'Saturation')),
+            Slider(
+              key: const ValueKey('routine-color-saturation'),
+              value: _selection.saturation,
+              divisions: 20,
+              onChanged: (value) => setState(
+                () => _selection = _selection.withSaturation(value),
+              ),
+            ),
+            Text(context.tr('Luminosidad', 'Lightness')),
+            Slider(
+              key: const ValueKey('routine-color-lightness'),
+              value: _selection.lightness.clamp(0.2, 0.8),
+              min: 0.2,
+              max: 0.8,
+              divisions: 12,
+              onChanged: (value) => setState(
+                () => _selection = _selection.withLightness(value),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(context.tr('Cancelar', 'Cancel')),
+      ),
+      FilledButton(
+        key: const ValueKey('routine-color-apply'),
+        onPressed: () => Navigator.pop(context, _color.toARGB32()),
+        child: Text(context.tr('Usar color', 'Use color')),
+      ),
+    ],
+  );
+}
+
 class _RecurrenceStep extends StatelessWidget {
   const _RecurrenceStep({required this.draft, required this.onChanged});
   final RoutineEditorDraft draft;
   final ValueChanged<RoutineEditorDraft> onChanged;
+
+  Future<void> _pickStartDate(BuildContext context) async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: draft.validFromDate ?? _today(),
+      firstDate: DateTime(1970),
+      lastDate: DateTime(2100, 12, 31),
+      helpText: context.tr('Fecha de inicio', 'Start date'),
+    );
+    if (selected != null) {
+      onChanged(draft.copyWith(validFromDate: _dateOnlyValue(selected)));
+    }
+  }
+
+  Future<void> _pickEndDate(BuildContext context) async {
+    final firstDate = draft.validFromDate ?? DateTime(1970);
+    final fallback = draft.validUntilDate ?? draft.validFromDate ?? _today();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: fallback.isBefore(firstDate) ? firstDate : fallback,
+      firstDate: firstDate,
+      lastDate: DateTime(2100, 12, 31),
+      helpText: context.tr('Fecha de finalización', 'End date'),
+    );
+    if (selected != null) {
+      onChanged(draft.copyWith(validUntilDate: _dateOnlyValue(selected)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -825,7 +998,7 @@ class _RecurrenceStep extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    context.tr('Frecuencia semanal', 'Weekly frequency'),
+                    context.tr('Días y vigencia', 'Days and validity'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   Text(
@@ -870,6 +1043,67 @@ class _RecurrenceStep extends StatelessWidget {
       ),
       const SizedBox(height: 24),
       _SectionLabel(
+        icon: Icons.event_available_rounded,
+        label: context.tr('Vigencia', 'Validity'),
+      ),
+      const SizedBox(height: 10),
+      _EditorSurface(
+        child: Column(
+          children: [
+            _DateField(
+              fieldKey: const ValueKey('routine-valid-from'),
+              label: context.tr('Fecha de inicio', 'Start date'),
+              value: draft.validFromDate == null
+                  ? context.tr('Sin fecha registrada', 'No date recorded')
+                  : _formatDate(context, draft.validFromDate!),
+              onTap: () => _pickStartDate(context),
+            ),
+            const Divider(height: 24),
+            SwitchListTile.adaptive(
+              key: const ValueKey('routine-no-end-date'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                context.tr(
+                  'Sin fecha de finalización',
+                  'No end date',
+                ),
+              ),
+              subtitle: Text(
+                context.tr(
+                  'La rutina seguirá activa hasta que la cambies.',
+                  'The routine stays active until you change it.',
+                ),
+              ),
+              value: draft.validUntilDate == null,
+              onChanged: (indefinite) {
+                if (indefinite) {
+                  onChanged(draft.copyWith(clearValidUntilDate: true));
+                } else {
+                  onChanged(
+                    draft.copyWith(
+                      validUntilDate: draft.validFromDate ?? _today(),
+                    ),
+                  );
+                }
+              },
+            ),
+            if (draft.validUntilDate != null) ...[
+              const Divider(height: 24),
+              _DateField(
+                fieldKey: const ValueKey('routine-valid-until'),
+                label: context.tr(
+                  'Fecha de finalización',
+                  'End date',
+                ),
+                value: _formatDate(context, draft.validUntilDate!),
+                onTap: () => _pickEndDate(context),
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+      _SectionLabel(
         icon: Icons.bolt_rounded,
         label: context.tr('Selección rápida', 'Quick selection'),
       ),
@@ -894,6 +1128,31 @@ class _RecurrenceStep extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final Key fieldKey;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    key: fieldKey,
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(Icons.calendar_today_rounded, color: context.palette.primary),
+    title: Text(label),
+    subtitle: Text(value),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: onTap,
   );
 }
 
@@ -1126,15 +1385,12 @@ class _ReviewStep extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: _colorFor(
-                  context.palette,
-                  draft.colorKey,
-                ).withValues(alpha: 0.16),
+                color: _draftColor(draft).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 _routineIcons[draft.iconKey] ?? Icons.event_repeat_rounded,
-                color: _colorFor(context.palette, draft.colorKey),
+                color: _draftColor(draft),
               ),
             ),
             const SizedBox(width: 14),
@@ -1177,6 +1433,54 @@ class _ReviewStep extends StatelessWidget {
                   color: context.palette.primary,
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
+      _SectionLabel(
+        icon: Icons.palette_outlined,
+        label: context.tr('Color y vigencia', 'Color and validity'),
+      ),
+      const SizedBox(height: 10),
+      _EditorSurface(
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: _draftColor(draft),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: context.palette.neutralSoft),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    context.tr(
+                      'Color personalizado de la rutina',
+                      'Routine custom color',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            _ReviewValue(
+              label: context.tr('Inicio', 'Start'),
+              value: draft.validFromDate == null
+                  ? context.tr('Sin fecha registrada', 'No date recorded')
+                  : _formatDate(context, draft.validFromDate!),
+            ),
+            const SizedBox(height: 10),
+            _ReviewValue(
+              label: context.tr('Finalización', 'End'),
+              value: draft.validUntilDate == null
+                  ? context.tr('Sin fecha de finalización', 'No end date')
+                  : _formatDate(context, draft.validUntilDate!),
             ),
           ],
         ),
@@ -1292,6 +1596,37 @@ class _ReviewStep extends StatelessWidget {
         ),
         if (index != draft.items.length - 1) const SizedBox(height: 8),
       ],
+    ],
+  );
+}
+
+class _ReviewValue extends StatelessWidget {
+  const _ReviewValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: context.palette.textSecondary,
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Flexible(
+        child: Text(
+          value,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     ],
   );
 }
@@ -1584,8 +1919,17 @@ class _RoutineItemEditorState extends State<_RoutineItemEditor> {
               controller: _title,
               maxLength: 160,
               textCapitalization: TextCapitalization.sentences,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 2,
               decoration: InputDecoration(
+                alignLabelWithHint: true,
                 labelText: context.tr('Título', 'Title'),
+                suffixIcon: SpeechDictationFieldActions(
+                  fieldId: 'routine-item-title',
+                  textController: _title,
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -1788,6 +2132,22 @@ String _validationMessage(BuildContext context, RoutineValidationIssue issue) =>
         'El nombre es demasiado largo.',
         'The name is too long.',
       ),
+      'color.customRequired' => context.tr(
+        'Selecciona un color para la rutina.',
+        'Select a color for the routine.',
+      ),
+      'validity.startRequired' => context.tr(
+        'Selecciona la fecha de inicio.',
+        'Select the start date.',
+      ),
+      'validity.dateInvalid' => context.tr(
+        'La fecha seleccionada no es válida.',
+        'The selected date is invalid.',
+      ),
+      'validity.rangeInvalid' => context.tr(
+        'La fecha final no puede ser anterior a la inicial.',
+        'The end date cannot be before the start date.',
+      ),
       'weekdays.required' => context.tr(
         'Selecciona al menos un día.',
         'Select at least one day.',
@@ -1819,7 +2179,20 @@ const _stepIcons = <IconData>[
   Icons.view_timeline_rounded,
   Icons.fact_check_outlined,
 ];
-const _routineColors = ['primary', 'secondary', 'tertiary', 'peach', 'neutral'];
+const _routineCustomColors = <int>[
+  0xFF789B5F,
+  0xFF0F766E,
+  0xFF2563EB,
+  0xFF4F46E5,
+  0xFF7C3AED,
+  0xFFDB2777,
+  0xFFE11D48,
+  0xFFEA580C,
+  0xFFD97706,
+  0xFF65A30D,
+  0xFF0891B2,
+  0xFF475569,
+];
 
 String _routineIconLabel(BuildContext context, String key) => switch (key) {
   'sun' => context.tr('Mañana', 'Morning'),
@@ -1829,10 +2202,23 @@ String _routineIconLabel(BuildContext context, String key) => switch (key) {
   _ => context.tr('Lista diaria', 'Daily list'),
 };
 
-Color _colorFor(AppPalette palette, String key) => switch (key) {
-  'secondary' => palette.secondary,
-  'tertiary' => palette.tertiary,
-  'peach' => palette.accentPeach,
-  'neutral' => palette.neutral,
-  _ => palette.primary,
-};
+Color _draftColor(RoutineEditorDraft draft) => Color(
+  effectiveRoutineIdentityColorArgb(
+    colorKey: draft.colorKey,
+    customColorArgb: draft.customColorArgb,
+  ),
+);
+
+Color _foregroundFor(Color background) =>
+    background.computeLuminance() > 0.46 ? Colors.black : Colors.white;
+
+DateTime _today() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+}
+
+DateTime _dateOnlyValue(DateTime value) =>
+    DateTime(value.year, value.month, value.day);
+
+String _formatDate(BuildContext context, DateTime value) =>
+    MaterialLocalizations.of(context).formatMediumDate(value);

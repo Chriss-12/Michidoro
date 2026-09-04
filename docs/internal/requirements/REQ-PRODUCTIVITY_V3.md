@@ -363,7 +363,15 @@ Notes:
 - The panel supports day, month, and year views.
 - Mood is calculated from completed Pomodoro reflection scores in the selected
   range.
-- Task counts are calculated from local tasks in the selected range.
+- Task counts always include every local task by its current status, whether or
+  not it has a scheduled date. The selected range applies to mood and focus
+  records, not to the task totals.
+- 2026-08-28 aligned the profile totals with Home so unscheduled tasks are not
+  omitted from day, month, or year views.
+- 2026-08-28 verification evidence: focused analysis passed, the profile
+  regression test passed, and the complete Flutter test suite passed. Full
+  project analysis retains one unrelated existing info in
+  tmp/verify_physical_database_round_trip.dart.
 - The motivational phrase changes according to the mood average.
 - Verification evidence: `dart format lib test` passed; `flutter analyze`
   passed; widget test passed; full `flutter test` passed with 69 tests.

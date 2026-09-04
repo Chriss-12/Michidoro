@@ -30,6 +30,10 @@ void main() {
       find.byKey(const ValueKey('local-security-timeout')),
       findsOneWidget,
     );
+    expect(
+      find.textContaining('pasa realmente a segundo plano'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('does not change protection when authentication is cancelled', (

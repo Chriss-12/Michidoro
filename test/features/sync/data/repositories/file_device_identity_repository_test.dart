@@ -21,6 +21,21 @@ void main() {
     expect((await repository.load()).isInitialized, isFalse);
   });
 
+  test('reuses the loaded identity without reopening its file', () async {
+    var directoryReads = 0;
+    final cachedRepository = FileDeviceIdentityRepository(
+      directory: () async {
+        directoryReads++;
+        return directory;
+      },
+    );
+
+    await cachedRepository.load();
+    await cachedRepository.load();
+
+    expect(directoryReads, 1);
+  });
+
   test('persists and reloads the stable identity', () async {
     const identity = DeviceIdentity(
       installationId: 'installation_1234',

@@ -49,12 +49,25 @@ void main() {
               completionTrackingStartedAt: now,
             ),
           );
+      await database
+          .into(database.quickNoteRecords)
+          .insert(
+            QuickNoteRecordsCompanion.insert(
+              id: 'note-1',
+              textContent: 'Note',
+              colorArgb: 0xFF334455,
+              position: 100,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       final summary = await DriftSyncLocalDataInspector(database)();
 
       expect(summary.goals, 1);
       expect(summary.tasks, 1);
-      expect(summary.totalRecords, 2);
+      expect(summary.quickNotes, 1);
+      expect(summary.totalRecords, 3);
       expect(summary.hasUserData, isTrue);
     },
   );

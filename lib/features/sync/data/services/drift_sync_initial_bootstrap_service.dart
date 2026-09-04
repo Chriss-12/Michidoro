@@ -51,6 +51,7 @@ class DriftSyncInitialBootstrapService {
       for (final id in await _taskIds()) _BootstrapTarget('task', id),
       for (final id in await _calendarIds())
         _BootstrapTarget('calendarEvent', id),
+      for (final id in await _quickNoteIds()) _BootstrapTarget('quickNote', id),
     ];
     var queued = 0;
     var skipped = 0;
@@ -126,6 +127,7 @@ class DriftSyncInitialBootstrapService {
       'routine' => _routineFields(database, target.entityId),
       'task' => _taskFields(database, target.entityId),
       'calendarEvent' => _calendarFields(database, target.entityId),
+      'quickNote' => _quickNoteFields(database, target.entityId),
       _ => throw StateError('Unsupported bootstrap entity type.'),
     };
   }
@@ -184,6 +186,26 @@ class DriftSyncInitialBootstrapService {
     };
   }
 
+  Future<Map<String, Object?>?> _quickNoteFields(
+    MichiFocusDatabase database,
+    String id,
+  ) async {
+    final record = await (database.select(
+      database.quickNoteRecords,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (record == null) return null;
+    return {
+      'text': record.textContent,
+      'isCompleted': record.isCompleted,
+      'colorArgb': record.colorArgb,
+      'localDate': record.localDate,
+      'priority': record.priority,
+      'position': record.position,
+      'createdAt': record.createdAt.millisecondsSinceEpoch,
+      'updatedAt': record.updatedAt.millisecondsSinceEpoch,
+    };
+  }
+
   Future<Map<String, Object?>?> _routineFields(
     MichiFocusDatabase database,
     String id,
@@ -208,6 +230,9 @@ class DriftSyncInitialBootstrapService {
         'description': routine.description,
         'iconKey': routine.iconKey,
         'colorKey': routine.colorKey,
+        'customColorArgb': routine.customColorArgb,
+        'validFromLocalDate': routine.validFromLocalDate,
+        'validUntilLocalDate': routine.validUntilLocalDate,
         'status': routine.status,
         'pausedUntilLocalDate': routine.pausedUntilLocalDate,
         'archivedAt': routine.archivedAt?.millisecondsSinceEpoch,
@@ -261,6 +286,13 @@ class DriftSyncInitialBootstrapService {
   Future<List<String>> _routineIds() async =>
       (await (_database.select(
             _database.routineRecords,
+          )..orderBy([(row) => OrderingTerm.asc(row.id)])).get())
+          .map((row) => row.id)
+          .toList(growable: false);
+
+  Future<List<String>> _quickNoteIds() async =>
+      (await (_database.select(
+            _database.quickNoteRecords,
           )..orderBy([(row) => OrderingTerm.asc(row.id)])).get())
           .map((row) => row.id)
           .toList(growable: false);

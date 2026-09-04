@@ -48,9 +48,9 @@ class _LocalSecuritySettingsCardState extends State<LocalSecuritySettingsCard> {
               const SizedBox(height: 8),
               Text(
                 context.tr(
-                  'Protege tus tareas, rutinas y objetivos con la seguridad '
+                  'Protege tus tareas, rutinas, objetivos y notas con la seguridad '
                       'registrada en este dispositivo.',
-                  'Protect your tasks, routines, and goals with the security '
+                  'Protect your tasks, routines, goals, and notes with the security '
                       'registered on this device.',
                 ),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -115,8 +115,10 @@ class _LocalSecuritySettingsCardState extends State<LocalSecuritySettingsCard> {
                 const SizedBox(height: 8),
                 Text(
                   context.tr(
-                    'Recomendado: después de 5 minutos.',
-                    'Recommended: after 5 minutes.',
+                    'El tiempo comienza cuando MichiFocus pasa realmente a segundo plano. '
+                        'Cerrar la app por completo siempre solicitará desbloqueo al abrirla.',
+                    'The timer starts when MichiFocus actually enters the background. '
+                        'Fully closing the app always requires unlocking when reopened.',
                   ),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: context.palette.textSecondary,

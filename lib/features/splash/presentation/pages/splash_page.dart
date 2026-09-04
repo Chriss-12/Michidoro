@@ -79,10 +79,23 @@ class _SplashPageState extends State<SplashPage> {
                           dimension: 260,
                           child: CustomPaint(
                             painter: _MichiDoroPainter(
-                              catColor: Colors.black,
-                              accentColor: palette.primary,
+                              catColor: palette.primary,
+                              catDetailColor: _readableForeground(
+                                palette.primary,
+                              ),
+                              accentColor: _readableForeground(
+                                palette.primary,
+                              ),
                               rulerColor: palette.secondary,
+                              rulerDetailColor: _readableForeground(
+                                palette.secondary,
+                              ),
                               clockColor: palette.tertiary,
+                              clockDetailColor: _readableForeground(
+                                palette.tertiary,
+                              ),
+                              surfaceColor: palette.surface,
+                              trackColor: palette.neutralSoft,
                               progress: progress,
                               loadingColors: [
                                 palette.secondary,
@@ -138,17 +151,27 @@ class _SplashPageState extends State<SplashPage> {
 class _MichiDoroPainter extends CustomPainter {
   const _MichiDoroPainter({
     required this.catColor,
+    required this.catDetailColor,
     required this.accentColor,
     required this.rulerColor,
+    required this.rulerDetailColor,
     required this.clockColor,
+    required this.clockDetailColor,
+    required this.surfaceColor,
+    required this.trackColor,
     required this.progress,
     required this.loadingColors,
   });
 
   final Color catColor;
+  final Color catDetailColor;
   final Color accentColor;
   final Color rulerColor;
+  final Color rulerDetailColor;
   final Color clockColor;
+  final Color clockDetailColor;
+  final Color surfaceColor;
+  final Color trackColor;
   final double progress;
   final List<Color> loadingColors;
 
@@ -162,13 +185,18 @@ class _MichiDoroPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = w * 0.035
       ..strokeCap = StrokeCap.round;
+    final clockDetailPaint = Paint()
+      ..color = clockDetailColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.035
+      ..strokeCap = StrokeCap.round;
     final clockPaint = Paint()
       ..color = clockColor
       ..style = PaintingStyle.fill;
     final rulerPaint = Paint()
       ..color = rulerColor
       ..style = PaintingStyle.fill;
-    final whitePaint = Paint()..color = Colors.white;
+    final catDetailPaint = Paint()..color = catDetailColor;
     final center = Offset(w * 0.5, h * 0.5);
     final loadingPadding = w * 0.035;
     final loadingStrokeWidth = w * 0.04;
@@ -176,7 +204,7 @@ class _MichiDoroPainter extends CustomPainter {
     final loadingRect = Rect.fromCircle(center: center, radius: loadingRadius);
     final clampedProgress = progress.clamp(0.0, 1.0);
     final loadingTrack = Paint()
-      ..color = Colors.white.withValues(alpha: 0.36)
+      ..color = trackColor.withValues(alpha: 0.72)
       ..style = PaintingStyle.stroke
       ..strokeWidth = loadingStrokeWidth
       ..strokeCap = StrokeCap.round;
@@ -189,7 +217,7 @@ class _MichiDoroPainter extends CustomPainter {
       ..strokeWidth = loadingStrokeWidth
       ..strokeCap = StrokeCap.round;
     final backgroundPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
+      ..color = surfaceColor.withValues(alpha: 0.92)
       ..style = PaintingStyle.fill;
 
     canvas
@@ -222,8 +250,8 @@ class _MichiDoroPainter extends CustomPainter {
     canvas
       ..drawPath(leftEar, catPaint)
       ..drawPath(rightEar, catPaint)
-      ..drawCircle(Offset(w * 0.42, h * 0.47), w * 0.024, whitePaint)
-      ..drawCircle(Offset(w * 0.58, h * 0.47), w * 0.024, whitePaint)
+      ..drawCircle(Offset(w * 0.42, h * 0.47), w * 0.024, catDetailPaint)
+      ..drawCircle(Offset(w * 0.58, h * 0.47), w * 0.024, catDetailPaint)
       ..drawArc(
         Rect.fromCenter(
           center: Offset(w * 0.5, h * 0.535),
@@ -239,16 +267,16 @@ class _MichiDoroPainter extends CustomPainter {
     final clockCenter = Offset(w * 0.73, h * 0.36);
     canvas
       ..drawCircle(clockCenter, w * 0.09, clockPaint)
-      ..drawCircle(clockCenter, w * 0.064, Paint()..color = Colors.white)
+      ..drawCircle(clockCenter, w * 0.064, Paint()..color = surfaceColor)
       ..drawLine(
         clockCenter,
         Offset(clockCenter.dx, clockCenter.dy - w * 0.04),
-        accentPaint,
+        clockDetailPaint,
       )
       ..drawLine(
         clockCenter,
         Offset(clockCenter.dx + w * 0.032, clockCenter.dy),
-        accentPaint,
+        clockDetailPaint,
       );
 
     final ruler = RRect.fromRectAndRadius(
@@ -262,7 +290,7 @@ class _MichiDoroPainter extends CustomPainter {
         Offset(x, h * 0.68),
         Offset(x, h * (i.isEven ? 0.745 : 0.725)),
         Paint()
-          ..color = Colors.white
+          ..color = rulerDetailColor
           ..strokeWidth = w * 0.01
           ..strokeCap = StrokeCap.round,
       );
@@ -272,10 +300,20 @@ class _MichiDoroPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MichiDoroPainter oldDelegate) {
     return catColor != oldDelegate.catColor ||
+        catDetailColor != oldDelegate.catDetailColor ||
         accentColor != oldDelegate.accentColor ||
         rulerColor != oldDelegate.rulerColor ||
+        rulerDetailColor != oldDelegate.rulerDetailColor ||
         clockColor != oldDelegate.clockColor ||
+        clockDetailColor != oldDelegate.clockDetailColor ||
+        surfaceColor != oldDelegate.surfaceColor ||
+        trackColor != oldDelegate.trackColor ||
         progress != oldDelegate.progress ||
         loadingColors != oldDelegate.loadingColors;
   }
 }
+
+Color _readableForeground(Color background) =>
+    ThemeData.estimateBrightnessForColor(background) == Brightness.dark
+    ? Colors.white
+    : Colors.black;

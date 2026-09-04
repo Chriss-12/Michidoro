@@ -75,6 +75,115 @@ void main() {
     ]);
   });
 
+  test('weekly projection obeys inclusive routine validity dates', () {
+    final routine = _routine(
+      id: 'bounded',
+      now: now,
+      weekdays: const [
+        DateTime.monday,
+        DateTime.tuesday,
+        DateTime.wednesday,
+        DateTime.thursday,
+      ],
+      validFromDate: DateTime(2026, 8, 11),
+      validUntilDate: DateTime(2026, 8, 12),
+    );
+
+    final activities = projectRoutineActivities(
+      routines: [routine],
+      runs: const [],
+      itemRuns: const {},
+      startDate: DateTime(2026, 8, 10),
+      endDate: DateTime(2026, 8, 13),
+      today: now,
+    );
+
+    expect(
+      activities.map((activity) => activity.localDate),
+      [DateTime(2026, 8, 11), DateTime(2026, 8, 12)],
+    );
+  });
+
+  test('weekly activities preserve snapshot colors and item times', () {
+    final routine = _routine(
+      id: 'colored',
+      now: now,
+      customColorArgb: 0xFF112233,
+    );
+    final run = _run(
+      id: 'colored-run',
+      routine: routine,
+      day: DateTime(2026, 8, 10),
+      customColorArgbSnapshot: 0xFFABCDEF,
+    );
+    final item = _itemRun(
+      id: 'colored-item',
+      run: run,
+      taskId: 'colored-task',
+    );
+
+    final activities = projectRoutineActivities(
+      routines: [routine],
+      runs: [run],
+      itemRuns: {
+        run.id: [item],
+      },
+      startDate: DateTime(2026, 8, 10),
+      endDate: DateTime(2026, 8, 16),
+      today: now,
+    );
+
+    expect(activities, hasLength(1));
+    expect(activities.single.isVirtual, isFalse);
+    expect(activities.single.customColorArgb, 0xFFABCDEF);
+    expect(activities.single.startMinute, 9 * 60);
+    expect(activities.single.durationMinutes, 30);
+  });
+
+  test('overlapping activity blocks retain their original positions', () {
+    final first = _routine(id: 'first-activity', now: now);
+    final second = _routine(id: 'second-activity', now: now);
+
+    final activities = projectRoutineActivities(
+      routines: [first, second],
+      runs: const [],
+      itemRuns: const {},
+      startDate: DateTime(2026, 8, 10),
+      endDate: DateTime(2026, 8, 10),
+      today: now,
+    );
+
+    expect(activities, hasLength(2));
+    expect(activities.every((activity) => activity.hasOverlap), isTrue);
+    expect(activities.map((activity) => activity.startMinute), [
+      9 * 60,
+      9 * 60,
+    ]);
+  });
+
+  test('an activity crossing local midnight stays owned by its start day', () {
+    final routine = _routine(
+      id: 'late',
+      now: now,
+      scheduledMinute: 23 * 60 + 30,
+      durationMinutes: 90,
+    );
+
+    final activities = projectRoutineActivities(
+      routines: [routine],
+      runs: const [],
+      itemRuns: const {},
+      startDate: DateTime(2026, 8, 10),
+      endDate: DateTime(2026, 8, 11),
+      today: now,
+    );
+
+    expect(activities, hasLength(1));
+    expect(activities.single.localDate, DateTime(2026, 8, 10));
+    expect(activities.single.startMinute, 23 * 60 + 30);
+    expect(activities.single.endMinute, 25 * 60);
+  });
+
   test('Home projection prioritizes an in-progress item', () {
     final pendingRoutine = _routine(id: 'pending', now: now);
     final activeRoutine = _routine(id: 'active', now: now);
@@ -128,11 +237,19 @@ Routine _routine({
   required String id,
   required DateTime now,
   List<int> weekdays = const [DateTime.monday],
+  int? customColorArgb,
+  DateTime? validFromDate,
+  DateTime? validUntilDate,
+  int scheduledMinute = 9 * 60,
+  int durationMinutes = 30,
 }) => Routine(
   id: id,
   name: 'Routine $id',
   iconKey: 'sun',
   colorKey: 'primary',
+  customColorArgb: customColorArgb,
+  validFromDate: validFromDate,
+  validUntilDate: validUntilDate,
   status: RoutineStatus.active,
   createdAt: now.subtract(const Duration(days: 2)),
   updatedAt: now,
@@ -143,8 +260,8 @@ Routine _routine({
       routineId: id,
       position: 0,
       title: 'Activity $id',
-      scheduledMinute: 9 * 60,
-      durationMinutes: 30,
+      scheduledMinute: scheduledMinute,
+      durationMinutes: durationMinutes,
       isOptional: false,
       pomodoroMode: RoutinePomodoroMode.recommended,
       createdAt: now,
@@ -158,6 +275,7 @@ RoutineRun _run({
   required Routine routine,
   required DateTime day,
   RoutineRunStatus status = RoutineRunStatus.scheduled,
+  int? customColorArgbSnapshot,
 }) => RoutineRun(
   id: id,
   sourceRoutineId: routine.id,
@@ -167,6 +285,7 @@ RoutineRun _run({
   nameSnapshot: routine.name,
   iconKeySnapshot: routine.iconKey,
   colorKeySnapshot: routine.colorKey,
+  customColorArgbSnapshot: customColorArgbSnapshot,
   scheduledStartMinuteSnapshot: 9 * 60,
   createdAt: day,
   updatedAt: day,

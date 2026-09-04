@@ -106,12 +106,16 @@ TaskFocusMinuteSummary summarizeTaskFocusMinutes({
   }
 
   final completedWholeMinutes = totalFocusedSeconds ~/ 60;
-  final pendingMinutes = plannedMinutes - completedWholeMinutes;
+  final plannedSeconds = plannedMinutes * 60;
+  final pendingSeconds = plannedSeconds - totalFocusedSeconds;
+  final remainingSeconds = pendingSeconds > 0 ? pendingSeconds : 0;
+  final remainingMinutes = (remainingSeconds + 59) ~/ 60;
 
   return TaskFocusMinuteSummary(
     totalFocusedSeconds: totalFocusedSeconds,
     completedWholeMinutes: completedWholeMinutes,
-    remainingMinutes: pendingMinutes > 0 ? pendingMinutes : 0,
+    remainingMinutes: remainingMinutes,
+    remainingSeconds: remainingSeconds,
   );
 }
 

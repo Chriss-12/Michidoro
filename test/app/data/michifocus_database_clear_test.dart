@@ -120,6 +120,20 @@ void main() {
             ),
           );
       await database
+          .into(database.quickNoteRecords)
+          .insert(
+            QuickNoteRecordsCompanion.insert(
+              id: 'quick-note-1',
+              textContent: 'Remember this',
+              colorArgb: 0xFF446688,
+              localDate: const Value('2026-08-11'),
+              priority: const Value('medium'),
+              position: 100,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
           .into(database.syncLocalStateRecords)
           .insert(
             SyncLocalStateRecordsCompanion.insert(

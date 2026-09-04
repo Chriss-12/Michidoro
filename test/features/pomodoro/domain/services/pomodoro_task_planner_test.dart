@@ -231,6 +231,7 @@ void main() {
       expect(summary.totalFocusedSeconds, 118);
       expect(summary.completedWholeMinutes, 1);
       expect(summary.remainingMinutes, 119);
+      expect(summary.remainingSeconds, (120 * 60) - 118);
     });
 
     test('floors partial minutes for recommendation calculations', () {
@@ -242,6 +243,7 @@ void main() {
       expect(summary.totalFocusedSeconds, 2750);
       expect(summary.completedWholeMinutes, 45);
       expect(summary.remainingMinutes, 75);
+      expect(summary.remainingSeconds, (120 * 60) - 2750);
     });
 
     test('clamps remaining minutes at zero without losing exact seconds', () {
@@ -253,6 +255,7 @@ void main() {
       expect(summary.totalFocusedSeconds, 1530);
       expect(summary.completedWholeMinutes, 25);
       expect(summary.remainingMinutes, 0);
+      expect(summary.remainingSeconds, 0);
     });
 
     test('rejects negative planned minutes or focused seconds', () {

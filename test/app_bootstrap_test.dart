@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
+import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
+import 'package:pomodoro_app_v1/features/splash/presentation/pages/splash_page.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
 import 'package:pomodoro_app_v1/main.dart';
 
@@ -84,6 +87,45 @@ void main() {
     initialization.complete();
     await tester.pump();
     expect(find.text('Aplicación lista'), findsOneWidget);
+  });
+
+  testWidgets('uses the saved appearance before showing startup loading', (
+    tester,
+  ) async {
+    final initialization = Completer<void>();
+    addTearDown(() {
+      appSettingsController
+        ..themePreset.value = AppThemePreset.natureFocus
+        ..isDarkMode.value = false;
+    });
+
+    await tester.pumpWidget(
+      AppBootstrap(
+        startupAuthenticator: _FakeAuthenticator(
+          authentication: Future<bool>.value(true),
+        ),
+        loadStartupPreferences: () async {
+          appSettingsController
+            ..themePreset.value = AppThemePreset.sunsetTide
+            ..isDarkMode.value = true;
+        },
+        initializeApp: () => initialization.future,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(SplashPage), findsOneWidget);
+    final context = tester.element(find.byType(SplashPage));
+    final actualPalette = Theme.of(context).extension<AppPalette>();
+    final expectedPalette = AppPalette.fromPreset(
+      AppThemePreset.sunsetTide,
+      isDark: true,
+    );
+    expect(actualPalette?.background, expectedPalette.background);
+    expect(actualPalette?.primary, expectedPalette.primary);
+
+    initialization.complete();
   });
 }
 

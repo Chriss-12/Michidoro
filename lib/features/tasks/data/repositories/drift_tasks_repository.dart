@@ -29,10 +29,11 @@ class DriftTasksRepository implements TasksRepository {
   }
 
   @override
-  Future<domain.Task> createTask(String title) async {
+  Future<domain.Task> createTask(String title, {int? durationMinutes}) async {
     return _createTask(
       title: title,
       status: domain.TaskStatus.listed,
+      durationMinutes: durationMinutes,
     );
   }
 

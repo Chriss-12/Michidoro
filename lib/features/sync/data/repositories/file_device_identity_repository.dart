@@ -14,28 +14,35 @@ class FileDeviceIdentityRepository implements DeviceIdentityRepository {
   static const _fileName = 'michifocus-device-identity.json';
 
   final DeviceIdentityDirectoryProvider _directory;
+  DeviceIdentity? _cached;
 
   @override
   Future<DeviceIdentity> load() async {
+    final cached = _cached;
+    if (cached != null) return cached;
     try {
       final file = await _identityFile();
-      if (!file.existsSync()) return const DeviceIdentity();
+      if (!file.existsSync()) return _cache(const DeviceIdentity());
 
       final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! Map<String, dynamic>) return const DeviceIdentity();
+      if (decoded is! Map<String, dynamic>) {
+        return _cache(const DeviceIdentity());
+      }
 
-      return DeviceIdentity(
-        installationId: decoded['installationId'] is String
-            ? decoded['installationId'] as String
-            : '',
-        friendlyName: decoded['friendlyName'] is String
-            ? decoded['friendlyName'] as String
-            : '',
-      ).normalized();
+      return _cache(
+        DeviceIdentity(
+          installationId: decoded['installationId'] is String
+              ? decoded['installationId'] as String
+              : '',
+          friendlyName: decoded['friendlyName'] is String
+              ? decoded['friendlyName'] as String
+              : '',
+        ).normalized(),
+      );
     } on FormatException {
-      return const DeviceIdentity();
+      return _cache(const DeviceIdentity());
     } on FileSystemException {
-      return const DeviceIdentity();
+      return _cache(const DeviceIdentity());
     }
   }
 
@@ -50,7 +57,10 @@ class FileDeviceIdentityRepository implements DeviceIdentityRepository {
       }),
       flush: true,
     );
+    _cached = normalized;
   }
+
+  DeviceIdentity _cache(DeviceIdentity value) => _cached = value;
 
   Future<File> _identityFile() async {
     final directory = await _directory();

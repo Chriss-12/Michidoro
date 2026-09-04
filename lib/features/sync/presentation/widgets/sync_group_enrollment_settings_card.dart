@@ -864,8 +864,8 @@ class _OutboxPublicationStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = switch (state) {
       SyncOutboxPublicationState.idle => context.tr(
-        'El envío cifrado de tareas, objetivos, calendario y rutinas está activo. Pulsa el botón cuando quieras entregar los cambios a Syncthing.',
-        'Encrypted sending for tasks, goals, calendar, and routines is active. Press the button when you want to hand changes to Syncthing.',
+        'El envío cifrado de tareas, objetivos, calendario, rutinas y notas está activo. Pulsa el botón cuando quieras entregar los cambios a Syncthing.',
+        'Encrypted sending for tasks, goals, calendar, routines, and notes is active. Press the button when you want to hand changes to Syncthing.',
       ),
       SyncOutboxPublicationState.publishing => context.tr(
         'Cifrando y preparando los cambios pendientes…',
@@ -921,8 +921,8 @@ class _IncomingApplicationStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = switch (state) {
       SyncIncomingApplicationState.idle => context.tr(
-        'La recepción segura de tareas, objetivos, calendario y rutinas está activa. Revísala después de que Syncthing transporte archivos.',
-        'Secure receiving for tasks, goals, calendar, and routines is active. Review it after Syncthing transports files.',
+        'La recepción segura de tareas, objetivos, calendario, rutinas y notas está activa. Revísala después de que Syncthing transporte archivos.',
+        'Secure receiving for tasks, goals, calendar, routines, and notes is active. Review it after Syncthing transports files.',
       ),
       SyncIncomingApplicationState.processing => context.tr(
         'Validando, descifrando y combinando los cambios recibidos…',
@@ -1020,8 +1020,8 @@ class _LocalDataDecision extends StatelessWidget {
       children: [
         Text(
           context.tr(
-            'Hay ${summary.totalRecords} registros locales: ${summary.tasks} tareas, ${summary.goals} objetivos, ${summary.routines} rutinas y ${summary.focusSessions} sesiones de enfoque.',
-            'There are ${summary.totalRecords} local records: ${summary.tasks} tasks, ${summary.goals} goals, ${summary.routines} routines, and ${summary.focusSessions} focus sessions.',
+            'Hay ${summary.totalRecords} registros locales: ${summary.tasks} tareas, ${summary.goals} objetivos, ${summary.routines} rutinas, ${summary.quickNotes} notas y ${summary.focusSessions} sesiones de enfoque.',
+            'There are ${summary.totalRecords} local records: ${summary.tasks} tasks, ${summary.goals} goals, ${summary.routines} routines, ${summary.quickNotes} notes, and ${summary.focusSessions} focus sessions.',
           ),
           style: Theme.of(context).textTheme.bodySmall,
         ),

@@ -70,9 +70,11 @@ class TaskFocusMinuteSummary {
     required this.totalFocusedSeconds,
     required this.completedWholeMinutes,
     required this.remainingMinutes,
+    required this.remainingSeconds,
   });
 
   final int totalFocusedSeconds;
   final int completedWholeMinutes;
   final int remainingMinutes;
+  final int remainingSeconds;
 }

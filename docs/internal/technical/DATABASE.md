@@ -11,7 +11,7 @@ The current local persistence model uses one Drift-managed SQLite file,
 
 Current Drift-backed SQLite store:
 
-The unified database is currently at schema version 6. The `Introduced` column
+The unified database is currently at schema version 9. The `Introduced` column
 records the first unified-schema version containing each table.
 
 | SQLite table | Introduced | Purpose |
@@ -28,6 +28,7 @@ records the first unified-schema version containing each table.
 | `routine_items` | 5 | Ordered task templates scheduled within a routine. |
 | `routine_runs` | 5 | Dated routine occurrence and immutable routine snapshots. |
 | `routine_item_runs` | 5 | Idempotent task materialization link and historical item outcome. |
+| `quick_notes` | 9 | Independent quick checklist items with color, optional date/priority, and stable manual order. |
 | `sync_local_state` | 6 | Per-group installation identity, protocol version, and monotonic local counter. |
 | `sync_outbox` | 6 | Durable local operation descriptions awaiting immutable publication. |
 | `sync_applied_operations` | 6 | Idempotency ledger for validated remote operations. |
@@ -55,8 +56,9 @@ Important boundary:
   Pomodoro history links.
 - Settings and timer preferences are stored through the local JSON settings
   repository, not as Drift tables and not as part of database backups.
-- The 12 application-data tables remain unchanged. Schema 6 adds seven private
-  synchronization-metadata tables; none is a second live user database.
+- The 13 application-data tables include the schema-9 quick-note table. The
+  seven synchronization-metadata tables remain private metadata; none is a
+  second live user database.
 - Database export checkpoints the active timer, creates a consistent SQLite
   snapshot with `VACUUM INTO`, and exports only that `michifocus.sqlite` file.
 - Database import selects a local backup folder, stages `michifocus.sqlite`,
@@ -267,6 +269,12 @@ It stores the active owner, focus/break phase, running or paused state,
 remaining and total phase seconds, cadence, automatic transition settings,
 continuous or single-block mode, current block, total blocks, task estimate,
 focused baseline, and clock reconciliation timestamps.
+
+V18 reuses those fields without a schema change. On startup, the controller
+compares `task_focused_seconds_at_start` with persisted task sessions. Newer
+completed focus resumes at its break, newer partial focus rebuilds a paused
+block from the exact remaining seconds, and terminal task exits await deletion
+of the singleton runtime before returning.
 
 ## V9 routines persistence
 
@@ -490,3 +498,76 @@ an unmatched row remains retryable and rejected. On 2026-08-21 this compatibilit
 path recovered 29 existing operations across Poco and Realme; both phones applied
 the other phone's complete batch with zero rejected or deferred files.
 
+
+## V12 routine color and validity foundation
+
+Status: Implemented as the persistence foundation of V12-M1 on 2026-08-26;
+the routine editor and visual color selection remain pending.
+
+Unified database schema version 8 adds nullable `custom_color_argb`,
+`valid_from_local_date`, and `valid_until_local_date` columns to `routines`, plus
+nullable `custom_color_argb_snapshot` to `routine_runs`. The existing
+`color_key` remains the compatibility fallback. A custom color is stored as an
+opaque ARGB integer from `0xFF000000` through `0xFFFFFFFF`; local validity dates
+use canonical `YYYY-MM-DD` values and an inclusive end date.
+
+The 5–7→8 migration is forward-only. Existing rows receive null values, which
+preserves their prior unbounded behavior and avoids inventing historical start
+or end dates. Repository validation rejects non-date-only values, inverted
+ranges, and non-opaque custom colors. Daily reconciliation creates occurrences
+only inside the configured inclusive range and copies the effective custom
+color into each new run, so later template edits do not recolor history.
+
+Routine aggregate creation, bootstrap, incoming application, and conflict
+resolution carry the three mutable template fields. Unified backup, staged
+import, recovery snapshots, and protected reset inherit the fields because they
+operate on the complete validated SQLite database.
+
+Verification evidence on 2026-08-26:
+
+- Drift generated code rebuilt successfully for schema version 8.
+- 45 focused routine, migration, validator, and synchronization tests passed.
+- Static analysis of `lib` and `test` completed with no issues.
+- The complete Flutter suite passed with 425 tests, including backup/import,
+  protected reset, routine history, and synchronization regressions.
+
+## V12 quick-note persistence
+
+Status: Implemented for V12-M3 and V12-M4 on 2026-08-27.
+
+Unified schema version 9 adds `quick_notes`. Each row stores a stable ID,
+trimmed text, completion flag, opaque ARGB color, nullable canonical local date,
+nullable `high | medium | low` priority, spaced integer position, and creation
+and update timestamps. Three indexes cover manual order, selected-day lookup,
+and recent sorting.
+
+Quick notes are deliberately independent from `tasks`: they have no duration,
+goal, focus owner, routine materialization, completion-history event, or report
+relationship. Complete-database snapshot/export and recovery include them
+automatically; staged import additionally checks their schema, indexes, values,
+and canonical dates. Protected reset clears them.
+
+Migration checks from every supported historical fixture, file-restart CRUD,
+ordering, validator, reset, secure bootstrap/incoming, and full regression tests
+pass as part of the complete 444-test suite. Generated Drift code and static
+analysis are clean; the release APK also builds and installs on RMX3301.
+
+## V18 exact Pomodoro continuation
+
+Status: Implemented on 2026-08-30; manual physical reproduction remains before
+verification.
+
+V18 reuses the focused seconds already persisted in Pomodoro sessions and the
+task focus baseline already stored in the recoverable runtime. It introduces no
+schema, migration, backup, import, or synchronization change.
+
+When a task is prepared or an interrupted runtime is restored, the controller
+subtracts every persisted focused second from the task estimate. A stale runtime
+whose focus session was already saved is reconciled defensively: a completed
+focus continues at its break, while a partial focus is replanned from the exact
+remaining seconds. Terminal actions await runtime deletion so an immediate app
+close cannot ordinarily leave an obsolete focus block behind.
+
+Automated coverage includes the 60-minute task with 30 completed minutes and 25
+partial minutes, complete and partial stale runtimes, and serialized runtime
+cleanup. Static analysis is clean and all 476 tests pass.

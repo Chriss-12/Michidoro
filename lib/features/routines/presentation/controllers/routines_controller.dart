@@ -2,6 +2,7 @@ import 'package:pomodoro_app_v1/features/routines/domain/entities/routine.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/entities/routine_run.dart';
 import 'package:pomodoro_app_v1/features/routines/domain/repositories/routines_repository.dart';
 import 'package:pomodoro_app_v1/features/routines/presentation/models/routine_schedule_projection.dart';
+import 'package:pomodoro_app_v1/shared/models/date_period_filter.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
 enum RoutineFilter { active, paused, archived }
@@ -126,6 +127,9 @@ class RoutineEditorDraft {
     required this.weekdays,
     required this.items,
     this.description,
+    this.customColorArgb,
+    this.validFromDate,
+    this.validUntilDate,
     this.pausedUntilDate,
     this.archivedAt,
     this.createdAt,
@@ -136,6 +140,9 @@ class RoutineEditorDraft {
   final String? description;
   final String iconKey;
   final String colorKey;
+  final int? customColorArgb;
+  final DateTime? validFromDate;
+  final DateTime? validUntilDate;
   final RoutineStatus status;
   final DateTime? pausedUntilDate;
   final DateTime? archivedAt;
@@ -152,6 +159,12 @@ class RoutineEditorDraft {
     bool clearDescription = false,
     String? iconKey,
     String? colorKey,
+    int? customColorArgb,
+    bool clearCustomColor = false,
+    DateTime? validFromDate,
+    bool clearValidFromDate = false,
+    DateTime? validUntilDate,
+    bool clearValidUntilDate = false,
     RoutineStatus? status,
     DateTime? pausedUntilDate,
     bool clearPausedUntilDate = false,
@@ -167,6 +180,15 @@ class RoutineEditorDraft {
       description: clearDescription ? null : description ?? this.description,
       iconKey: iconKey ?? this.iconKey,
       colorKey: colorKey ?? this.colorKey,
+      customColorArgb: clearCustomColor
+          ? null
+          : customColorArgb ?? this.customColorArgb,
+      validFromDate: clearValidFromDate
+          ? null
+          : validFromDate ?? this.validFromDate,
+      validUntilDate: clearValidUntilDate
+          ? null
+          : validUntilDate ?? this.validUntilDate,
       status: status ?? this.status,
       pausedUntilDate: clearPausedUntilDate
           ? null
@@ -242,6 +264,7 @@ class RoutinesController {
     RoutineLocalIdFactory? createId,
   }) : _repository = repository,
        _now = now ?? DateTime.now,
+       dateFilter = signal(DatePeriodFilter.today((now ?? DateTime.now)())),
        _externalIdFactory = createId;
 
   static const int recommendedFocusMinutes = 25;
@@ -260,6 +283,7 @@ class RoutinesController {
     const {},
   );
   final FlutterSignal<RoutineFilter> filter = signal(RoutineFilter.active);
+  final FlutterSignal<DatePeriodFilter> dateFilter;
   final FlutterSignal<List<RoutineValidationIssue>> validationIssues = signal(
     const [],
   );
@@ -272,8 +296,13 @@ class RoutinesController {
       RoutineFilter.paused => RoutineStatus.paused,
       RoutineFilter.archived => RoutineStatus.archived,
     };
+    final selectedPeriod = dateFilter.value;
     return routines.value
-        .where((routine) => routine.status == expectedStatus)
+        .where(
+          (routine) =>
+              routine.status == expectedStatus &&
+              _occursInPeriod(routine, selectedPeriod),
+        )
         .toList(growable: false);
   });
 
@@ -294,9 +323,33 @@ class RoutinesController {
 
   RoutineFilter get selectedFilter => filter.value;
 
+  DatePeriodFilter get selectedDateFilter => dateFilter.value;
+
   DateTime get currentLocalTime => _now();
 
   set selectedFilter(RoutineFilter value) => filter.value = value;
+
+  set selectedDateFilter(DatePeriodFilter value) => dateFilter.value = value;
+
+  bool _occursInPeriod(Routine routine, DatePeriodFilter period) {
+    if (period.kind == DatePeriodFilterKind.all) return true;
+    var start = period.start!;
+    var end = period.end!;
+    final validFrom = routine.validFromDate;
+    final validUntil = routine.validUntilDate;
+    if (validFrom != null && validFrom.isAfter(start)) start = validFrom;
+    if (validUntil != null && validUntil.isBefore(end)) end = validUntil;
+    if (start.isAfter(end)) return false;
+
+    for (
+      var day = _dateOnly(start);
+      !day.isAfter(end);
+      day = day.add(const Duration(days: 1))
+    ) {
+      if (routine.weekdays.contains(day.weekday)) return true;
+    }
+    return false;
+  }
 
   Future<void> load({DateTime? day}) async {
     isLoading.value = true;
@@ -341,6 +394,14 @@ class RoutinesController {
   Future<List<RoutineScheduleOccurrence>> scheduleBetween({
     required DateTime startDate,
     required DateTime endDate,
+  }) async => (await scheduleProjectionBetween(
+    startDate: startDate,
+    endDate: endDate,
+  )).occurrences;
+
+  Future<RoutineScheduleProjection> scheduleProjectionBetween({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final loadedRuns = await _repository.loadRuns(
       startDate: _dateOnly(startDate),
@@ -351,19 +412,31 @@ class RoutinesController {
         (run) async => MapEntry(run.id, await _repository.loadItemRuns(run.id)),
       ),
     );
-    return projectRoutineSchedule(
-      routines: routines.value,
-      runs: loadedRuns,
-      itemRuns: Map.fromEntries(entries),
-      startDate: startDate,
-      endDate: endDate,
-      today: _now(),
+    final loadedItemRuns = Map.fromEntries(entries);
+    return RoutineScheduleProjection(
+      occurrences: projectRoutineSchedule(
+        routines: routines.value,
+        runs: loadedRuns,
+        itemRuns: loadedItemRuns,
+        startDate: startDate,
+        endDate: endDate,
+        today: _now(),
+      ),
+      activities: projectRoutineActivities(
+        routines: routines.value,
+        runs: loadedRuns,
+        itemRuns: loadedItemRuns,
+        startDate: startDate,
+        endDate: endDate,
+        today: _now(),
+      ),
     );
   }
 
   RoutineEditorDraft newDraft({
     String iconKey = 'routine',
     String colorKey = 'primary',
+    int customColorArgb = 0xFF789B5F,
   }) {
     return RoutineEditorDraft(
       id: _nextUniqueId(
@@ -373,6 +446,8 @@ class RoutinesController {
       name: '',
       iconKey: iconKey,
       colorKey: colorKey,
+      customColorArgb: customColorArgb,
+      validFromDate: _dateOnly(_now()),
       status: RoutineStatus.active,
       weekdays: const [],
       items: const [],
@@ -385,6 +460,9 @@ class RoutinesController {
     description: routine.description,
     iconKey: routine.iconKey,
     colorKey: routine.colorKey,
+    customColorArgb: routine.customColorArgb,
+    validFromDate: routine.validFromDate,
+    validUntilDate: routine.validUntilDate,
     status: routine.status,
     pausedUntilDate: routine.pausedUntilDate,
     archivedAt: routine.archivedAt,
@@ -518,6 +596,8 @@ class RoutinesController {
       description: source.description,
       iconKey: source.iconKey,
       colorKey: source.colorKey,
+      customColorArgb: source.customColorArgb,
+      validFromDate: _dateOnly(now),
       status: RoutineStatus.paused,
       createdAt: now,
       updatedAt: now,
@@ -683,6 +763,38 @@ class RoutinesController {
     if (draft.colorKey.trim().isEmpty) {
       add('color.required', RoutineEditorSection.identity, 'colorKey');
     }
+    if (draft.isNew && draft.customColorArgb == null) {
+      add(
+        'color.customRequired',
+        RoutineEditorSection.identity,
+        'customColorArgb',
+      );
+    }
+
+    if (draft.isNew && draft.validFromDate == null) {
+      add(
+        'validity.startRequired',
+        RoutineEditorSection.recurrence,
+        'validFromDate',
+      );
+    }
+    if ((draft.validFromDate != null && !_isDateOnly(draft.validFromDate!)) ||
+        (draft.validUntilDate != null && !_isDateOnly(draft.validUntilDate!))) {
+      add(
+        'validity.dateInvalid',
+        RoutineEditorSection.recurrence,
+        'validFromDate',
+      );
+    }
+    if (draft.validFromDate != null &&
+        draft.validUntilDate != null &&
+        draft.validFromDate!.isAfter(draft.validUntilDate!)) {
+      add(
+        'validity.rangeInvalid',
+        RoutineEditorSection.recurrence,
+        'validUntilDate',
+      );
+    }
 
     final days = draft.weekdays.toSet();
     if (draft.weekdays.isEmpty) {
@@ -840,6 +952,9 @@ class RoutinesController {
       description: _trimmedOrNull(draft.description),
       iconKey: draft.iconKey.trim(),
       colorKey: draft.colorKey.trim(),
+      customColorArgb: draft.customColorArgb,
+      validFromDate: draft.validFromDate,
+      validUntilDate: draft.validUntilDate,
       status: draft.status,
       pausedUntilDate: draft.pausedUntilDate,
       archivedAt: draft.archivedAt,
@@ -1046,6 +1161,13 @@ class _ScheduledDraft {
   final int start;
   final int finish;
 }
+
+bool _isDateOnly(DateTime value) =>
+    value.hour == 0 &&
+    value.minute == 0 &&
+    value.second == 0 &&
+    value.millisecond == 0 &&
+    value.microsecond == 0;
 
 DateTime _dateOnly(DateTime value) =>
     DateTime(value.year, value.month, value.day);

@@ -3,9 +3,17 @@ import 'dart:async';
 import 'package:get_it/get_it.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/legacy_database_migrator.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
+import 'package:pomodoro_app_v1/app/state/application_data_refresh_coordinator.dart';
 import 'package:pomodoro_app_v1/features/calendar/data/repositories/drift_calendar_events_repository.dart';
+import 'package:pomodoro_app_v1/features/calendar/data/services/local_weekly_schedule_exporter.dart';
 import 'package:pomodoro_app_v1/features/calendar/domain/repositories/calendar_events_repository.dart';
+import 'package:pomodoro_app_v1/features/calendar/domain/repositories/weekly_schedule_exporter.dart';
 import 'package:pomodoro_app_v1/features/calendar/presentation/controllers/calendar_controller.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/data/repositories/file_focus_silence_preferences_repository.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/data/services/android_focus_silence_platform.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/domain/repositories/focus_silence_preferences_repository.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/domain/services/focus_silence_platform.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/controllers/focus_silence_controller.dart';
 import 'package:pomodoro_app_v1/features/goals/data/repositories/drift_goals_repository.dart';
 import 'package:pomodoro_app_v1/features/goals/domain/repositories/goals_repository.dart';
 import 'package:pomodoro_app_v1/features/goals/presentation/controllers/goals_controller.dart';
@@ -14,6 +22,9 @@ import 'package:pomodoro_app_v1/features/pomodoro/data/repositories/drift_pomodo
 import 'package:pomodoro_app_v1/features/pomodoro/domain/repositories/pomodoro_runtime_repository.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/domain/repositories/pomodoro_sessions_repository.dart';
 import 'package:pomodoro_app_v1/features/pomodoro/presentation/controllers/pomodoro_controller.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/data/repositories/drift_quick_notes_repository.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/domain/repositories/quick_notes_repository.dart';
+import 'package:pomodoro_app_v1/features/quick_notes/presentation/controllers/quick_notes_controller.dart';
 import 'package:pomodoro_app_v1/features/reports/data/repositories/drift_statistics_report_repository.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_repository.dart';
 import 'package:pomodoro_app_v1/features/reports/domain/use_cases/generate_statistics_report.dart';
@@ -88,6 +99,26 @@ Future<void> configureDependencies() async {
     serviceLocator.registerLazySingleton<SettingsRepository>(
       FileSettingsRepository.new,
     );
+  }
+  if (!serviceLocator.isRegistered<FocusSilencePreferencesRepository>()) {
+    serviceLocator.registerLazySingleton<FocusSilencePreferencesRepository>(
+      FileFocusSilencePreferencesRepository.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<FocusSilencePlatform>()) {
+    serviceLocator.registerLazySingleton<FocusSilencePlatform>(
+      AndroidFocusSilencePlatform.new,
+    );
+  }
+  if (!serviceLocator.isRegistered<FocusSilenceController>()) {
+    final focusSilenceController = FocusSilenceController(
+      repository: serviceLocator<FocusSilencePreferencesRepository>(),
+      platform: serviceLocator<FocusSilencePlatform>(),
+    );
+    serviceLocator.registerSingleton<FocusSilenceController>(
+      focusSilenceController,
+    );
+    _loadInBackground(focusSilenceController.initialize());
   }
 
   if (!serviceLocator.isRegistered<LocalUnlockPolicyRepository>()) {
@@ -285,7 +316,7 @@ Future<void> configureDependencies() async {
         externalSyncAppLauncher: serviceLocator<ExternalSyncAppLauncher>(),
         conflictResolutionService:
             serviceLocator<SyncConflictResolutionService>(),
-        refreshApplicationData: _refreshSynchronizedApplicationData,
+        refreshApplicationData: refreshApplicationData,
       ),
     );
   }
@@ -362,6 +393,31 @@ Future<void> configureDependencies() async {
     serviceLocator.registerSingleton<CalendarController>(calendarController);
     _loadInBackground(calendarController.loadEvents());
   }
+  if (!serviceLocator.isRegistered<WeeklyScheduleExporter>()) {
+    serviceLocator.registerLazySingleton<WeeklyScheduleExporter>(
+      LocalWeeklyScheduleExporter.new,
+    );
+  }
+
+  if (!serviceLocator.isRegistered<QuickNotesDao>()) {
+    serviceLocator
+      ..registerLazySingleton<QuickNotesDao>(
+        () => QuickNotesDao(serviceLocator<MichiFocusDatabase>()),
+      )
+      ..registerLazySingleton<QuickNotesRepository>(
+        () => DriftQuickNotesRepository(
+          serviceLocator<QuickNotesDao>(),
+          sync: serviceLocator<SyncMutationCoordinator>(),
+          idGenerator: serviceLocator<SecureSyncIdGenerator>(),
+        ),
+      );
+  }
+  if (!serviceLocator.isRegistered<QuickNotesController>()) {
+    final controller = QuickNotesController(
+      repository: serviceLocator<QuickNotesRepository>(),
+    );
+    serviceLocator.registerSingleton<QuickNotesController>(controller);
+  }
 
   if (!serviceLocator.isRegistered<TasksDao>()) {
     serviceLocator
@@ -395,7 +451,6 @@ Future<void> configureDependencies() async {
       repository: serviceLocator<RoutinesRepository>(),
     );
     serviceLocator.registerSingleton<RoutinesController>(routinesController);
-    _loadInBackground(routinesController.load());
   }
 
   if (!serviceLocator.isRegistered<GenerateStatisticsReport>()) {
@@ -413,22 +468,33 @@ Future<void> configureDependencies() async {
       );
   }
 
-  if (serviceLocator.isRegistered<TasksController>()) {
-    return;
+  if (!serviceLocator.isRegistered<TasksController>()) {
+    if (!serviceLocator.isRegistered<TaskTemporalFilterRepository>()) {
+      serviceLocator.registerLazySingleton<TaskTemporalFilterRepository>(
+        FileTaskTemporalFilterRepository.new,
+      );
+    }
+
+    final tasksController = TasksController(
+      repository: serviceLocator<TasksRepository>(),
+      temporalFilterRepository: serviceLocator<TaskTemporalFilterRepository>(),
+    );
+    serviceLocator.registerSingleton<TasksController>(tasksController);
   }
 
-  if (!serviceLocator.isRegistered<TaskTemporalFilterRepository>()) {
-    serviceLocator.registerLazySingleton<TaskTemporalFilterRepository>(
-      FileTaskTemporalFilterRepository.new,
+  if (!serviceLocator.isRegistered<ApplicationDataRefreshCoordinator>()) {
+    serviceLocator.registerSingleton<ApplicationDataRefreshCoordinator>(
+      ApplicationDataRefreshCoordinator(
+        refreshers: [
+          serviceLocator<GoalsController>().loadGoals,
+          serviceLocator<TasksController>().loadTasks,
+          serviceLocator<CalendarController>().loadEvents,
+          serviceLocator<RoutinesController>().load,
+          serviceLocator<QuickNotesController>().load,
+        ],
+      ),
     );
   }
-
-  final tasksController = TasksController(
-    repository: serviceLocator<TasksRepository>(),
-    temporalFilterRepository: serviceLocator<TaskTemporalFilterRepository>(),
-  );
-  serviceLocator.registerSingleton<TasksController>(tasksController);
-  _loadInBackground(tasksController.loadTasks());
 }
 
 void _loadInBackground(Future<void> load) {
@@ -439,19 +505,9 @@ void _loadInBackground(Future<void> load) {
   );
 }
 
-Future<void> _refreshSynchronizedApplicationData() async {
-  final loads = <Future<void>>[];
-  if (serviceLocator.isRegistered<GoalsController>()) {
-    loads.add(serviceLocator<GoalsController>().loadGoals());
+Future<void> refreshApplicationData() {
+  if (!serviceLocator.isRegistered<ApplicationDataRefreshCoordinator>()) {
+    return Future.value();
   }
-  if (serviceLocator.isRegistered<TasksController>()) {
-    loads.add(serviceLocator<TasksController>().loadTasks());
-  }
-  if (serviceLocator.isRegistered<CalendarController>()) {
-    loads.add(serviceLocator<CalendarController>().loadEvents());
-  }
-  if (serviceLocator.isRegistered<RoutinesController>()) {
-    loads.add(serviceLocator<RoutinesController>().load());
-  }
-  await Future.wait(loads);
+  return serviceLocator<ApplicationDataRefreshCoordinator>().refresh();
 }

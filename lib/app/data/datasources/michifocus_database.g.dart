@@ -154,6 +154,22 @@ class CalendarEventsDaoManager {
       );
 }
 
+mixin _$QuickNotesDaoMixin on DatabaseAccessor<MichiFocusDatabase> {
+  $QuickNoteRecordsTable get quickNoteRecords =>
+      attachedDatabase.quickNoteRecords;
+  QuickNotesDaoManager get managers => QuickNotesDaoManager(this);
+}
+
+class QuickNotesDaoManager {
+  final _$QuickNotesDaoMixin _db;
+  QuickNotesDaoManager(this._db);
+  $$QuickNoteRecordsTableTableManager get quickNoteRecords =>
+      $$QuickNoteRecordsTableTableManager(
+        _db.attachedDatabase,
+        _db.quickNoteRecords,
+      );
+}
+
 mixin _$ReportsDaoMixin on DatabaseAccessor<MichiFocusDatabase> {
   $GoalRecordsTable get goalRecords => attachedDatabase.goalRecords;
   $TaskRecordsTable get taskRecords => attachedDatabase.taskRecords;
@@ -4231,6 +4247,39 @@ class $RoutineRecordsTable extends RoutineRecords
     requiredDuringInsert: false,
     defaultValue: const Constant('primary'),
   );
+  static const VerificationMeta _customColorArgbMeta = const VerificationMeta(
+    'customColorArgb',
+  );
+  @override
+  late final GeneratedColumn<int> customColorArgb = GeneratedColumn<int>(
+    'custom_color_argb',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _validFromLocalDateMeta =
+      const VerificationMeta('validFromLocalDate');
+  @override
+  late final GeneratedColumn<String> validFromLocalDate =
+      GeneratedColumn<String>(
+        'valid_from_local_date',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _validUntilLocalDateMeta =
+      const VerificationMeta('validUntilLocalDate');
+  @override
+  late final GeneratedColumn<String> validUntilLocalDate =
+      GeneratedColumn<String>(
+        'valid_until_local_date',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -4292,6 +4341,9 @@ class $RoutineRecordsTable extends RoutineRecords
     description,
     iconKey,
     colorKey,
+    customColorArgb,
+    validFromLocalDate,
+    validUntilLocalDate,
     status,
     pausedUntilLocalDate,
     archivedAt,
@@ -4342,6 +4394,33 @@ class $RoutineRecordsTable extends RoutineRecords
       context.handle(
         _colorKeyMeta,
         colorKey.isAcceptableOrUnknown(data['color_key']!, _colorKeyMeta),
+      );
+    }
+    if (data.containsKey('custom_color_argb')) {
+      context.handle(
+        _customColorArgbMeta,
+        customColorArgb.isAcceptableOrUnknown(
+          data['custom_color_argb']!,
+          _customColorArgbMeta,
+        ),
+      );
+    }
+    if (data.containsKey('valid_from_local_date')) {
+      context.handle(
+        _validFromLocalDateMeta,
+        validFromLocalDate.isAcceptableOrUnknown(
+          data['valid_from_local_date']!,
+          _validFromLocalDateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('valid_until_local_date')) {
+      context.handle(
+        _validUntilLocalDateMeta,
+        validUntilLocalDate.isAcceptableOrUnknown(
+          data['valid_until_local_date']!,
+          _validUntilLocalDateMeta,
+        ),
       );
     }
     if (data.containsKey('status')) {
@@ -4410,6 +4489,18 @@ class $RoutineRecordsTable extends RoutineRecords
         DriftSqlType.string,
         data['${effectivePrefix}color_key'],
       )!,
+      customColorArgb: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_color_argb'],
+      ),
+      validFromLocalDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}valid_from_local_date'],
+      ),
+      validUntilLocalDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}valid_until_local_date'],
+      ),
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -4445,6 +4536,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
   final String? description;
   final String iconKey;
   final String colorKey;
+  final int? customColorArgb;
+  final String? validFromLocalDate;
+  final String? validUntilLocalDate;
   final String status;
   final String? pausedUntilLocalDate;
   final DateTime? archivedAt;
@@ -4456,6 +4550,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
     this.description,
     required this.iconKey,
     required this.colorKey,
+    this.customColorArgb,
+    this.validFromLocalDate,
+    this.validUntilLocalDate,
     required this.status,
     this.pausedUntilLocalDate,
     this.archivedAt,
@@ -4472,6 +4569,15 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
     }
     map['icon_key'] = Variable<String>(iconKey);
     map['color_key'] = Variable<String>(colorKey);
+    if (!nullToAbsent || customColorArgb != null) {
+      map['custom_color_argb'] = Variable<int>(customColorArgb);
+    }
+    if (!nullToAbsent || validFromLocalDate != null) {
+      map['valid_from_local_date'] = Variable<String>(validFromLocalDate);
+    }
+    if (!nullToAbsent || validUntilLocalDate != null) {
+      map['valid_until_local_date'] = Variable<String>(validUntilLocalDate);
+    }
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || pausedUntilLocalDate != null) {
       map['paused_until_local_date'] = Variable<String>(pausedUntilLocalDate);
@@ -4493,6 +4599,15 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
           : Value(description),
       iconKey: Value(iconKey),
       colorKey: Value(colorKey),
+      customColorArgb: customColorArgb == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customColorArgb),
+      validFromLocalDate: validFromLocalDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validFromLocalDate),
+      validUntilLocalDate: validUntilLocalDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validUntilLocalDate),
       status: Value(status),
       pausedUntilLocalDate: pausedUntilLocalDate == null && nullToAbsent
           ? const Value.absent()
@@ -4516,6 +4631,13 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
       description: serializer.fromJson<String?>(json['description']),
       iconKey: serializer.fromJson<String>(json['iconKey']),
       colorKey: serializer.fromJson<String>(json['colorKey']),
+      customColorArgb: serializer.fromJson<int?>(json['customColorArgb']),
+      validFromLocalDate: serializer.fromJson<String?>(
+        json['validFromLocalDate'],
+      ),
+      validUntilLocalDate: serializer.fromJson<String?>(
+        json['validUntilLocalDate'],
+      ),
       status: serializer.fromJson<String>(json['status']),
       pausedUntilLocalDate: serializer.fromJson<String?>(
         json['pausedUntilLocalDate'],
@@ -4534,6 +4656,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
       'description': serializer.toJson<String?>(description),
       'iconKey': serializer.toJson<String>(iconKey),
       'colorKey': serializer.toJson<String>(colorKey),
+      'customColorArgb': serializer.toJson<int?>(customColorArgb),
+      'validFromLocalDate': serializer.toJson<String?>(validFromLocalDate),
+      'validUntilLocalDate': serializer.toJson<String?>(validUntilLocalDate),
       'status': serializer.toJson<String>(status),
       'pausedUntilLocalDate': serializer.toJson<String?>(pausedUntilLocalDate),
       'archivedAt': serializer.toJson<DateTime?>(archivedAt),
@@ -4548,6 +4673,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
     Value<String?> description = const Value.absent(),
     String? iconKey,
     String? colorKey,
+    Value<int?> customColorArgb = const Value.absent(),
+    Value<String?> validFromLocalDate = const Value.absent(),
+    Value<String?> validUntilLocalDate = const Value.absent(),
     String? status,
     Value<String?> pausedUntilLocalDate = const Value.absent(),
     Value<DateTime?> archivedAt = const Value.absent(),
@@ -4559,6 +4687,15 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
     description: description.present ? description.value : this.description,
     iconKey: iconKey ?? this.iconKey,
     colorKey: colorKey ?? this.colorKey,
+    customColorArgb: customColorArgb.present
+        ? customColorArgb.value
+        : this.customColorArgb,
+    validFromLocalDate: validFromLocalDate.present
+        ? validFromLocalDate.value
+        : this.validFromLocalDate,
+    validUntilLocalDate: validUntilLocalDate.present
+        ? validUntilLocalDate.value
+        : this.validUntilLocalDate,
     status: status ?? this.status,
     pausedUntilLocalDate: pausedUntilLocalDate.present
         ? pausedUntilLocalDate.value
@@ -4576,6 +4713,15 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
           : this.description,
       iconKey: data.iconKey.present ? data.iconKey.value : this.iconKey,
       colorKey: data.colorKey.present ? data.colorKey.value : this.colorKey,
+      customColorArgb: data.customColorArgb.present
+          ? data.customColorArgb.value
+          : this.customColorArgb,
+      validFromLocalDate: data.validFromLocalDate.present
+          ? data.validFromLocalDate.value
+          : this.validFromLocalDate,
+      validUntilLocalDate: data.validUntilLocalDate.present
+          ? data.validUntilLocalDate.value
+          : this.validUntilLocalDate,
       status: data.status.present ? data.status.value : this.status,
       pausedUntilLocalDate: data.pausedUntilLocalDate.present
           ? data.pausedUntilLocalDate.value
@@ -4596,6 +4742,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
           ..write('description: $description, ')
           ..write('iconKey: $iconKey, ')
           ..write('colorKey: $colorKey, ')
+          ..write('customColorArgb: $customColorArgb, ')
+          ..write('validFromLocalDate: $validFromLocalDate, ')
+          ..write('validUntilLocalDate: $validUntilLocalDate, ')
           ..write('status: $status, ')
           ..write('pausedUntilLocalDate: $pausedUntilLocalDate, ')
           ..write('archivedAt: $archivedAt, ')
@@ -4612,6 +4761,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
     description,
     iconKey,
     colorKey,
+    customColorArgb,
+    validFromLocalDate,
+    validUntilLocalDate,
     status,
     pausedUntilLocalDate,
     archivedAt,
@@ -4627,6 +4779,9 @@ class RoutineRecord extends DataClass implements Insertable<RoutineRecord> {
           other.description == this.description &&
           other.iconKey == this.iconKey &&
           other.colorKey == this.colorKey &&
+          other.customColorArgb == this.customColorArgb &&
+          other.validFromLocalDate == this.validFromLocalDate &&
+          other.validUntilLocalDate == this.validUntilLocalDate &&
           other.status == this.status &&
           other.pausedUntilLocalDate == this.pausedUntilLocalDate &&
           other.archivedAt == this.archivedAt &&
@@ -4640,6 +4795,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
   final Value<String?> description;
   final Value<String> iconKey;
   final Value<String> colorKey;
+  final Value<int?> customColorArgb;
+  final Value<String?> validFromLocalDate;
+  final Value<String?> validUntilLocalDate;
   final Value<String> status;
   final Value<String?> pausedUntilLocalDate;
   final Value<DateTime?> archivedAt;
@@ -4652,6 +4810,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
     this.description = const Value.absent(),
     this.iconKey = const Value.absent(),
     this.colorKey = const Value.absent(),
+    this.customColorArgb = const Value.absent(),
+    this.validFromLocalDate = const Value.absent(),
+    this.validUntilLocalDate = const Value.absent(),
     this.status = const Value.absent(),
     this.pausedUntilLocalDate = const Value.absent(),
     this.archivedAt = const Value.absent(),
@@ -4665,6 +4826,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
     this.description = const Value.absent(),
     this.iconKey = const Value.absent(),
     this.colorKey = const Value.absent(),
+    this.customColorArgb = const Value.absent(),
+    this.validFromLocalDate = const Value.absent(),
+    this.validUntilLocalDate = const Value.absent(),
     this.status = const Value.absent(),
     this.pausedUntilLocalDate = const Value.absent(),
     this.archivedAt = const Value.absent(),
@@ -4681,6 +4845,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
     Expression<String>? description,
     Expression<String>? iconKey,
     Expression<String>? colorKey,
+    Expression<int>? customColorArgb,
+    Expression<String>? validFromLocalDate,
+    Expression<String>? validUntilLocalDate,
     Expression<String>? status,
     Expression<String>? pausedUntilLocalDate,
     Expression<DateTime>? archivedAt,
@@ -4694,6 +4861,11 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
       if (description != null) 'description': description,
       if (iconKey != null) 'icon_key': iconKey,
       if (colorKey != null) 'color_key': colorKey,
+      if (customColorArgb != null) 'custom_color_argb': customColorArgb,
+      if (validFromLocalDate != null)
+        'valid_from_local_date': validFromLocalDate,
+      if (validUntilLocalDate != null)
+        'valid_until_local_date': validUntilLocalDate,
       if (status != null) 'status': status,
       if (pausedUntilLocalDate != null)
         'paused_until_local_date': pausedUntilLocalDate,
@@ -4710,6 +4882,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
     Value<String?>? description,
     Value<String>? iconKey,
     Value<String>? colorKey,
+    Value<int?>? customColorArgb,
+    Value<String?>? validFromLocalDate,
+    Value<String?>? validUntilLocalDate,
     Value<String>? status,
     Value<String?>? pausedUntilLocalDate,
     Value<DateTime?>? archivedAt,
@@ -4723,6 +4898,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
       description: description ?? this.description,
       iconKey: iconKey ?? this.iconKey,
       colorKey: colorKey ?? this.colorKey,
+      customColorArgb: customColorArgb ?? this.customColorArgb,
+      validFromLocalDate: validFromLocalDate ?? this.validFromLocalDate,
+      validUntilLocalDate: validUntilLocalDate ?? this.validUntilLocalDate,
       status: status ?? this.status,
       pausedUntilLocalDate: pausedUntilLocalDate ?? this.pausedUntilLocalDate,
       archivedAt: archivedAt ?? this.archivedAt,
@@ -4749,6 +4927,17 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
     }
     if (colorKey.present) {
       map['color_key'] = Variable<String>(colorKey.value);
+    }
+    if (customColorArgb.present) {
+      map['custom_color_argb'] = Variable<int>(customColorArgb.value);
+    }
+    if (validFromLocalDate.present) {
+      map['valid_from_local_date'] = Variable<String>(validFromLocalDate.value);
+    }
+    if (validUntilLocalDate.present) {
+      map['valid_until_local_date'] = Variable<String>(
+        validUntilLocalDate.value,
+      );
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -4781,6 +4970,9 @@ class RoutineRecordsCompanion extends UpdateCompanion<RoutineRecord> {
           ..write('description: $description, ')
           ..write('iconKey: $iconKey, ')
           ..write('colorKey: $colorKey, ')
+          ..write('customColorArgb: $customColorArgb, ')
+          ..write('validFromLocalDate: $validFromLocalDate, ')
+          ..write('validUntilLocalDate: $validUntilLocalDate, ')
           ..write('status: $status, ')
           ..write('pausedUntilLocalDate: $pausedUntilLocalDate, ')
           ..write('archivedAt: $archivedAt, ')
@@ -5957,6 +6149,17 @@ class $RoutineRunRecordsTable extends RoutineRunRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _customColorArgbSnapshotMeta =
+      const VerificationMeta('customColorArgbSnapshot');
+  @override
+  late final GeneratedColumn<int> customColorArgbSnapshot =
+      GeneratedColumn<int>(
+        'custom_color_argb_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _scheduledStartMinuteSnapshotMeta =
       const VerificationMeta('scheduledStartMinuteSnapshot');
   @override
@@ -6033,6 +6236,7 @@ class $RoutineRunRecordsTable extends RoutineRunRecords
     nameSnapshot,
     iconKeySnapshot,
     colorKeySnapshot,
+    customColorArgbSnapshot,
     scheduledStartMinuteSnapshot,
     startedAt,
     completedAt,
@@ -6120,6 +6324,15 @@ class $RoutineRunRecordsTable extends RoutineRunRecords
       );
     } else if (isInserting) {
       context.missing(_colorKeySnapshotMeta);
+    }
+    if (data.containsKey('custom_color_argb_snapshot')) {
+      context.handle(
+        _customColorArgbSnapshotMeta,
+        customColorArgbSnapshot.isAcceptableOrUnknown(
+          data['custom_color_argb_snapshot']!,
+          _customColorArgbSnapshotMeta,
+        ),
+      );
     }
     if (data.containsKey('scheduled_start_minute_snapshot')) {
       context.handle(
@@ -6210,6 +6423,10 @@ class $RoutineRunRecordsTable extends RoutineRunRecords
         DriftSqlType.string,
         data['${effectivePrefix}color_key_snapshot'],
       )!,
+      customColorArgbSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_color_argb_snapshot'],
+      ),
       scheduledStartMinuteSnapshot: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}scheduled_start_minute_snapshot'],
@@ -6253,6 +6470,7 @@ class RoutineRunRecord extends DataClass
   final String nameSnapshot;
   final String iconKeySnapshot;
   final String colorKeySnapshot;
+  final int? customColorArgbSnapshot;
   final int scheduledStartMinuteSnapshot;
   final DateTime? startedAt;
   final DateTime? completedAt;
@@ -6268,6 +6486,7 @@ class RoutineRunRecord extends DataClass
     required this.nameSnapshot,
     required this.iconKeySnapshot,
     required this.colorKeySnapshot,
+    this.customColorArgbSnapshot,
     required this.scheduledStartMinuteSnapshot,
     this.startedAt,
     this.completedAt,
@@ -6288,6 +6507,11 @@ class RoutineRunRecord extends DataClass
     map['name_snapshot'] = Variable<String>(nameSnapshot);
     map['icon_key_snapshot'] = Variable<String>(iconKeySnapshot);
     map['color_key_snapshot'] = Variable<String>(colorKeySnapshot);
+    if (!nullToAbsent || customColorArgbSnapshot != null) {
+      map['custom_color_argb_snapshot'] = Variable<int>(
+        customColorArgbSnapshot,
+      );
+    }
     map['scheduled_start_minute_snapshot'] = Variable<int>(
       scheduledStartMinuteSnapshot,
     );
@@ -6317,6 +6541,9 @@ class RoutineRunRecord extends DataClass
       nameSnapshot: Value(nameSnapshot),
       iconKeySnapshot: Value(iconKeySnapshot),
       colorKeySnapshot: Value(colorKeySnapshot),
+      customColorArgbSnapshot: customColorArgbSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customColorArgbSnapshot),
       scheduledStartMinuteSnapshot: Value(scheduledStartMinuteSnapshot),
       startedAt: startedAt == null && nullToAbsent
           ? const Value.absent()
@@ -6346,6 +6573,9 @@ class RoutineRunRecord extends DataClass
       nameSnapshot: serializer.fromJson<String>(json['nameSnapshot']),
       iconKeySnapshot: serializer.fromJson<String>(json['iconKeySnapshot']),
       colorKeySnapshot: serializer.fromJson<String>(json['colorKeySnapshot']),
+      customColorArgbSnapshot: serializer.fromJson<int?>(
+        json['customColorArgbSnapshot'],
+      ),
       scheduledStartMinuteSnapshot: serializer.fromJson<int>(
         json['scheduledStartMinuteSnapshot'],
       ),
@@ -6368,6 +6598,9 @@ class RoutineRunRecord extends DataClass
       'nameSnapshot': serializer.toJson<String>(nameSnapshot),
       'iconKeySnapshot': serializer.toJson<String>(iconKeySnapshot),
       'colorKeySnapshot': serializer.toJson<String>(colorKeySnapshot),
+      'customColorArgbSnapshot': serializer.toJson<int?>(
+        customColorArgbSnapshot,
+      ),
       'scheduledStartMinuteSnapshot': serializer.toJson<int>(
         scheduledStartMinuteSnapshot,
       ),
@@ -6388,6 +6621,7 @@ class RoutineRunRecord extends DataClass
     String? nameSnapshot,
     String? iconKeySnapshot,
     String? colorKeySnapshot,
+    Value<int?> customColorArgbSnapshot = const Value.absent(),
     int? scheduledStartMinuteSnapshot,
     Value<DateTime?> startedAt = const Value.absent(),
     Value<DateTime?> completedAt = const Value.absent(),
@@ -6403,6 +6637,9 @@ class RoutineRunRecord extends DataClass
     nameSnapshot: nameSnapshot ?? this.nameSnapshot,
     iconKeySnapshot: iconKeySnapshot ?? this.iconKeySnapshot,
     colorKeySnapshot: colorKeySnapshot ?? this.colorKeySnapshot,
+    customColorArgbSnapshot: customColorArgbSnapshot.present
+        ? customColorArgbSnapshot.value
+        : this.customColorArgbSnapshot,
     scheduledStartMinuteSnapshot:
         scheduledStartMinuteSnapshot ?? this.scheduledStartMinuteSnapshot,
     startedAt: startedAt.present ? startedAt.value : this.startedAt,
@@ -6429,6 +6666,9 @@ class RoutineRunRecord extends DataClass
       colorKeySnapshot: data.colorKeySnapshot.present
           ? data.colorKeySnapshot.value
           : this.colorKeySnapshot,
+      customColorArgbSnapshot: data.customColorArgbSnapshot.present
+          ? data.customColorArgbSnapshot.value
+          : this.customColorArgbSnapshot,
       scheduledStartMinuteSnapshot: data.scheduledStartMinuteSnapshot.present
           ? data.scheduledStartMinuteSnapshot.value
           : this.scheduledStartMinuteSnapshot,
@@ -6453,6 +6693,7 @@ class RoutineRunRecord extends DataClass
           ..write('nameSnapshot: $nameSnapshot, ')
           ..write('iconKeySnapshot: $iconKeySnapshot, ')
           ..write('colorKeySnapshot: $colorKeySnapshot, ')
+          ..write('customColorArgbSnapshot: $customColorArgbSnapshot, ')
           ..write(
             'scheduledStartMinuteSnapshot: $scheduledStartMinuteSnapshot, ',
           )
@@ -6475,6 +6716,7 @@ class RoutineRunRecord extends DataClass
     nameSnapshot,
     iconKeySnapshot,
     colorKeySnapshot,
+    customColorArgbSnapshot,
     scheduledStartMinuteSnapshot,
     startedAt,
     completedAt,
@@ -6494,6 +6736,7 @@ class RoutineRunRecord extends DataClass
           other.nameSnapshot == this.nameSnapshot &&
           other.iconKeySnapshot == this.iconKeySnapshot &&
           other.colorKeySnapshot == this.colorKeySnapshot &&
+          other.customColorArgbSnapshot == this.customColorArgbSnapshot &&
           other.scheduledStartMinuteSnapshot ==
               this.scheduledStartMinuteSnapshot &&
           other.startedAt == this.startedAt &&
@@ -6512,6 +6755,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
   final Value<String> nameSnapshot;
   final Value<String> iconKeySnapshot;
   final Value<String> colorKeySnapshot;
+  final Value<int?> customColorArgbSnapshot;
   final Value<int> scheduledStartMinuteSnapshot;
   final Value<DateTime?> startedAt;
   final Value<DateTime?> completedAt;
@@ -6528,6 +6772,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
     this.nameSnapshot = const Value.absent(),
     this.iconKeySnapshot = const Value.absent(),
     this.colorKeySnapshot = const Value.absent(),
+    this.customColorArgbSnapshot = const Value.absent(),
     this.scheduledStartMinuteSnapshot = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
@@ -6545,6 +6790,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
     required String nameSnapshot,
     required String iconKeySnapshot,
     required String colorKeySnapshot,
+    this.customColorArgbSnapshot = const Value.absent(),
     required int scheduledStartMinuteSnapshot,
     this.startedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
@@ -6570,6 +6816,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
     Expression<String>? nameSnapshot,
     Expression<String>? iconKeySnapshot,
     Expression<String>? colorKeySnapshot,
+    Expression<int>? customColorArgbSnapshot,
     Expression<int>? scheduledStartMinuteSnapshot,
     Expression<DateTime>? startedAt,
     Expression<DateTime>? completedAt,
@@ -6587,6 +6834,8 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
       if (nameSnapshot != null) 'name_snapshot': nameSnapshot,
       if (iconKeySnapshot != null) 'icon_key_snapshot': iconKeySnapshot,
       if (colorKeySnapshot != null) 'color_key_snapshot': colorKeySnapshot,
+      if (customColorArgbSnapshot != null)
+        'custom_color_argb_snapshot': customColorArgbSnapshot,
       if (scheduledStartMinuteSnapshot != null)
         'scheduled_start_minute_snapshot': scheduledStartMinuteSnapshot,
       if (startedAt != null) 'started_at': startedAt,
@@ -6607,6 +6856,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
     Value<String>? nameSnapshot,
     Value<String>? iconKeySnapshot,
     Value<String>? colorKeySnapshot,
+    Value<int?>? customColorArgbSnapshot,
     Value<int>? scheduledStartMinuteSnapshot,
     Value<DateTime?>? startedAt,
     Value<DateTime?>? completedAt,
@@ -6624,6 +6874,8 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
       nameSnapshot: nameSnapshot ?? this.nameSnapshot,
       iconKeySnapshot: iconKeySnapshot ?? this.iconKeySnapshot,
       colorKeySnapshot: colorKeySnapshot ?? this.colorKeySnapshot,
+      customColorArgbSnapshot:
+          customColorArgbSnapshot ?? this.customColorArgbSnapshot,
       scheduledStartMinuteSnapshot:
           scheduledStartMinuteSnapshot ?? this.scheduledStartMinuteSnapshot,
       startedAt: startedAt ?? this.startedAt,
@@ -6662,6 +6914,11 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
     if (colorKeySnapshot.present) {
       map['color_key_snapshot'] = Variable<String>(colorKeySnapshot.value);
     }
+    if (customColorArgbSnapshot.present) {
+      map['custom_color_argb_snapshot'] = Variable<int>(
+        customColorArgbSnapshot.value,
+      );
+    }
     if (scheduledStartMinuteSnapshot.present) {
       map['scheduled_start_minute_snapshot'] = Variable<int>(
         scheduledStartMinuteSnapshot.value,
@@ -6699,6 +6956,7 @@ class RoutineRunRecordsCompanion extends UpdateCompanion<RoutineRunRecord> {
           ..write('nameSnapshot: $nameSnapshot, ')
           ..write('iconKeySnapshot: $iconKeySnapshot, ')
           ..write('colorKeySnapshot: $colorKeySnapshot, ')
+          ..write('customColorArgbSnapshot: $customColorArgbSnapshot, ')
           ..write(
             'scheduledStartMinuteSnapshot: $scheduledStartMinuteSnapshot, ',
           )
@@ -8419,6 +8677,579 @@ class CalendarEventRecordsCompanion
           ..write('scheduledAt: $scheduledAt, ')
           ..write('durationMinutes: $durationMinutes, ')
           ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuickNoteRecordsTable extends QuickNoteRecords
+    with TableInfo<$QuickNoteRecordsTable, QuickNoteRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuickNoteRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _textContentMeta = const VerificationMeta(
+    'textContent',
+  );
+  @override
+  late final GeneratedColumn<String> textContent = GeneratedColumn<String>(
+    'text_content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isCompletedMeta = const VerificationMeta(
+    'isCompleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isCompleted = GeneratedColumn<bool>(
+    'is_completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _colorArgbMeta = const VerificationMeta(
+    'colorArgb',
+  );
+  @override
+  late final GeneratedColumn<int> colorArgb = GeneratedColumn<int>(
+    'color_argb',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _localDateMeta = const VerificationMeta(
+    'localDate',
+  );
+  @override
+  late final GeneratedColumn<String> localDate = GeneratedColumn<String>(
+    'local_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<String> priority = GeneratedColumn<String>(
+    'priority',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    textContent,
+    isCompleted,
+    colorArgb,
+    localDate,
+    priority,
+    position,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quick_notes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuickNoteRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('text_content')) {
+      context.handle(
+        _textContentMeta,
+        textContent.isAcceptableOrUnknown(
+          data['text_content']!,
+          _textContentMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_textContentMeta);
+    }
+    if (data.containsKey('is_completed')) {
+      context.handle(
+        _isCompletedMeta,
+        isCompleted.isAcceptableOrUnknown(
+          data['is_completed']!,
+          _isCompletedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('color_argb')) {
+      context.handle(
+        _colorArgbMeta,
+        colorArgb.isAcceptableOrUnknown(data['color_argb']!, _colorArgbMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_colorArgbMeta);
+    }
+    if (data.containsKey('local_date')) {
+      context.handle(
+        _localDateMeta,
+        localDate.isAcceptableOrUnknown(data['local_date']!, _localDateMeta),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuickNoteRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuickNoteRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      textContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}text_content'],
+      )!,
+      isCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_completed'],
+      )!,
+      colorArgb: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}color_argb'],
+      )!,
+      localDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_date'],
+      ),
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}priority'],
+      ),
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $QuickNoteRecordsTable createAlias(String alias) {
+    return $QuickNoteRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class QuickNoteRecord extends DataClass implements Insertable<QuickNoteRecord> {
+  final String id;
+  final String textContent;
+  final bool isCompleted;
+  final int colorArgb;
+  final String? localDate;
+  final String? priority;
+  final int position;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const QuickNoteRecord({
+    required this.id,
+    required this.textContent,
+    required this.isCompleted,
+    required this.colorArgb,
+    this.localDate,
+    this.priority,
+    required this.position,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['text_content'] = Variable<String>(textContent);
+    map['is_completed'] = Variable<bool>(isCompleted);
+    map['color_argb'] = Variable<int>(colorArgb);
+    if (!nullToAbsent || localDate != null) {
+      map['local_date'] = Variable<String>(localDate);
+    }
+    if (!nullToAbsent || priority != null) {
+      map['priority'] = Variable<String>(priority);
+    }
+    map['position'] = Variable<int>(position);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  QuickNoteRecordsCompanion toCompanion(bool nullToAbsent) {
+    return QuickNoteRecordsCompanion(
+      id: Value(id),
+      textContent: Value(textContent),
+      isCompleted: Value(isCompleted),
+      colorArgb: Value(colorArgb),
+      localDate: localDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localDate),
+      priority: priority == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priority),
+      position: Value(position),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory QuickNoteRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuickNoteRecord(
+      id: serializer.fromJson<String>(json['id']),
+      textContent: serializer.fromJson<String>(json['textContent']),
+      isCompleted: serializer.fromJson<bool>(json['isCompleted']),
+      colorArgb: serializer.fromJson<int>(json['colorArgb']),
+      localDate: serializer.fromJson<String?>(json['localDate']),
+      priority: serializer.fromJson<String?>(json['priority']),
+      position: serializer.fromJson<int>(json['position']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'textContent': serializer.toJson<String>(textContent),
+      'isCompleted': serializer.toJson<bool>(isCompleted),
+      'colorArgb': serializer.toJson<int>(colorArgb),
+      'localDate': serializer.toJson<String?>(localDate),
+      'priority': serializer.toJson<String?>(priority),
+      'position': serializer.toJson<int>(position),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  QuickNoteRecord copyWith({
+    String? id,
+    String? textContent,
+    bool? isCompleted,
+    int? colorArgb,
+    Value<String?> localDate = const Value.absent(),
+    Value<String?> priority = const Value.absent(),
+    int? position,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => QuickNoteRecord(
+    id: id ?? this.id,
+    textContent: textContent ?? this.textContent,
+    isCompleted: isCompleted ?? this.isCompleted,
+    colorArgb: colorArgb ?? this.colorArgb,
+    localDate: localDate.present ? localDate.value : this.localDate,
+    priority: priority.present ? priority.value : this.priority,
+    position: position ?? this.position,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  QuickNoteRecord copyWithCompanion(QuickNoteRecordsCompanion data) {
+    return QuickNoteRecord(
+      id: data.id.present ? data.id.value : this.id,
+      textContent: data.textContent.present
+          ? data.textContent.value
+          : this.textContent,
+      isCompleted: data.isCompleted.present
+          ? data.isCompleted.value
+          : this.isCompleted,
+      colorArgb: data.colorArgb.present ? data.colorArgb.value : this.colorArgb,
+      localDate: data.localDate.present ? data.localDate.value : this.localDate,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      position: data.position.present ? data.position.value : this.position,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickNoteRecord(')
+          ..write('id: $id, ')
+          ..write('textContent: $textContent, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('colorArgb: $colorArgb, ')
+          ..write('localDate: $localDate, ')
+          ..write('priority: $priority, ')
+          ..write('position: $position, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    textContent,
+    isCompleted,
+    colorArgb,
+    localDate,
+    priority,
+    position,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuickNoteRecord &&
+          other.id == this.id &&
+          other.textContent == this.textContent &&
+          other.isCompleted == this.isCompleted &&
+          other.colorArgb == this.colorArgb &&
+          other.localDate == this.localDate &&
+          other.priority == this.priority &&
+          other.position == this.position &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class QuickNoteRecordsCompanion extends UpdateCompanion<QuickNoteRecord> {
+  final Value<String> id;
+  final Value<String> textContent;
+  final Value<bool> isCompleted;
+  final Value<int> colorArgb;
+  final Value<String?> localDate;
+  final Value<String?> priority;
+  final Value<int> position;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const QuickNoteRecordsCompanion({
+    this.id = const Value.absent(),
+    this.textContent = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.colorArgb = const Value.absent(),
+    this.localDate = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.position = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuickNoteRecordsCompanion.insert({
+    required String id,
+    required String textContent,
+    this.isCompleted = const Value.absent(),
+    required int colorArgb,
+    this.localDate = const Value.absent(),
+    this.priority = const Value.absent(),
+    required int position,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       textContent = Value(textContent),
+       colorArgb = Value(colorArgb),
+       position = Value(position),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<QuickNoteRecord> custom({
+    Expression<String>? id,
+    Expression<String>? textContent,
+    Expression<bool>? isCompleted,
+    Expression<int>? colorArgb,
+    Expression<String>? localDate,
+    Expression<String>? priority,
+    Expression<int>? position,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (textContent != null) 'text_content': textContent,
+      if (isCompleted != null) 'is_completed': isCompleted,
+      if (colorArgb != null) 'color_argb': colorArgb,
+      if (localDate != null) 'local_date': localDate,
+      if (priority != null) 'priority': priority,
+      if (position != null) 'position': position,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuickNoteRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? textContent,
+    Value<bool>? isCompleted,
+    Value<int>? colorArgb,
+    Value<String?>? localDate,
+    Value<String?>? priority,
+    Value<int>? position,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return QuickNoteRecordsCompanion(
+      id: id ?? this.id,
+      textContent: textContent ?? this.textContent,
+      isCompleted: isCompleted ?? this.isCompleted,
+      colorArgb: colorArgb ?? this.colorArgb,
+      localDate: localDate ?? this.localDate,
+      priority: priority ?? this.priority,
+      position: position ?? this.position,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (textContent.present) {
+      map['text_content'] = Variable<String>(textContent.value);
+    }
+    if (isCompleted.present) {
+      map['is_completed'] = Variable<bool>(isCompleted.value);
+    }
+    if (colorArgb.present) {
+      map['color_argb'] = Variable<int>(colorArgb.value);
+    }
+    if (localDate.present) {
+      map['local_date'] = Variable<String>(localDate.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<String>(priority.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickNoteRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('textContent: $textContent, ')
+          ..write('isCompleted: $isCompleted, ')
+          ..write('colorArgb: $colorArgb, ')
+          ..write('localDate: $localDate, ')
+          ..write('priority: $priority, ')
+          ..write('position: $position, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12590,6 +13421,9 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
       $RoutineItemRunRecordsTable(this);
   late final $CalendarEventRecordsTable calendarEventRecords =
       $CalendarEventRecordsTable(this);
+  late final $QuickNoteRecordsTable quickNoteRecords = $QuickNoteRecordsTable(
+    this,
+  );
   late final $SyncLocalStateRecordsTable syncLocalStateRecords =
       $SyncLocalStateRecordsTable(this);
   late final $SyncOutboxRecordsTable syncOutboxRecords =
@@ -12700,6 +13534,18 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     'calendar_events_scheduled_at_idx',
     'CREATE INDEX calendar_events_scheduled_at_idx ON calendar_events (scheduled_at)',
   );
+  late final Index quickNotesPositionIdx = Index(
+    'quick_notes_position_idx',
+    'CREATE INDEX quick_notes_position_idx ON quick_notes (position)',
+  );
+  late final Index quickNotesLocalDateIdx = Index(
+    'quick_notes_local_date_idx',
+    'CREATE INDEX quick_notes_local_date_idx ON quick_notes (local_date)',
+  );
+  late final Index quickNotesUpdatedAtIdx = Index(
+    'quick_notes_updated_at_idx',
+    'CREATE INDEX quick_notes_updated_at_idx ON quick_notes (updated_at)',
+  );
   late final Index syncOutboxOriginCounterUq = Index(
     'sync_outbox_origin_counter_uq',
     'CREATE UNIQUE INDEX sync_outbox_origin_counter_uq ON sync_outbox (group_id, origin_device_id, origin_counter)',
@@ -12728,6 +13574,9 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
   late final CalendarEventsDao calendarEventsDao = CalendarEventsDao(
     this as MichiFocusDatabase,
   );
+  late final QuickNotesDao quickNotesDao = QuickNotesDao(
+    this as MichiFocusDatabase,
+  );
   late final ReportsDao reportsDao = ReportsDao(this as MichiFocusDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -12746,6 +13595,7 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     routineRunRecords,
     routineItemRunRecords,
     calendarEventRecords,
+    quickNoteRecords,
     syncLocalStateRecords,
     syncOutboxRecords,
     syncAppliedOperationRecords,
@@ -12777,6 +13627,9 @@ abstract class _$MichiFocusDatabase extends GeneratedDatabase {
     routineItemRunsScheduleStatusIdx,
     routineItemRunsRunPositionIdx,
     calendarEventsScheduledAtIdx,
+    quickNotesPositionIdx,
+    quickNotesLocalDateIdx,
+    quickNotesUpdatedAtIdx,
     syncOutboxOriginCounterUq,
     syncOutboxStateCreatedIdx,
     syncAppliedOriginCounterUq,
@@ -16361,6 +17214,9 @@ typedef $$RoutineRecordsTableCreateCompanionBuilder =
       Value<String?> description,
       Value<String> iconKey,
       Value<String> colorKey,
+      Value<int?> customColorArgb,
+      Value<String?> validFromLocalDate,
+      Value<String?> validUntilLocalDate,
       Value<String> status,
       Value<String?> pausedUntilLocalDate,
       Value<DateTime?> archivedAt,
@@ -16375,6 +17231,9 @@ typedef $$RoutineRecordsTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<String> iconKey,
       Value<String> colorKey,
+      Value<int?> customColorArgb,
+      Value<String?> validFromLocalDate,
+      Value<String?> validUntilLocalDate,
       Value<String> status,
       Value<String?> pausedUntilLocalDate,
       Value<DateTime?> archivedAt,
@@ -16500,6 +17359,21 @@ class $$RoutineRecordsTableFilterComposer
 
   ColumnFilters<String> get colorKey => $composableBuilder(
     column: $table.colorKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customColorArgb => $composableBuilder(
+    column: $table.customColorArgb,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validFromLocalDate => $composableBuilder(
+    column: $table.validFromLocalDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validUntilLocalDate => $composableBuilder(
+    column: $table.validUntilLocalDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16638,6 +17512,21 @@ class $$RoutineRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get customColorArgb => $composableBuilder(
+    column: $table.customColorArgb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validFromLocalDate => $composableBuilder(
+    column: $table.validFromLocalDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validUntilLocalDate => $composableBuilder(
+    column: $table.validUntilLocalDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -16689,6 +17578,21 @@ class $$RoutineRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get colorKey =>
       $composableBuilder(column: $table.colorKey, builder: (column) => column);
+
+  GeneratedColumn<int> get customColorArgb => $composableBuilder(
+    column: $table.customColorArgb,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validFromLocalDate => $composableBuilder(
+    column: $table.validFromLocalDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validUntilLocalDate => $composableBuilder(
+    column: $table.validUntilLocalDate,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -16827,6 +17731,9 @@ class $$RoutineRecordsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> iconKey = const Value.absent(),
                 Value<String> colorKey = const Value.absent(),
+                Value<int?> customColorArgb = const Value.absent(),
+                Value<String?> validFromLocalDate = const Value.absent(),
+                Value<String?> validUntilLocalDate = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> pausedUntilLocalDate = const Value.absent(),
                 Value<DateTime?> archivedAt = const Value.absent(),
@@ -16839,6 +17746,9 @@ class $$RoutineRecordsTableTableManager
                 description: description,
                 iconKey: iconKey,
                 colorKey: colorKey,
+                customColorArgb: customColorArgb,
+                validFromLocalDate: validFromLocalDate,
+                validUntilLocalDate: validUntilLocalDate,
                 status: status,
                 pausedUntilLocalDate: pausedUntilLocalDate,
                 archivedAt: archivedAt,
@@ -16853,6 +17763,9 @@ class $$RoutineRecordsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> iconKey = const Value.absent(),
                 Value<String> colorKey = const Value.absent(),
+                Value<int?> customColorArgb = const Value.absent(),
+                Value<String?> validFromLocalDate = const Value.absent(),
+                Value<String?> validUntilLocalDate = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> pausedUntilLocalDate = const Value.absent(),
                 Value<DateTime?> archivedAt = const Value.absent(),
@@ -16865,6 +17778,9 @@ class $$RoutineRecordsTableTableManager
                 description: description,
                 iconKey: iconKey,
                 colorKey: colorKey,
+                customColorArgb: customColorArgb,
+                validFromLocalDate: validFromLocalDate,
+                validUntilLocalDate: validUntilLocalDate,
                 status: status,
                 pausedUntilLocalDate: pausedUntilLocalDate,
                 archivedAt: archivedAt,
@@ -18006,6 +18922,7 @@ typedef $$RoutineRunRecordsTableCreateCompanionBuilder =
       required String nameSnapshot,
       required String iconKeySnapshot,
       required String colorKeySnapshot,
+      Value<int?> customColorArgbSnapshot,
       required int scheduledStartMinuteSnapshot,
       Value<DateTime?> startedAt,
       Value<DateTime?> completedAt,
@@ -18024,6 +18941,7 @@ typedef $$RoutineRunRecordsTableUpdateCompanionBuilder =
       Value<String> nameSnapshot,
       Value<String> iconKeySnapshot,
       Value<String> colorKeySnapshot,
+      Value<int?> customColorArgbSnapshot,
       Value<int> scheduledStartMinuteSnapshot,
       Value<DateTime?> startedAt,
       Value<DateTime?> completedAt,
@@ -18138,6 +19056,11 @@ class $$RoutineRunRecordsTableFilterComposer
 
   ColumnFilters<String> get colorKeySnapshot => $composableBuilder(
     column: $table.colorKeySnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customColorArgbSnapshot => $composableBuilder(
+    column: $table.customColorArgbSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18265,6 +19188,11 @@ class $$RoutineRunRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get customColorArgbSnapshot => $composableBuilder(
+    column: $table.customColorArgbSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get scheduledStartMinuteSnapshot => $composableBuilder(
     column: $table.scheduledStartMinuteSnapshot,
     builder: (column) => ColumnOrderings(column),
@@ -18354,6 +19282,11 @@ class $$RoutineRunRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get colorKeySnapshot => $composableBuilder(
     column: $table.colorKeySnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get customColorArgbSnapshot => $composableBuilder(
+    column: $table.customColorArgbSnapshot,
     builder: (column) => column,
   );
 
@@ -18473,6 +19406,7 @@ class $$RoutineRunRecordsTableTableManager
                 Value<String> nameSnapshot = const Value.absent(),
                 Value<String> iconKeySnapshot = const Value.absent(),
                 Value<String> colorKeySnapshot = const Value.absent(),
+                Value<int?> customColorArgbSnapshot = const Value.absent(),
                 Value<int> scheduledStartMinuteSnapshot = const Value.absent(),
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
@@ -18489,6 +19423,7 @@ class $$RoutineRunRecordsTableTableManager
                 nameSnapshot: nameSnapshot,
                 iconKeySnapshot: iconKeySnapshot,
                 colorKeySnapshot: colorKeySnapshot,
+                customColorArgbSnapshot: customColorArgbSnapshot,
                 scheduledStartMinuteSnapshot: scheduledStartMinuteSnapshot,
                 startedAt: startedAt,
                 completedAt: completedAt,
@@ -18507,6 +19442,7 @@ class $$RoutineRunRecordsTableTableManager
                 required String nameSnapshot,
                 required String iconKeySnapshot,
                 required String colorKeySnapshot,
+                Value<int?> customColorArgbSnapshot = const Value.absent(),
                 required int scheduledStartMinuteSnapshot,
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
@@ -18523,6 +19459,7 @@ class $$RoutineRunRecordsTableTableManager
                 nameSnapshot: nameSnapshot,
                 iconKeySnapshot: iconKeySnapshot,
                 colorKeySnapshot: colorKeySnapshot,
+                customColorArgbSnapshot: customColorArgbSnapshot,
                 scheduledStartMinuteSnapshot: scheduledStartMinuteSnapshot,
                 startedAt: startedAt,
                 completedAt: completedAt,
@@ -19734,6 +20671,296 @@ typedef $$CalendarEventRecordsTableProcessedTableManager =
         >,
       ),
       CalendarEventRecord,
+      PrefetchHooks Function()
+    >;
+typedef $$QuickNoteRecordsTableCreateCompanionBuilder =
+    QuickNoteRecordsCompanion Function({
+      required String id,
+      required String textContent,
+      Value<bool> isCompleted,
+      required int colorArgb,
+      Value<String?> localDate,
+      Value<String?> priority,
+      required int position,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$QuickNoteRecordsTableUpdateCompanionBuilder =
+    QuickNoteRecordsCompanion Function({
+      Value<String> id,
+      Value<String> textContent,
+      Value<bool> isCompleted,
+      Value<int> colorArgb,
+      Value<String?> localDate,
+      Value<String?> priority,
+      Value<int> position,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$QuickNoteRecordsTableFilterComposer
+    extends Composer<_$MichiFocusDatabase, $QuickNoteRecordsTable> {
+  $$QuickNoteRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get textContent => $composableBuilder(
+    column: $table.textContent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get colorArgb => $composableBuilder(
+    column: $table.colorArgb,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localDate => $composableBuilder(
+    column: $table.localDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$QuickNoteRecordsTableOrderingComposer
+    extends Composer<_$MichiFocusDatabase, $QuickNoteRecordsTable> {
+  $$QuickNoteRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get textContent => $composableBuilder(
+    column: $table.textContent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get colorArgb => $composableBuilder(
+    column: $table.colorArgb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localDate => $composableBuilder(
+    column: $table.localDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$QuickNoteRecordsTableAnnotationComposer
+    extends Composer<_$MichiFocusDatabase, $QuickNoteRecordsTable> {
+  $$QuickNoteRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get textContent => $composableBuilder(
+    column: $table.textContent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get colorArgb =>
+      $composableBuilder(column: $table.colorArgb, builder: (column) => column);
+
+  GeneratedColumn<String> get localDate =>
+      $composableBuilder(column: $table.localDate, builder: (column) => column);
+
+  GeneratedColumn<String> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$QuickNoteRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$MichiFocusDatabase,
+          $QuickNoteRecordsTable,
+          QuickNoteRecord,
+          $$QuickNoteRecordsTableFilterComposer,
+          $$QuickNoteRecordsTableOrderingComposer,
+          $$QuickNoteRecordsTableAnnotationComposer,
+          $$QuickNoteRecordsTableCreateCompanionBuilder,
+          $$QuickNoteRecordsTableUpdateCompanionBuilder,
+          (
+            QuickNoteRecord,
+            BaseReferences<
+              _$MichiFocusDatabase,
+              $QuickNoteRecordsTable,
+              QuickNoteRecord
+            >,
+          ),
+          QuickNoteRecord,
+          PrefetchHooks Function()
+        > {
+  $$QuickNoteRecordsTableTableManager(
+    _$MichiFocusDatabase db,
+    $QuickNoteRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuickNoteRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuickNoteRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuickNoteRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> textContent = const Value.absent(),
+                Value<bool> isCompleted = const Value.absent(),
+                Value<int> colorArgb = const Value.absent(),
+                Value<String?> localDate = const Value.absent(),
+                Value<String?> priority = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuickNoteRecordsCompanion(
+                id: id,
+                textContent: textContent,
+                isCompleted: isCompleted,
+                colorArgb: colorArgb,
+                localDate: localDate,
+                priority: priority,
+                position: position,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String textContent,
+                Value<bool> isCompleted = const Value.absent(),
+                required int colorArgb,
+                Value<String?> localDate = const Value.absent(),
+                Value<String?> priority = const Value.absent(),
+                required int position,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => QuickNoteRecordsCompanion.insert(
+                id: id,
+                textContent: textContent,
+                isCompleted: isCompleted,
+                colorArgb: colorArgb,
+                localDate: localDate,
+                priority: priority,
+                position: position,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$QuickNoteRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$MichiFocusDatabase,
+      $QuickNoteRecordsTable,
+      QuickNoteRecord,
+      $$QuickNoteRecordsTableFilterComposer,
+      $$QuickNoteRecordsTableOrderingComposer,
+      $$QuickNoteRecordsTableAnnotationComposer,
+      $$QuickNoteRecordsTableCreateCompanionBuilder,
+      $$QuickNoteRecordsTableUpdateCompanionBuilder,
+      (
+        QuickNoteRecord,
+        BaseReferences<
+          _$MichiFocusDatabase,
+          $QuickNoteRecordsTable,
+          QuickNoteRecord
+        >,
+      ),
+      QuickNoteRecord,
       PrefetchHooks Function()
     >;
 typedef $$SyncLocalStateRecordsTableCreateCompanionBuilder =
@@ -21889,6 +23116,8 @@ class $MichiFocusDatabaseManager {
       $$RoutineItemRunRecordsTableTableManager(_db, _db.routineItemRunRecords);
   $$CalendarEventRecordsTableTableManager get calendarEventRecords =>
       $$CalendarEventRecordsTableTableManager(_db, _db.calendarEventRecords);
+  $$QuickNoteRecordsTableTableManager get quickNoteRecords =>
+      $$QuickNoteRecordsTableTableManager(_db, _db.quickNoteRecords);
   $$SyncLocalStateRecordsTableTableManager get syncLocalStateRecords =>
       $$SyncLocalStateRecordsTableTableManager(_db, _db.syncLocalStateRecords);
   $$SyncOutboxRecordsTableTableManager get syncOutboxRecords =>

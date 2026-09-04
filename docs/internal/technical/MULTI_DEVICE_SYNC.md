@@ -200,8 +200,9 @@ other installation directories through Android SAF with bounded file reads.
 Dart repeats path/envelope validation, authenticates and decrypts AES-256-GCM,
 rejects foreign-group or unsupported payloads, orders goals and routine
 aggregates before dependent tasks, and retries deferred dependencies during the
-same review pass. Tasks, goals, calendar events, and routine templates/lifecycle
-apply inside the same transaction as their idempotency and causal metadata.
+same review pass. Tasks, goals, calendar events, routine templates/lifecycle,
+and quick notes apply inside the same transaction as their idempotency and
+causal metadata.
 After commit, the owning controllers reload. Invalid input never reaches an
 application mutation. Physical two-phone Syncthing transport, quarantine file
 movement, conflict resolution UI, acknowledgements, and immutable history remain.
@@ -309,7 +310,9 @@ gate, another Android-authenticated temporary DEK unwrap, and an explicit
 `Revisar cambios recibidos` action. Complete snapshot bootstrap/replacement and
 automatic background processing remain gated. Outgoing current and pre-enrollment
 goal, task, calendar, and routine data can be prepared as encrypted immutable
-files for Syncthing.
+files for Syncthing. Schema 8 routine aggregates include optional opaque custom
+color and inclusive local validity dates; older aggregates without those keys
+remain compatible and resolve them as null.
 
 Recovery snapshot creation uses the existing `VACUUM INTO` boundary, validates
 the isolated copy against schema version, required tables/indexes, integrity,

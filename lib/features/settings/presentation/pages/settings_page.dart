@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
@@ -11,6 +12,8 @@ import 'package:pomodoro_app_v1/app/theme/app_card_paddings.dart';
 import 'package:pomodoro_app_v1/app/theme/app_design_tokens.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/controllers/focus_silence_controller.dart';
+import 'package:pomodoro_app_v1/features/focus_silence/presentation/widgets/focus_silence_settings_card.dart';
 import 'package:pomodoro_app_v1/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:pomodoro_app_v1/features/settings/presentation/widgets/routine_reminder_capability_tile.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/widgets/device_identity_scope.dart';
@@ -49,6 +52,12 @@ class SettingsPage extends StatelessWidget {
         const _ReportsCard(),
         const SizedBox(height: 26),
         const _NotificationsCard(),
+        if (serviceLocator.isRegistered<FocusSilenceController>()) ...[
+          const SizedBox(height: 26),
+          FocusSilenceSettingsCard(
+            controller: serviceLocator<FocusSilenceController>(),
+          ),
+        ],
         const SizedBox(height: 26),
         SyncStorageSettingsCard(controller: SyncStorageScope.of(context)),
         DeviceIdentitySettingsSection(
@@ -92,7 +101,7 @@ class _DatabaseDataCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             context.tr(
-              'Borra objetivos, tareas, sesiones, rutinas, calendario y estadísticas. Tus ajustes y archivos exportados se conservan.',
+              'Borra objetivos, tareas, notas, sesiones, rutinas, calendario y estadísticas. Tus ajustes y archivos exportados se conservan.',
               'Deletes goals, tasks, sessions, routines, calendar data, and statistics. Settings and exported files are retained.',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -486,27 +495,35 @@ class _AppearanceCard extends StatelessWidget {
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
+          DropdownButtonFormField<AppThemePreset>(
+            key: const ValueKey('settings-theme-selector'),
+            value: settings.themePreset,
+            isExpanded: true,
+            menuMaxHeight: 360,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.palette_rounded),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+            ),
+            items: [
               for (final preset in AppThemePreset.values)
-                ChoiceChip(
-                  label: Text(_themeLabel(context, preset)),
-                  selected: settings.themePreset == preset,
-                  onSelected: (_) => settings.onThemeChanged(preset),
-                  selectedColor: palette.primaryMuted,
-                  checkmarkColor: palette.primary,
-                  labelStyle: TextStyle(
-                    color: settings.themePreset == preset
-                        ? palette.textPrimary
-                        : palette.textSecondary,
-                    fontWeight: settings.themePreset == preset
-                        ? FontWeight.w700
-                        : FontWeight.w500,
+                DropdownMenuItem(
+                  key: ValueKey('settings-theme-option-${preset.name}'),
+                  value: preset,
+                  child: _ThemeSelectorOption(
+                    preset: preset,
+                    label: _themeLabel(context, preset),
+                    isDark: settings.isDarkMode,
                   ),
                 ),
             ],
+            onChanged: (preset) {
+              if (preset != null) {
+                settings.onThemeChanged(preset);
+              }
+            },
           ),
           const SizedBox(height: 12),
           Text(
@@ -554,6 +571,63 @@ class _AppearanceCard extends StatelessWidget {
         'Sunset Tide',
       ),
     };
+  }
+}
+
+class _ThemeSelectorOption extends StatelessWidget {
+  const _ThemeSelectorOption({
+    required this.preset,
+    required this.label,
+    required this.isDark,
+  });
+
+  final AppThemePreset preset;
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = AppPalette.fromPreset(preset, isDark: isDark);
+
+    return Row(
+      children: [
+        _ThemeColorDot(color: preview.primary),
+        const SizedBox(width: 4),
+        _ThemeColorDot(color: preview.secondary),
+        const SizedBox(width: 4),
+        _ThemeColorDot(color: preview.gradientEnd),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeColorDot extends StatelessWidget {
+  const _ThemeColorDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: context.palette.neutralSoft),
+      ),
+    );
   }
 }
 

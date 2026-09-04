@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task.dart';
 import 'package:pomodoro_app_v1/features/tasks/domain/entities/task_temporal_filter.dart';
@@ -22,7 +24,10 @@ void main() {
     test('trims and stores valid task titles', () async {
       final controller = TasksController(repository: _MemoryTasksRepository());
 
-      await controller.createTask('  Revisar M2  ');
+      await controller.createTask(
+        '  Revisar M2  ',
+        durationMinutes: 25,
+      );
 
       final validationMessage = controller.validationMessage.value;
       final tasks = controller.tasks.value;
@@ -35,6 +40,7 @@ void main() {
       expect(task.isCompleted, isFalse);
       expect(task.scheduledDate, isNull);
       expect(task.goalId, isNull);
+      expect(task.durationMinutes, 25);
     });
 
     test('creates planned tasks with date and optional goal', () async {
@@ -197,12 +203,14 @@ void main() {
       );
 
       expect(controller.tasksForGoal('goal-4'), hasLength(1));
+      controller.selectedGoalId = 'goal-4';
 
       await controller.detachTasksFromGoal('goal-4');
 
       expect(controller.tasksForGoal('goal-4'), isEmpty);
       expect(controller.tasks.value.single.goalId, isNull);
       expect(controller.tasks.value.single.scheduledDate, scheduledDate);
+      expect(controller.selectedGoalId, isNull);
     });
 
     test('deletes tasks by id', () async {
@@ -290,6 +298,53 @@ void main() {
       expect(controller.tasks.value, hasLength(5));
     });
 
+    test('composes goal temporal and status filters', () async {
+      final controller = TasksController(
+        repository: _MemoryTasksRepository(),
+        now: () => DateTime(2026, 8, 24),
+      );
+      controller.tasks.value = [
+        Task(
+          id: 'goal-1-active',
+          title: 'Objetivo uno activa',
+          createdAt: DateTime(2026, 8, 24),
+          goalId: 'goal-1',
+        ),
+        Task(
+          id: 'goal-1-done',
+          title: 'Objetivo uno hecha',
+          createdAt: DateTime(2026, 8, 24),
+          goalId: 'goal-1',
+          status: TaskStatus.completed,
+        ),
+        Task(
+          id: 'goal-2-active',
+          title: 'Objetivo dos activa',
+          createdAt: DateTime(2026, 8, 24),
+          goalId: 'goal-2',
+        ),
+        Task(
+          id: 'unassigned',
+          title: 'Sin objetivo',
+          createdAt: DateTime(2026, 8, 24),
+        ),
+      ];
+
+      expect(controller.selectedGoalId, isNull);
+      expect(controller.filteredTasks.value, hasLength(4));
+
+      controller.selectedGoalId = 'goal-1';
+      expect(controller.goalFilteredTasks.value, hasLength(2));
+      expect(controller.filteredTasks.value, hasLength(2));
+
+      controller.selectedFilter = TaskFilter.completed;
+      expect(controller.filteredTasks.value.single.id, 'goal-1-done');
+
+      controller.selectedGoalId = null;
+      expect(controller.filteredTasks.value.single.id, 'goal-1-done');
+      expect(controller.tasks.value, hasLength(4));
+    });
+
     test('supports inclusive day year and normalized range filters', () async {
       final controller = TasksController(repository: _MemoryTasksRepository());
       controller.tasks.value = [
@@ -363,6 +418,24 @@ void main() {
       expect(restarted.temporalFilter.value.kind, TaskTemporalFilterKind.range);
       expect(restarted.temporalFilter.value.start, DateTime(2026, 5, 2));
       expect(restarted.temporalFilter.value.end, DateTime(2026, 5, 9));
+    });
+
+    test('shares one repository load between simultaneous callers', () async {
+      final repository = _DelayedTasksRepository();
+      final controller = TasksController(repository: repository);
+
+      final first = controller.loadTasks();
+      final second = controller.loadTasks();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.loadCalls, 1);
+      expect(controller.isLoading.value, isTrue);
+
+      repository.completeLoad();
+      await Future.wait([first, second]);
+
+      expect(repository.loadCalls, 1);
+      expect(controller.isLoading.value, isFalse);
     });
 
     test('summarizes task status totals by goal and unassigned work', () async {
@@ -479,11 +552,12 @@ class _MemoryTasksRepository implements TasksRepository {
   }
 
   @override
-  Future<Task> createTask(String title) async {
+  Future<Task> createTask(String title, {int? durationMinutes}) async {
     final task = Task(
       id: (_nextId++).toString(),
       title: title,
       createdAt: DateTime.now(),
+      durationMinutes: durationMinutes,
     );
     _tasks.insert(0, task);
     return task;
@@ -607,4 +681,17 @@ class _MemoryTemporalFilterRepository implements TaskTemporalFilterRepository {
   Future<void> save(TaskTemporalFilter filter) async {
     this.filter = filter;
   }
+}
+
+class _DelayedTasksRepository extends _MemoryTasksRepository {
+  final Completer<List<Task>> _loadCompleter = Completer<List<Task>>();
+  int loadCalls = 0;
+
+  @override
+  Future<List<Task>> loadTasks() {
+    loadCalls += 1;
+    return _loadCompleter.future;
+  }
+
+  void completeLoad() => _loadCompleter.complete(const []);
 }
