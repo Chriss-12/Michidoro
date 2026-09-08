@@ -150,7 +150,7 @@ This project is distributed under the **GNU General Public License v3.0**. See [
 
 ## 👤 Author
 
-**Cristhian Alave**
+**Cristhian Rodrigo Alave Sanjines**
 
 GitHub: [@Chriss-12](https://github.com/Chriss-12)
 
