@@ -155,7 +155,6 @@ Future<void> startTaskFocusFlow({
           focusMinutes: preferredCadence.focusMinutes,
           breakMinutes: preferredCadence.breakMinutes,
         );
-
   final selection = await _showFocusOptions(
     context: context,
     task: task,
@@ -337,9 +336,9 @@ Future<_TaskFocusSelection?> _showFocusOptions({
               Text(
                 sheetContext.tr(
                   'Usará ${recommendedPreset.label(sheetContext)} y enlazará '
-                      'automáticamente todos los bloques restantes.',
+                      'cada bloque con su descanso antes de continuar.',
                   'It will use ${recommendedPreset.label(sheetContext)} and '
-                      'automatically link all remaining blocks.',
+                      'link every block with its break before continuing.',
                 ),
                 style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,

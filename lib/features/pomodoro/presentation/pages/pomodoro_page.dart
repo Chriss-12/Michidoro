@@ -72,9 +72,7 @@ class PomodoroPage extends StatelessWidget {
 
             return _ActiveFocusContextCard(
               taskTitle: selectedTaskTitle,
-              selectedGoal: selectedGoal?.targetDate == null
-                  ? null
-                  : selectedGoal,
+              selectedGoal: selectedGoal,
               scheduledGoals: scheduledGoals,
               onSelectGoal: (goalId) =>
                   pomodoroController.selectedGoalId = goalId,
@@ -531,7 +529,7 @@ class _FocusLifecycleActionsSection extends StatelessWidget {
 
     return _FocusLifecycleActions(
       phase: runtime.phase,
-      hasElapsedPhase: runtime.remainingSeconds < runtime.currentPhaseSeconds,
+      hasActiveRuntime: runtime.hasActiveRuntime,
       onDiscard: runtime.onDiscard,
       onRestart: runtime.onRestart,
       onFinishEarly: () => unawaited(
@@ -549,7 +547,7 @@ class _TimerStatsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final runtime = PomodoroRuntimeScope.of(context);
-    final focusedMinutes = runtime.totalFocusSeconds ~/ 60;
+    final focusedMinutes = runtime.todayFocusSeconds ~/ 60;
     final focusedLabel = focusedMinutes >= 60
         ? '${(focusedMinutes / 60).toStringAsFixed(1)}h'
         : '${focusedMinutes}m';
@@ -568,7 +566,7 @@ class _TimerStatsSection extends StatelessWidget {
           Expanded(
             child: _TimerStat(
               label: context.tr('Sesiones', 'Sessions'),
-              value: '${runtime.completedPomodoros}',
+              value: '${runtime.todayCompletedPomodoros}',
             ),
           ),
         ],
@@ -689,14 +687,14 @@ String _phaseTitle(BuildContext context, PomodoroPhase phase) {
 class _FocusLifecycleActions extends StatelessWidget {
   const _FocusLifecycleActions({
     required this.phase,
-    required this.hasElapsedPhase,
+    required this.hasActiveRuntime,
     required this.onDiscard,
     required this.onRestart,
     required this.onFinishEarly,
   });
 
   final PomodoroPhase phase;
-  final bool hasElapsedPhase;
+  final bool hasActiveRuntime;
   final VoidCallback onDiscard;
   final VoidCallback onRestart;
   final VoidCallback onFinishEarly;
@@ -707,34 +705,50 @@ class _FocusLifecycleActions extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _CompactLifecycleButton(
-              label: context.tr('Descartar', 'Discard'),
-              icon: Icons.close_rounded,
-              onPressed: hasElapsedPhase ? onDiscard : null,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _CompactLifecycleButton(
+                  label: context.tr('Descartar', 'Discard'),
+                  icon: Icons.close_rounded,
+                  onPressed: hasActiveRuntime ? onDiscard : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _CompactLifecycleButton(
+                  label: context.tr('Reiniciar', 'Restart'),
+                  icon: Icons.replay_rounded,
+                  onPressed: hasActiveRuntime ? onRestart : null,
+                ),
+              ),
+              if (!isBreak) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _CompactLifecycleButton(
+                    label: context.tr('Terminar', 'Finish'),
+                    icon: Icons.flag_rounded,
+                    onPressed: hasActiveRuntime ? onFinishEarly : null,
+                    filled: true,
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _CompactLifecycleButton(
-              label: context.tr('Reiniciar', 'Restart'),
-              icon: Icons.replay_rounded,
-              onPressed: onRestart,
+          if (isBreak) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: _CompactLifecycleButton(
+                label: context.tr('Omitir descanso', 'Skip break'),
+                icon: Icons.skip_next_rounded,
+                onPressed: onFinishEarly,
+                filled: true,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _CompactLifecycleButton(
-              label: isBreak
-                  ? context.tr('Saltar', 'Skip')
-                  : context.tr('Terminar', 'Finish'),
-              icon: Icons.flag_rounded,
-              onPressed: hasElapsedPhase ? onFinishEarly : null,
-              filled: true,
-            ),
-          ),
+          ],
         ],
       ),
     );

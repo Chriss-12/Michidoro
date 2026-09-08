@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/legacy_database_migrator.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/unified_database_validator.dart';
+import 'package:pomodoro_app_v1/app/security/encrypted_database_backup_codec.dart';
 import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
 import 'package:pomodoro_app_v1/app/theme/app_typography.dart';
@@ -108,9 +109,12 @@ class AppNotification {
 class AppSettingsController {
   AppSettingsController({
     Directory? documentsDirectory,
+    EncryptedDatabaseBackupCodec? encryptedDatabaseBackupCodec,
     StatisticsReportDocumentRenderer? statisticsReportRenderer,
     StatisticsReportFileWriter? statisticsReportFileWriter,
   }) : _documentsDirectoryOverride = documentsDirectory,
+       _encryptedDatabaseBackupCodec =
+           encryptedDatabaseBackupCodec ?? EncryptedDatabaseBackupCodec(),
        _statisticsReportRenderer =
            statisticsReportRenderer ?? const RawStatisticsPdfRenderer(),
        _statisticsReportFileWriter =
@@ -122,6 +126,8 @@ class AppSettingsController {
   static const databaseBackupFileNames = [
     'michifocus.sqlite',
   ];
+  static const encryptedDatabaseBackupFileName = 'michifocus-backup.michi';
+  static const encryptedDatabaseBackupFilePrefix = 'michifocus-backup-';
 
   static const currentOnboardingVersion = 1;
 
@@ -182,6 +188,7 @@ class AppSettingsController {
   Timer? _timer;
   SettingsRepository? _settingsRepository;
   final Directory? _documentsDirectoryOverride;
+  final EncryptedDatabaseBackupCodec _encryptedDatabaseBackupCodec;
   final StatisticsReportDocumentRenderer _statisticsReportRenderer;
   final StatisticsReportFileWriter _statisticsReportFileWriter;
 
@@ -578,6 +585,120 @@ class AppSettingsController {
     return backupDirectory.path;
   }
 
+  Future<String> exportEncryptedDatabaseBackup({
+    required String password,
+    required Future<void> Function(String targetPath) createDatabaseSnapshot,
+  }) async {
+    final appDirectory = await _applicationDocumentsDirectory();
+    final snapshot = File('${appDirectory.path}/.michifocus-export.sqlite');
+    var clearBytes = <int>[];
+    try {
+      if (snapshot.existsSync()) await snapshot.delete();
+      await createDatabaseSnapshot(snapshot.path);
+      if (!snapshot.existsSync() || !await _isSQLiteDatabase(snapshot)) {
+        throw const FileSystemException(
+          'No se pudo crear una instantánea válida de la base de datos.',
+        );
+      }
+      clearBytes = await snapshot.readAsBytes();
+      final encryptedBytes = await _encryptedDatabaseBackupCodec.encrypt(
+        databaseBytes: clearBytes,
+        password: password,
+      );
+      final backupFileName = _newEncryptedBackupFileName();
+
+      final externalFolder = _externalReportsFolderReference();
+      if (externalFolder != null) {
+        final saved = await NativeFileManager.saveFileToExternalFolder(
+          folderUri: externalFolder,
+          fileName: backupFileName,
+          mimeType: 'application/octet-stream',
+          bytes: encryptedBytes,
+        );
+        lastReportPath.value = saved.displayPath;
+        return lastReportPath.value;
+      }
+
+      final directory = await _reportsDirectory();
+      final backupDirectory = Directory('${directory.path}/michifocus-backup');
+      if (!backupDirectory.existsSync()) {
+        backupDirectory.createSync(recursive: true);
+      }
+      await File(
+        '${backupDirectory.path}/$backupFileName',
+      ).writeAsBytes(encryptedBytes, flush: true);
+      lastReportPath.value = backupDirectory.path;
+      return backupDirectory.path;
+    } finally {
+      _eraseBytes(clearBytes);
+      if (snapshot.existsSync()) await snapshot.delete();
+    }
+  }
+
+  Future<void> stageEncryptedDatabaseBackupImport(
+    String directoryPath, {
+    required String password,
+  }) async {
+    final sourceDirectory = Directory(directoryPath.trim());
+    final source = _latestEncryptedBackup(sourceDirectory);
+    if (!sourceDirectory.existsSync() || source == null) {
+      throw const FileSystemException(
+        'La carpeta no contiene una copia cifrada de Michi Focus.',
+      );
+    }
+
+    final appDirectory = await _applicationDocumentsDirectory();
+    final pendingDirectory = Directory(
+      '${appDirectory.path}/$_pendingImportDirectoryName',
+    );
+    final stagingDirectory = Directory(
+      '${appDirectory.path}/$_stagingImportDirectoryName',
+    );
+    var clearBytes = <int>[];
+    try {
+      clearBytes = await _encryptedDatabaseBackupCodec.decrypt(
+        encryptedBytes: await source.readAsBytes(),
+        password: password,
+      );
+      if (stagingDirectory.existsSync()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+      stagingDirectory.createSync(recursive: true);
+      final stagedDatabase = File(
+        '${stagingDirectory.path}/michifocus.sqlite',
+      );
+      await stagedDatabase.writeAsBytes(clearBytes, flush: true);
+      await const UnifiedDatabaseValidator().validateForImport(stagedDatabase);
+      if (pendingDirectory.existsSync()) {
+        await pendingDirectory.delete(recursive: true);
+      }
+      await stagingDirectory.rename(pendingDirectory.path);
+      lastReportPath.value = pendingDirectory.path;
+    } on EncryptedDatabaseBackupException {
+      if (stagingDirectory.existsSync()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+      throw const FileSystemException(
+        'Contraseña incorrecta o copia de seguridad alterada.',
+      );
+    } on FileSystemException {
+      if (stagingDirectory.existsSync()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+      rethrow;
+    } on Object catch (error) {
+      if (stagingDirectory.existsSync()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+      throw FileSystemException(
+        'La copia no es compatible o está dañada: $error',
+        source.path,
+      );
+    } finally {
+      _eraseBytes(clearBytes);
+    }
+  }
+
   Future<void> stageDatabaseBackupImport(String directoryPath) async {
     final sourceDirectory = Directory(directoryPath.trim());
     if (!sourceDirectory.existsSync()) {
@@ -670,6 +791,34 @@ class AppSettingsController {
     await stagingDirectory.rename(pendingDirectory.path);
 
     lastReportPath.value = pendingDirectory.path;
+  }
+
+  void _eraseBytes(List<int> bytes) {
+    for (var index = 0; index < bytes.length; index++) {
+      bytes[index] = 0;
+    }
+  }
+
+  String _newEncryptedBackupFileName() {
+    final timestamp = DateTime.now().toUtc().microsecondsSinceEpoch;
+    return '$encryptedDatabaseBackupFilePrefix$timestamp.michi';
+  }
+
+  File? _latestEncryptedBackup(Directory directory) {
+    if (!directory.existsSync()) return null;
+    final candidates =
+        directory
+            .listSync()
+            .whereType<File>()
+            .where((file) {
+              final name = _fileName(file.path);
+              return name == encryptedDatabaseBackupFileName ||
+                  (name.startsWith(encryptedDatabaseBackupFilePrefix) &&
+                      name.endsWith('.michi'));
+            })
+            .toList(growable: false)
+          ..sort((left, right) => right.path.compareTo(left.path));
+    return candidates.firstOrNull;
   }
 
   Future<bool> applyPendingDatabaseImport() async {

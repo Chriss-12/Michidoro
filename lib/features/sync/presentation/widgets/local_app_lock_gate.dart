@@ -1,4 +1,79 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
+class LocalAppPrivacyShield extends StatelessWidget {
+  const LocalAppPrivacyShield({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      container: true,
+      label: 'Contenido protegido y difuminado',
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colorScheme.primaryContainer,
+                    colorScheme.surface,
+                    colorScheme.secondaryContainer,
+                  ],
+                ),
+              ),
+            ),
+            Align(
+              alignment: const Alignment(-0.7, -0.55),
+              child: _PrivacyGlow(color: colorScheme.primary),
+            ),
+            Align(
+              alignment: const Alignment(0.75, 0.55),
+              child: _PrivacyGlow(color: colorScheme.secondary),
+            ),
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+              child: ColoredBox(
+                color: colorScheme.surface.withValues(alpha: 0.28),
+              ),
+            ),
+            Center(
+              child: Icon(
+                Icons.lock_outline_rounded,
+                size: 48,
+                color: colorScheme.primary.withValues(alpha: 0.72),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyGlow extends StatelessWidget {
+  const _PrivacyGlow({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 240,
+      height: 240,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.5),
+      ),
+    );
+  }
+}
 
 class LocalAppLockGate extends StatelessWidget {
   const LocalAppLockGate({

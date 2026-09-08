@@ -357,6 +357,12 @@ Acceptance criteria:
       is actually hidden/paused, ignores transient `inactive` states, cannot be
       extended by repeated lifecycle events, and fails closed for invalid elapsed
       state.
+- [x] With local protection enabled, Android recent-app previews are protected
+      from the moment the app leaves the foreground, while a Flutter privacy
+      shield removes routed content before the snapshot can expose it.
+- [x] Returning after the configured timeout requests Android authentication
+      automatically without first revealing routed application content; returning
+      inside the grace period restores the app without an unnecessary prompt.
 - [ ] MichiFocus uses the Android system prompt and never receives, stores, logs,
       validates, or synchronizes the device PIN, pattern, password, or biometric.
 - [ ] Supported devices permit a strong biometric or the already registered
@@ -374,6 +380,19 @@ Acceptance criteria:
 - [ ] There is no offline bypass or MichiFocus master credential.
 - [ ] Unit, widget, lifecycle, native integration, restart, invalidation, and two
       physical-phone tests pass before the requirement becomes Verified.
+
+Implementation evidence on 2026-09-07:
+- Added a theme-aware privacy shield for every protected lifecycle transition and
+  retained the original monotonic timeout semantics.
+- Added a theme-aware blurred recent-app surface plus native Android 12+ render
+  blur. Android can retain the protected preview without replacing it with a
+  black frame, while task, note, routine, and objective text remains unreadable.
+- A timed lock now launches the existing Android biometric/device-credential
+  prompt automatically on resume. Cancellation remains fail-closed and leaves the
+  manual retry action available.
+- Twenty-six focused privacy/lock checks, scoped analysis, all 510 project tests,
+  and the debug Android build pass. Physical recent-preview and prompt validation
+  on the connected Realme remains required before this requirement is Verified.
 
 ## Non-goals for V11
 

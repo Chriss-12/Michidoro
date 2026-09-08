@@ -12,6 +12,8 @@ class PomodoroRuntimeScope extends InheritedWidget {
     required this.completedPomodoros,
     required this.completedPlanPomodoros,
     required this.totalFocusSeconds,
+    required this.todayCompletedPomodoros,
+    required this.todayFocusSeconds,
     required this.hasActiveRuntime,
     required this.hasStartedRuntime,
     required this.planMode,
@@ -38,6 +40,8 @@ class PomodoroRuntimeScope extends InheritedWidget {
   final int completedPomodoros;
   final int completedPlanPomodoros;
   final int totalFocusSeconds;
+  final int todayCompletedPomodoros;
+  final int todayFocusSeconds;
   final bool hasActiveRuntime;
   final bool hasStartedRuntime;
   final PomodoroPlanMode planMode;
@@ -71,6 +75,8 @@ class PomodoroRuntimeScope extends InheritedWidget {
         completedPomodoros != oldWidget.completedPomodoros ||
         completedPlanPomodoros != oldWidget.completedPlanPomodoros ||
         totalFocusSeconds != oldWidget.totalFocusSeconds ||
+        todayCompletedPomodoros != oldWidget.todayCompletedPomodoros ||
+        todayFocusSeconds != oldWidget.todayFocusSeconds ||
         hasActiveRuntime != oldWidget.hasActiveRuntime ||
         hasStartedRuntime != oldWidget.hasStartedRuntime ||
         planMode != oldWidget.planMode ||

@@ -115,10 +115,12 @@ void main() {
       final changeLifecycle = controller.onLifecycleStateChanged;
 
       changeLifecycle(AppLifecycleState.inactive);
+      expect(controller.isContentObscured.value, isTrue);
       clock.advance(const Duration(minutes: 2));
       changeLifecycle(AppLifecycleState.resumed);
 
       expect(controller.isLocked.value, isFalse);
+      expect(controller.isContentObscured.value, isFalse);
     });
 
     test('hidden starts one grace period until the app resumes', () {
@@ -137,6 +139,7 @@ void main() {
       changeLifecycle(AppLifecycleState.resumed);
 
       expect(controller.isLocked.value, isTrue);
+      expect(controller.isContentObscured.value, isTrue);
     });
 
     test('fails closed when the monotonic source moves backwards', () {
@@ -178,7 +181,31 @@ void main() {
 
       expect(controller.policy.value, LocalUnlockPolicy.disabled);
       expect(controller.isLocked.value, isFalse);
+      expect(controller.isContentObscured.value, isFalse);
     });
+
+    test(
+      'updates native recent-app protection with the stored policy',
+      () async {
+        final repository = _FakeLocalUnlockPolicyRepository(
+          LocalUnlockPolicy.afterFiveMinutes,
+        );
+        final protectionStates = <bool>[];
+        final controller = LocalAppLockController(
+          repository: repository,
+          setContentProtection: ({required enabled}) async {
+            protectionStates.add(enabled);
+          },
+        );
+
+        await controller.loadPolicy();
+        await controller.applyPolicyAfterAuthentication(
+          LocalUnlockPolicy.disabled,
+        );
+
+        expect(protectionStates, [true, false]);
+      },
+    );
 
     test('loads a persisted enabled policy in the locked state', () async {
       final repository = _FakeLocalUnlockPolicyRepository(
@@ -222,6 +249,7 @@ void main() {
 
       expect(await controller.requestUnlock(), isTrue);
       expect(controller.isLocked.value, isFalse);
+      expect(controller.isContentObscured.value, isFalse);
     });
 
     test('stays locked when device authentication is unavailable', () async {

@@ -70,7 +70,7 @@ class _SplashPageState extends State<SplashPage> {
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: 1),
                   duration: const Duration(milliseconds: 1700),
-                  curve: Curves.easeOutCubic,
+                  curve: Curves.easeInOutCubic,
                   builder: (context, progress, child) {
                     return Column(
                       mainAxisSize: MainAxisSize.min,
@@ -97,13 +97,7 @@ class _SplashPageState extends State<SplashPage> {
                               surfaceColor: palette.surface,
                               trackColor: palette.neutralSoft,
                               progress: progress,
-                              loadingColors: [
-                                palette.secondary,
-                                palette.primary,
-                                palette.accentPeach,
-                                palette.gradientEnd,
-                                palette.gradientStart,
-                              ],
+                              loadingColor: palette.primary,
                             ),
                           ),
                         ),
@@ -160,7 +154,7 @@ class _MichiDoroPainter extends CustomPainter {
     required this.surfaceColor,
     required this.trackColor,
     required this.progress,
-    required this.loadingColors,
+    required this.loadingColor,
   });
 
   final Color catColor;
@@ -173,7 +167,7 @@ class _MichiDoroPainter extends CustomPainter {
   final Color surfaceColor;
   final Color trackColor;
   final double progress;
-  final List<Color> loadingColors;
+  final Color loadingColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -209,10 +203,7 @@ class _MichiDoroPainter extends CustomPainter {
       ..strokeWidth = loadingStrokeWidth
       ..strokeCap = StrokeCap.round;
     final loadingPaint = Paint()
-      ..shader = SweepGradient(
-        colors: loadingColors,
-        stops: const [0, 0.25, 0.5, 0.75, 1],
-      ).createShader(loadingRect)
+      ..color = loadingColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = loadingStrokeWidth
       ..strokeCap = StrokeCap.round;
@@ -309,7 +300,7 @@ class _MichiDoroPainter extends CustomPainter {
         surfaceColor != oldDelegate.surfaceColor ||
         trackColor != oldDelegate.trackColor ||
         progress != oldDelegate.progress ||
-        loadingColors != oldDelegate.loadingColors;
+        loadingColor != oldDelegate.loadingColor;
   }
 }
 

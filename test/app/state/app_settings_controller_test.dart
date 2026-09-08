@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
+import 'package:pomodoro_app_v1/app/security/encrypted_database_backup_codec.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/native_file_manager.dart';
 import 'package:pomodoro_app_v1/app/theme/app_theme.dart';
@@ -545,6 +546,115 @@ void main() {
       );
       expect(
         File('${backupDirectory.path}/michifocus_tasks.sqlite').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('exports and restores a password-protected backup', () async {
+      final appDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-encrypted-app-',
+      );
+      final reportsDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-encrypted-reports-',
+      );
+      const password = 'correct horse battery staple';
+      final controller = AppSettingsController(
+        documentsDirectory: appDirectory,
+        encryptedDatabaseBackupCodec: EncryptedDatabaseBackupCodec(
+          parameters: const EncryptedDatabaseBackupParameters(
+            memoryKiB: 32,
+            iterations: 1,
+          ),
+        ),
+      )..setReportsDirectoryPath(reportsDirectory.path);
+      final liveFile = File('${appDirectory.path}/michifocus.sqlite');
+
+      addTearDown(() async {
+        if (appDirectory.existsSync()) {
+          await appDirectory.delete(recursive: true);
+        }
+        if (reportsDirectory.existsSync()) {
+          await reportsDirectory.delete(recursive: true);
+        }
+      });
+
+      await _createUnifiedDatabase(liveFile, goalTitle: 'Private goal');
+      final sourceDatabase = MichiFocusDatabase(NativeDatabase(liveFile));
+      final exportedPath = await controller.exportEncryptedDatabaseBackup(
+        password: password,
+        createDatabaseSnapshot: sourceDatabase.createBackupSnapshot,
+      );
+      await sourceDatabase.close();
+
+      final encryptedFile = Directory(exportedPath)
+          .listSync()
+          .whereType<File>()
+          .singleWhere((file) => file.path.endsWith('.michi'));
+      expect(encryptedFile.existsSync(), isTrue);
+      final exportedText = await encryptedFile.readAsString();
+      expect(exportedText, isNot(contains('SQLite format 3')));
+      expect(exportedText, isNot(contains('Private goal')));
+
+      await liveFile.delete();
+      await _createUnifiedDatabase(liveFile, goalTitle: 'Replacement goal');
+      await controller.stageEncryptedDatabaseBackupImport(
+        exportedPath,
+        password: password,
+      );
+      expect(await controller.applyPendingDatabaseImport(), isTrue);
+      expect(await _loadGoalTitles(liveFile), ['Private goal']);
+    });
+
+    test('wrong backup password never stages a database', () async {
+      final appDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-wrong-password-app-',
+      );
+      final backupDirectory = await Directory.systemTemp.createTemp(
+        'michifocus-wrong-password-backup-',
+      );
+      final codec = EncryptedDatabaseBackupCodec(
+        parameters: const EncryptedDatabaseBackupParameters(
+          memoryKiB: 32,
+          iterations: 1,
+        ),
+      );
+      final controller = AppSettingsController(
+        documentsDirectory: appDirectory,
+        encryptedDatabaseBackupCodec: codec,
+      );
+      addTearDown(() async {
+        if (appDirectory.existsSync()) {
+          await appDirectory.delete(recursive: true);
+        }
+        if (backupDirectory.existsSync()) {
+          await backupDirectory.delete(recursive: true);
+        }
+      });
+      final encrypted = await codec.encrypt(
+        databaseBytes: utf8.encode('SQLite format 3\u0000private'),
+        password: 'correct horse battery staple',
+      );
+      await File(
+        '${backupDirectory.path}/${AppSettingsController.encryptedDatabaseBackupFileName}',
+      ).writeAsBytes(encrypted);
+
+      await expectLater(
+        controller.stageEncryptedDatabaseBackupImport(
+          backupDirectory.path,
+          password: 'another secure password',
+        ),
+        throwsA(
+          isA<FileSystemException>().having(
+            (error) => error.message,
+            'message',
+            contains('Contraseña incorrecta'),
+          ),
+        ),
+      );
+      expect(
+        Directory(
+          '${appDirectory.path}/michifocus-pending-import',
+        ).existsSync(),
         isFalse,
       );
     });

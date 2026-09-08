@@ -13,6 +13,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -67,12 +69,14 @@ class MainActivity : FlutterActivity() {
     private val localSpeechChannelName = "michifocus/local_speech"
     private val focusSilenceChannelName = "michifocus/focus_silence"
     private val screenAwakeChannelName = "michifocus/screen_awake"
+    private val contentProtectionChannelName = "michifocus/content_protection"
     private val pickProfileImageRequest = 4101
     private val pickFolderRequest = 4102
     private val pickBackupImportFolderRequest = 4103
     private val localCredentialRequest = 4105
     private val backupFileNames = setOf(
         "michifocus.sqlite",
+        "michifocus-backup.michi",
     )
     private val legacyBackupFileNames = setOf(
         "michifocus_goals.sqlite",
@@ -89,6 +93,7 @@ class MainActivity : FlutterActivity() {
     private var localSpeechRecognizer: SpeechRecognizer? = null
     private var localSpeechDownloadRecognizer: SpeechRecognizer? = null
     private var localSpeechDownloadActive = false
+    private var contentProtectionEnabled = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -172,6 +177,42 @@ class MainActivity : FlutterActivity() {
                 }
                 result.success(null)
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, contentProtectionChannelName)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "setEnabled") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                setContentProtectionEnabled(call.argument<Boolean>("enabled") == true)
+                result.success(null)
+            }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun setContentProtectionEnabled(enabled: Boolean) {
+        contentProtectionEnabled = enabled
+        if (!enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.decorView.setRenderEffect(null)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (contentProtectionEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.decorView.setRenderEffect(
+                RenderEffect.createBlurEffect(28f, 28f, Shader.TileMode.CLAMP),
+            )
+        }
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Handler(Looper.getMainLooper()).postDelayed(
+                { window.decorView.setRenderEffect(null) },
+                180L,
+            )
+        }
     }
 
     private fun startLocalSpeech(call: MethodCall, result: MethodChannel.Result) {
@@ -1760,7 +1801,9 @@ class MainActivity : FlutterActivity() {
         val acceptedFileNames = backupFileNames + legacyBackupFileNames
         for (document in childDocuments(folderUri)) {
             val name = document.displayName
-            if (!acceptedFileNames.contains(name)) {
+            val isVersionedEncryptedBackup =
+                name.startsWith("michifocus-backup-") && name.endsWith(".michi")
+            if (!acceptedFileNames.contains(name) && !isVersionedEncryptedBackup) {
                 continue
             }
             contentResolver.openInputStream(document.uri).use { input ->

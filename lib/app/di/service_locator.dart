@@ -38,6 +38,7 @@ import 'package:pomodoro_app_v1/features/sync/data/repositories/file_device_iden
 import 'package:pomodoro_app_v1/features/sync/data/repositories/file_local_unlock_policy_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/data/repositories/file_sync_group_enrollment_repository.dart';
 import 'package:pomodoro_app_v1/features/sync/data/repositories/file_sync_storage_config_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/data/services/android_app_content_protection.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/android_device_bound_key_protector.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/android_device_name_provider.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/android_external_sync_app_launcher.dart';
@@ -136,6 +137,7 @@ Future<void> configureDependencies() async {
       LocalAppLockController(
         repository: serviceLocator<LocalUnlockPolicyRepository>(),
         authenticator: serviceLocator<LocalDeviceAuthenticator>(),
+        setContentProtection: const AndroidAppContentProtection().setEnabled,
       ),
     );
   }

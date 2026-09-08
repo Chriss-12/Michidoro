@@ -3111,6 +3111,9 @@ Deliverables:
       any bootstrap/loading work, then run the percentage loading exactly once.
 - [x] Route directly to onboarding or Home after bootstrap so the percentage
       loading is not replayed from 0 to 100.
+- [x] Protect the Android recent-app preview while local security is enabled and
+      automatically request system authentication after an elapsed background
+      timeout without revealing routed content first.
 - [ ] Add system-prompt unlock, locked-content overlay, cancellation, retry,
       secure-key invalidation, and password/recovery rebind flows.
 - [ ] Defer incoming encrypted operation application while locked and resume it
@@ -3194,6 +3197,17 @@ Implementation evidence on 2026-09-01:
   that a fully closed process always requires cold-start authentication.
 - Twenty-one focused controller/widget checks and all 495 project tests pass;
   physical Realme/Poco timeout verification remains pending.
+
+Implementation evidence on 2026-09-07:
+- The protected app now obscures routed content as soon as it becomes inactive,
+  without starting the configured grace period until it is hidden or paused.
+- The recent-app preview now uses a theme-aware blurred privacy surface instead
+  of a black frame. Android 12+ also applies native render blur during the task
+  snapshot; returning inside the grace period restores content, while an elapsed
+  timeout opens the existing system authentication prompt automatically.
+- Three native-bridge, eighteen controller, and five lock-surface checks pass,
+  as do scoped analysis, all 510 project tests, and the Java 17 debug APK build. Physical
+  preview and biometric/PIN confirmation on Realme remains pending.
 
 ### V11-M1 - Local storage mode, recovery folder, and sync metadata
 
@@ -4029,6 +4043,49 @@ Status: Implemented
 Tracks:
 - `REQ-V13-003`
 
+## V21 — Seguridad de base de datos y copias portátiles
+
+### V21-M0 — Contrato criptográfico
+
+Status: Approved
+
+- [x] Separar contraseña de backup, autenticación Android y clave de base viva.
+- [x] Definir Argon2id + AES-256-GCM para archivos portátiles.
+- [x] Definir migración atómica y rollback como puerta del cifrado local.
+
+### V21-M1 — Backup cifrado con contraseña
+
+Status: Implemented
+
+- [x] Crear sobres versionados `.michi` con nombres únicos sin sobrescritura.
+- [x] Pedir contraseña y confirmación al exportar.
+- [x] Pedir contraseña al importar y autenticar ambas acciones con Android.
+- [x] Validar antes de preparar el reemplazo y limpiar temporales.
+- [x] Pasar formato, análisis y las 515 pruebas completas.
+- [ ] Compilar el APK Android cuando Gradle recupere su conexión loopback local.
+- [ ] Instalar y validar exportación/importación física sin perder datos.
+
+Implementation evidence on 2026-09-08:
+- El análisis de `lib` y `test` está limpio y las 515 pruebas pasan.
+- Las pruebas incluyen sobre cifrado, texto no expuesto, manipulación,
+  contraseña equivocada, round trip SQLite y rollback de importación.
+- Tres intentos de ensamblado con JDK 17 fallaron antes de compilar por el socket
+  interno de Gradle (`Unable to establish loopback connection`); no es un error
+  de análisis o prueba de la aplicación.
+
+### V21-M2 — Cifrado de la base viva
+
+Status: Approved
+
+- [ ] Probar compatibilidad de Drift con SQLite3MultipleCiphers en el SDK actual.
+- [ ] Implementar clave aleatoria de 256 bits protegida por Android Keystore.
+- [ ] Implementar migración recuperable desde la base en claro.
+- [ ] Probar actualización, rollback y restauración en Realme y Poco.
+
+Tracks:
+- `REQ-V21-001`
+- `REQ-V21-002`
+
 ## V20 — Silencio temporal de enfoque en Android
 
 ### V20-M0 — Contrato y prueba de viabilidad nativa
@@ -4193,6 +4250,10 @@ Status: Verified
 - [x] Mantener el esquema y la sincronización sin cambios.
 - [x] Implementar reconciliación y limpieza esperada del runtime.
 - [x] Cubrir cierre, reapertura y último bloque reducido con pruebas.
+- [x] Reanudar únicamente el resto del último bloque parcial sin repetirlo.
+- [x] Ejecutar el descanso de cada bloque, incluido el bloque final.
+- [x] Permitir omitir cualquier descanso desde un botón visible; continuar al
+  siguiente foco o cerrar el plan si era la recuperación final.
 - [x] Ejecutar las puertas completas y la instalación física.
 
 Verification evidence through 2026-08-31:
@@ -4205,6 +4266,18 @@ Verification evidence through 2026-08-31:
   el Realme RMX3301 por depuración inalámbrica.
 - En el Realme, una tarea real de 55/60 mostró `faltan 5 min` y dejó el reloj
   preparado en `05:00`, 0/1, sin iniciar el conteo.
+- El 2026-09-07, una tarea de 60 minutos con 25 completos y 20 parciales quedó
+  cubierta como 5 de enfoque, descanso, 10 de enfoque y descanso final, sin
+  repetir el tramo corto ni iniciar otro foco después de completar la tarea.
+- El botón `Omitir descanso` queda disponible desde el primer segundo; las
+  pruebas cubren tanto la recuperación intermedia como la final.
+- Enfoque muestra la tarea y su objetivo aunque este no tenga fecha; Descartar,
+  Reiniciar y Terminar quedan activos desde que existe un plan, y Descartar
+  libera realmente su propiedad sin guardar foco inexistente.
+- `Hoy` y `Sesiones` se calculan con el día local y el foco activo actual.
+- Análisis de `lib` y `test` limpio, 505 pruebas aprobadas, APK generado con
+  Java 17 e instalación/apertura confirmada por Wi-Fi en el Realme RMX3301 el
+  2026-09-07.
 
 Tracks:
 - `REQ-V18-001`

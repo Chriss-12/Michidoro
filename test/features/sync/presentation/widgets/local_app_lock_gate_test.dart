@@ -3,6 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/widgets/local_app_lock_gate.dart';
 
 void main() {
+  testWidgets('shows a themed blurred surface without sensitive content', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: LocalAppPrivacyShield()),
+    );
+
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+    expect(find.text('Contenido sensible'), findsNothing);
+  });
+
   testWidgets('shows application content while unlocked', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(

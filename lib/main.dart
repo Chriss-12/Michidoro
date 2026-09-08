@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -324,6 +325,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final SyncGroupEnrollmentController _syncGroupEnrollmentController;
   late final SyncStorageController _syncStorageController;
   FocusSilenceController? _focusSilenceController;
+  bool _isRequestingLocalUnlock = false;
 
   @override
   void initState() {
@@ -405,6 +407,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       return;
     }
 
+    if (_localAppLockController.isLocked.value) {
+      unawaited(_requestLocalUnlock());
+    }
+
     unawaited(_resumePomodoro(pomodoroController));
     unawaited(_reconcileRoutineTasks());
     _scheduleRoutineRollover();
@@ -427,7 +433,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _requestLocalUnlock() async {
-    await _localAppLockController.requestUnlock();
+    if (_isRequestingLocalUnlock) return;
+    _isRequestingLocalUnlock = true;
+    try {
+      await _localAppLockController.requestUnlock();
+    } finally {
+      _isRequestingLocalUnlock = false;
+    }
   }
 
   Future<void> _deleteAllDatabaseData() async {
@@ -492,6 +504,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final typographyPreset = controller.typographyPreset.value;
         final language = controller.language.value;
         final isLocallyLocked = _localAppLockController.isLocked.value;
+        final isContentObscured =
+            _localAppLockController.isContentObscured.value;
 
         return MaterialApp.router(
           locale: language.locale,
@@ -518,6 +532,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                             _requestLocalUnlock(),
                           ),
                           child: const SizedBox.shrink(),
+                        );
+                      }
+                      if (isContentObscured) {
+                        return const LocalAppPrivacyShield(
+                          key: ValueKey('local-app-privacy-shield'),
                         );
                       }
 
@@ -691,16 +710,31 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                               request: request,
                             ),
                         onOpenReport: controller.openReport,
-                        onExportDatabaseBackup: () async {
+                        onExportDatabaseBackup: (password) async {
+                          if (!await _localAppLockController.requestUnlock()) {
+                            throw const FileSystemException(
+                              'Autenticación cancelada. No se exportó ningún dato.',
+                            );
+                          }
                           await pomodoroController.checkpointRuntime();
-                          return controller.exportDatabaseBackup(
+                          return controller.exportEncryptedDatabaseBackup(
+                            password: password,
                             createDatabaseSnapshot:
                                 serviceLocator<MichiFocusDatabase>()
                                     .createBackupSnapshot,
                           );
                         },
-                        onImportDatabaseBackup:
-                            controller.stageDatabaseBackupImport,
+                        onImportDatabaseBackup: (path, password) async {
+                          if (!await _localAppLockController.requestUnlock()) {
+                            throw const FileSystemException(
+                              'Autenticación cancelada. No se importó ningún dato.',
+                            );
+                          }
+                          await controller.stageEncryptedDatabaseBackupImport(
+                            path,
+                            password: password,
+                          );
+                        },
                         onDeleteAllDatabaseData: _deleteAllDatabaseData,
                         onTestNotification: controller.sendTestNotification,
                         onClearNotifications: controller.clearNotifications,
@@ -735,6 +769,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                                 pomodoroController.completedPlanPomodoros.value,
                             totalFocusSeconds:
                                 pomodoroController.totalFocusSeconds.value,
+                            todayCompletedPomodoros:
+                                pomodoroController.todayCompletedPomodoros,
+                            todayFocusSeconds:
+                                pomodoroController.todayFocusSeconds,
                             hasActiveRuntime:
                                 pomodoroController.hasActiveRuntime.value,
                             hasStartedRuntime:
@@ -758,7 +796,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                               pomodoroController.start();
                             },
                             onReset: pomodoroController.reset,
-                            onDiscard: pomodoroController.discardSession,
+                            onDiscard: () => unawaited(
+                              pomodoroController
+                                  .discardActiveRuntimeWithoutSaving(),
+                            ),
                             onRestart: pomodoroController.restartSession,
                             onFinishEarly: pomodoroController.finishEarly,
                             onStopForNow: pomodoroController.stopForNow,

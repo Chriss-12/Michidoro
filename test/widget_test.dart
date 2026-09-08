@@ -65,6 +65,7 @@ void main() {
       );
     }
     final tasksController = serviceLocator<TasksController>();
+    final goalsController = serviceLocator<GoalsController>();
     final pomodoroController = serviceLocator<PomodoroController>();
     appSettingsController.completedOnboardingVersion.value =
         AppSettingsController.currentOnboardingVersion;
@@ -251,6 +252,10 @@ void main() {
     expect(find.text('Objetivo V2'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    final focusGoal = goalsController.goals.value.firstWhere(
+      (goal) => goal.title == 'Objetivo V2',
+    );
+
     await tester.tap(find.text('Tareas').last);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Opciones de tarea').first);
@@ -321,6 +326,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Empezar Pomodoro'), findsNothing);
     expect(pomodoroController.hasActiveRuntime.value, isTrue);
+    pomodoroController.selectedGoalId = focusGoal.id;
+    await tester.pumpAndSettle();
     final activePlanTotal = pomodoroController.totalBlocks.value;
     expect(activePlanTotal, greaterThan(0));
     expect(
@@ -330,6 +337,61 @@ void main() {
     expect(find.text('25:00'), findsOneWidget);
     expect(find.text('MODO ENFOQUE'), findsOneWidget);
     expect(find.text('Enfoque actual'), findsOneWidget);
+    expect(
+      find.text('Tarea rapida V2 - Objetivo V2'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Descartar'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find
+                .ancestor(
+                  of: find.text('Descartar'),
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget is OutlinedButton,
+                  ),
+                )
+                .first,
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find
+                .ancestor(
+                  of: find.text('Reiniciar'),
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget is OutlinedButton,
+                  ),
+                )
+                .first,
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find
+                .ancestor(
+                  of: find.text('Terminar'),
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget is FilledButton,
+                  ),
+                )
+                .first,
+          )
+          .onPressed,
+      isNotNull,
+    );
     expect(
       find.text('0/$activePlanTotal'),
       findsOneWidget,
@@ -671,6 +733,7 @@ void main() {
     );
     expect(find.text('Este Pomodoro suma a'), findsNothing);
     pomodoroController.pendingReflectionSessionId.value = null;
+    pomodoroController.selectedGoalId = null;
     await tester.pumpAndSettle();
     await tester.binding.setSurfaceSize(const Size(480, 1800));
     await tester.pumpAndSettle();

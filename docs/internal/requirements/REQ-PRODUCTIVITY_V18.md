@@ -19,19 +19,29 @@ enfoque que ya fue guardado para una tarea.
   el enfoque persistido de la tarea.
 - Preparar un nuevo plan usa únicamente ese tiempo pendiente; el último bloque
   puede ser menor que un minuto.
+- Si ya existe enfoque persistido y no hay una fase activa recuperable,
+  `Continuar tarea` reconstruye los bloques del tiempo pendiente. Si la última
+  sesión guardada fue parcial, el primer bloque contiene únicamente lo que
+  faltaba de ese bloque interrumpido; después de su descanso continúa con los
+  bloques normales de la cadencia seleccionada.
 - Salir después de una sesión parcial espera a que el runtime anterior quede
   eliminado de la persistencia local.
 - Si un cierre interrumpe esa limpieza, el arranque compara el runtime con las
   sesiones guardadas y nunca repite un bloque ya registrado.
 - Un bloque completo recuperado continúa en su descanso; una sesión parcial
   recuperada ofrece un nuevo bloque acotado al tiempo real pendiente.
-- Llegar a la duración estimada finaliza el plan sin crear otro Pomodoro.
+- Cada bloque terminado abre su descanso configurado antes de comenzar el
+  siguiente. El bloque final completa la tarea, también abre su descanso y
+  libera el runtime al terminarlo sin crear otro bloque de enfoque.
 - No se modifica el esquema, la sincronización ni el significado histórico de
   las sesiones existentes.
 
 ### Verificación prevista
 
 - Pruebas de plan de 60 minutos con 30 minutos completos y 25 parciales.
+- Prueba de tarea de 60 minutos con 25 completos y 20 parciales: reanuda los 5
+  minutos del bloque interrumpido, descansa, ejecuta los 10 finales y vuelve a
+  descansar antes de liberar el plan.
 - Prueba de runtime antiguo posterior a una sesión completa.
 - Prueba de espera transaccional al limpiar el runtime.
 - Formato, análisis, suite completa, APK e instalación física.
@@ -53,3 +63,9 @@ enfoque que ya fue guardado para una tarea.
 - La tarea física `aprendizaje supervisado parte 2` conservó 55/60 minutos; al
   elegir Empezar Pomodoro mostró `faltan 5 min` y preparó el reloj en `05:00`,
   con 0/1 bloques y sin iniciar la cuenta.
+- El 2026-09-07 una regresión automatizada confirmó la secuencia exacta para
+  una tarea de 60 minutos con 25 completos y 20 parciales: 5 de enfoque, 5 de
+  descanso, 10 de enfoque y 5 de descanso. No repite el bloque corto ni une
+  varios bloques antes de permitir la recuperación.
+- El análisis de `lib` y `test` quedó limpio, las 500 pruebas pasaron y el APK
+  de depuración se generó con Java 17 el 2026-09-07.

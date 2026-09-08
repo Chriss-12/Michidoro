@@ -89,6 +89,29 @@ class PomodoroController {
       (total, session) => total + session.focusedSeconds,
     ),
   );
+  int get todayCompletedPomodoros {
+    final today = _now();
+    return sessions.value
+        .where(
+          (session) =>
+              session.status == PomodoroSessionStatus.completed &&
+              _isSameLocalDay(session.endedAt, today),
+        )
+        .length;
+  }
+
+  int get todayFocusSeconds {
+    final today = _now();
+    final persistedSeconds = sessions.value
+        .where((session) => _isSameLocalDay(session.endedAt, today))
+        .fold<int>(0, (total, session) => total + session.focusedSeconds);
+    final activeSeconds =
+        phase.value == PomodoroPhase.focus && _startedAt != null
+        ? elapsedFocusSeconds
+        : 0;
+    return persistedSeconds + activeSeconds;
+  }
+
   late final Computed<int> activeTaskFocusedSeconds = computed<int>(() {
     final taskId = activeTaskId.value;
     if (taskId == null) {
@@ -364,23 +387,31 @@ class PomodoroController {
       return false;
     }
 
+    final taskSessions =
+        sessions.value
+            .where((session) => session.taskId == taskId)
+            .toList(growable: false)
+          ..sort((first, second) => second.endedAt.compareTo(first.endedAt));
     final summary = summarizeTaskFocusMinutes(
       plannedMinutes: estimatedMinutes,
-      focusedSeconds: sessions.value
-          .where((session) => session.taskId == taskId)
-          .map((session) => session.focusedSeconds),
+      focusedSeconds: taskSessions.map((session) => session.focusedSeconds),
     );
     if (summary.remainingSeconds == 0) {
       return false;
     }
 
     final cadenceSeconds = cadence.focusMinutes * 60;
-    final remainingBlockCount =
-        (summary.remainingSeconds + cadenceSeconds - 1) ~/ cadenceSeconds;
-
     _focusSeconds = cadenceSeconds;
     _shortBreakSeconds = cadence.breakMinutes * 60;
-    _currentFocusSeconds = _min(cadenceSeconds, summary.remainingSeconds);
+    _currentFocusSeconds = _nextTaskFocusBlockSeconds(
+      remainingTaskSeconds: summary.remainingSeconds,
+      latestSession: taskSessions.firstOrNull,
+      mode: mode,
+    );
+    final remainingAfterCurrent =
+        summary.remainingSeconds - _currentFocusSeconds;
+    final remainingBlockCount =
+        1 + (remainingAfterCurrent + cadenceSeconds - 1) ~/ cadenceSeconds;
     planMode.value = mode;
     currentBlockIndex.value = 1;
     totalBlocks.value = mode == PomodoroPlanMode.continuous
@@ -646,6 +677,10 @@ class PomodoroController {
       if (taskId != null && callback != null) {
         await callback(taskId);
       }
+      if (_hasStructuredTaskPlan) {
+        _startBreakAfterFocus();
+        return;
+      }
       _timer?.cancel();
       isRunning.value = false;
       phase.value = PomodoroPhase.focus;
@@ -736,7 +771,8 @@ class PomodoroController {
 
     if (_hasStructuredTaskPlan &&
         activeTaskId.value != null &&
-        planMode.value == PomodoroPlanMode.singleBlock) {
+        (_hasCompletedActiveTask() ||
+            planMode.value == PomodoroPlanMode.singleBlock)) {
       phase.value = PomodoroPhase.focus;
       _lastTickAt = null;
       _startedAt = null;
@@ -831,6 +867,14 @@ class PomodoroController {
     return value;
   }
 
+  bool _isSameLocalDay(DateTime first, DateTime second) {
+    final localFirst = first.toLocal();
+    final localSecond = second.toLocal();
+    return localFirst.year == localSecond.year &&
+        localFirst.month == localSecond.month &&
+        localFirst.day == localSecond.day;
+  }
+
   int _clampMoodScore(int value) {
     return value.clamp(1, 5);
   }
@@ -891,14 +935,24 @@ class PomodoroController {
     }
 
     final remainingTaskSeconds = estimatedSeconds - persistedFocusedSeconds;
-    if (remainingTaskSeconds <= 0) {
-      await _clearSelectedTaskAndRuntime();
-      return true;
-    }
-
     final latestSession = sessions.value.firstWhere(
       (session) => session.taskId == taskId,
     );
+    if (remainingTaskSeconds <= 0) {
+      if (latestSession.status == PomodoroSessionStatus.completed) {
+        _timer?.cancel();
+        isRunning.value = false;
+        _lastTickAt = null;
+        _startedAt = null;
+        phase.value = _nextBreakPhase();
+        remainingSeconds.value = currentPhaseSeconds;
+        hasStartedRuntime.value = true;
+        await checkpointRuntime();
+      } else {
+        await _clearSelectedTaskAndRuntime();
+      }
+      return true;
+    }
     _timer?.cancel();
     isRunning.value = false;
     _lastTickAt = null;
@@ -910,11 +964,16 @@ class PomodoroController {
       hasStartedRuntime.value = true;
     } else {
       phase.value = PomodoroPhase.focus;
-      _currentFocusSeconds = _min(_focusSeconds, remainingTaskSeconds);
+      _currentFocusSeconds = _nextTaskFocusBlockSeconds(
+        remainingTaskSeconds: remainingTaskSeconds,
+        latestSession: latestSession,
+        mode: planMode.value,
+      );
       remainingSeconds.value = _currentFocusSeconds;
       currentBlockIndex.value = 1;
+      final remainingAfterCurrent = remainingTaskSeconds - _currentFocusSeconds;
       totalBlocks.value = planMode.value == PomodoroPlanMode.continuous
-          ? (remainingTaskSeconds + _focusSeconds - 1) ~/ _focusSeconds
+          ? 1 + (remainingAfterCurrent + _focusSeconds - 1) ~/ _focusSeconds
           : 1;
       hasStartedRuntime.value = false;
     }
@@ -928,6 +987,23 @@ class PomodoroController {
     return activeTaskId.value != null &&
         estimatedSeconds != null &&
         activeTaskFocusedSeconds.value >= estimatedSeconds;
+  }
+
+  int _nextTaskFocusBlockSeconds({
+    required int remainingTaskSeconds,
+    required PomodoroSession? latestSession,
+    required PomodoroPlanMode mode,
+  }) {
+    if (mode == PomodoroPlanMode.continuous &&
+        latestSession?.status == PomodoroSessionStatus.partial) {
+      final interruptedBlockSeconds =
+          latestSession!.plannedSeconds - latestSession.focusedSeconds;
+      if (interruptedBlockSeconds > 0) {
+        return _min(interruptedBlockSeconds, remainingTaskSeconds);
+      }
+    }
+
+    return _min(_focusSeconds, remainingTaskSeconds);
   }
 
   void _startTicker() {

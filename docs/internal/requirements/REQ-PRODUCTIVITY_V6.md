@@ -11,11 +11,12 @@ execution plan. Task duration remains net focus time. Breaks add elapsed clock
 time but never task progress.
 
 The approved V6-M0.5 extension makes timed recovery and per-block wellbeing
-explicit without creating a second source of truth. Every completed non-final
-focus block transitions to its configured break countdown. The final focus
-block completes the task without forcing a trailing break. Mood remains stored
-on the completed Pomodoro session and is aggregated from SQLite for Home
-statistics and PDF reports.
+explicit without creating a second source of truth. Every completed focus
+block, including the final block, transitions to its configured break
+countdown. The final focus block completes the task, while the runtime remains
+owned until its recovery finishes. Mood remains stored on the completed
+Pomodoro session and is aggregated from SQLite for Home statistics and PDF
+reports.
 
 ### REQ-V6-001 - Editable task duration and automatic task states
 
@@ -105,16 +106,24 @@ Acceptance criteria:
       remaining whole minutes.
 - [x] Continue resumes an active partial focus or break at its exact remaining
       second.
-- [x] Without a partial phase, Continue uses the recommended cadence and
+- [x] Without previous persisted focus, Start uses the recommended cadence and
       automatically sequences focus, break, and next focus until completion.
+- [x] Without a recoverable active phase, Continue rebuilds the remaining
+      cadence. If the latest saved session is partial, the first block contains
+      only the unfinished part of that interrupted block.
 - [x] Focus UI shows `Block X of N`; N represents the current execution plan.
 - [x] Selecting a predefined or custom single Pomodoro executes one focus block
       and its associated break, then stops with the task In Progress.
 - [x] A custom cadence can also be applied to the continuous remaining plan.
-- [x] The end of the final focus block completes the task and does not force a
-      trailing break.
+- [x] Every focus block is followed by its associated recovery before the next
+      focus begins. The final focus completes the task and its final recovery
+      releases the plan without creating another focus block.
 - [x] Stop for now saves actual focus, releases the timer, and keeps unfinished
       task progress.
+- [x] With an active plan, Discard, Restart, and Finish are available before
+      the first elapsed second. Discard releases ownership without saving,
+      Restart begins the current block from zero, and Finish saves only real
+      elapsed focus before releasing ownership.
 
 ### REQ-V6-004 - Exclusive and recoverable Pomodoro runtime
 
@@ -178,6 +187,10 @@ Acceptance criteria:
 - [x] Planning shows Pending, In Progress, or Completed consistently with task
       state and keeps the existing task progress bar.
 - [x] Controls and dialog actions remain responsive under supported font scales.
+- [x] Current focus shows the selected task and its associated goal, including
+      goals without a target date.
+- [x] The Today duration and Sessions counters use only local-day session
+      history; Today also reacts to elapsed focus in the running block.
 - [ ] Android visual inspection covers light/dark themes, at least two
       typography presets, small-screen layout, and active/paused/break states.
 
@@ -199,11 +212,15 @@ Checklist:
 - [x] Documentation and traceability updated
 
 Acceptance criteria:
-- [x] Every completed non-final task focus block starts the configured break
-      countdown, including continuous and explicit single-block execution.
+- [x] Every completed task focus block starts the configured break countdown,
+      including intermediate, final, continuous, and explicit single-block
+      execution.
 - [x] Break seconds never increase task focus progress or complete a task.
-- [x] The final focus block completes the planned task without forcing a
-      trailing break.
+- [x] The final focus block completes the planned task, keeps ownership during
+      its final recovery, and releases the runtime when that break finishes.
+- [x] Every active break exposes an immediately available `Omitir descanso`
+      action; an intermediate skip starts the next focus block and a final skip
+      closes the plan without adding focus time or starting another block.
 - [x] Focus asks how the user feels after each completed block on a scale from
       1 to 5 using face icons rather than emoji or plain numbers.
 - [x] Every unanswered completed-block reflection survives background phase

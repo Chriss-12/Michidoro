@@ -964,8 +964,11 @@ class _ReportsCard extends StatelessWidget {
                   return;
                 }
 
+                final password = await _requestBackupPassword(context);
+                if (password == null || !context.mounted) return;
+
                 try {
-                  await settings.onImportDatabaseBackup(path);
+                  await settings.onImportDatabaseBackup(path, password);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -1055,11 +1058,13 @@ class _ReportsCard extends StatelessWidget {
     BuildContext context,
     AppSettingsScope settings,
   ) async {
+    final password = await _requestBackupPassword(context, confirm: true);
+    if (password == null || !context.mounted) return null;
     try {
       final selection = await NativeFileManager.pickExportFolder();
       if (selection != null) {
         settings.onReportsDirectoryPathChanged(selection.uri);
-        return settings.onExportDatabaseBackup();
+        return settings.onExportDatabaseBackup(password);
       }
     } on PlatformException catch (error) {
       if (context.mounted) {
@@ -1076,9 +1081,139 @@ class _ReportsCard extends StatelessWidget {
         );
       }
       return null;
+    } on FileSystemException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+      return null;
     }
 
-    return settings.onExportDatabaseBackup();
+    return settings.onExportDatabaseBackup(password);
+  }
+
+  Future<String?> _requestBackupPassword(
+    BuildContext context, {
+    bool confirm = false,
+  }) async {
+    final passwordController = TextEditingController();
+    final confirmationController = TextEditingController();
+    var obscurePassword = true;
+    var errorText = '';
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: Text(
+              context.tr(
+                confirm ? 'Proteger copia' : 'Abrir copia protegida',
+                confirm ? 'Protect backup' : 'Open protected backup',
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.tr(
+                      'Usa al menos 12 caracteres y guárdala en Buttercup. '
+                          'Michi Focus no conserva esta contraseña.',
+                      'Use at least 12 characters and save it in Buttercup. '
+                          'Michi Focus does not store this password.',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: context.tr('Contraseña', 'Password'),
+                      suffixIcon: IconButton(
+                        onPressed: () => setState(
+                          () => obscurePassword = !obscurePassword,
+                        ),
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_rounded
+                              : Icons.visibility_off_rounded,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (confirm) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmationController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: context.tr(
+                          'Repetir contraseña',
+                          'Repeat password',
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (errorText.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      errorText,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(context.tr('Cancelar', 'Cancel')),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final password = passwordController.text;
+                  if (password.length < 12) {
+                    setState(() {
+                      errorText = context.tr(
+                        'La contraseña debe tener al menos 12 caracteres.',
+                        'The password must contain at least 12 characters.',
+                      );
+                    });
+                    return;
+                  }
+                  if (confirm && password != confirmationController.text) {
+                    setState(() {
+                      errorText = context.tr(
+                        'Las contraseñas no coinciden.',
+                        'Passwords do not match.',
+                      );
+                    });
+                    return;
+                  }
+                  Navigator.of(dialogContext).pop(password);
+                },
+                child: Text(
+                  context.tr(
+                    confirm ? 'Continuar' : 'Abrir',
+                    confirm ? 'Continue' : 'Open',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      passwordController.clear();
+      confirmationController.clear();
+      passwordController.dispose();
+      confirmationController.dispose();
+    }
   }
 
   String _displayDestination(BuildContext context, String destination) {

@@ -571,3 +571,24 @@ close cannot ordinarily leave an obsolete focus block behind.
 Automated coverage includes the 60-minute task with 30 completed minutes and 25
 partial minutes, complete and partial stale runtimes, and serialized runtime
 cleanup. Static analysis is clean and all 476 tests pass.
+
+## V21 portable backup security
+
+The Settings export path no longer publishes raw SQLite. It creates a validated
+snapshot inside application-private storage, derives a key from a user-provided
+password with Argon2id, and writes a uniquely named, versioned
+`michifocus-backup-<timestamp>.michi` envelope encrypted and authenticated with
+AES-256-GCM. A new random salt and nonce are generated for every export; prior
+backups are not overwritten and the password is not persisted.
+
+Import copies only the encrypted artifact from Android's selected folder,
+decrypts it into private staging, validates the unified schema, indexes,
+foreign-key contracts and integrity, and only then reuses the existing pending
+import and atomic rollback flow. Authentication failure, a wrong password,
+tampering, unsupported parameters, or validation failure cannot replace the
+live database.
+
+Transparent encryption of the live `michifocus.sqlite` is tracked separately.
+It requires a compatible maintained SQLite cipher, a random 256-bit data key
+wrapped by Android Keystore, and a tested plaintext-to-encrypted migration with
+an untouched rollback source before it may be enabled for existing users.
