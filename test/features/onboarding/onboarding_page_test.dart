@@ -282,7 +282,7 @@ class _OnboardingTestApp extends StatelessWidget {
             openReference: '',
           ),
           onOpenReport: (_) async {},
-          onExportDatabaseBackup: (_) async => '',
+          onExportDatabaseBackup: () async => '',
           onImportDatabaseBackup: (_, _) async {},
           onDeleteAllDatabaseData: () async {},
           onTestNotification: () async {},

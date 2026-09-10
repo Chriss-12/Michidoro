@@ -135,7 +135,7 @@ class AppSettingsScope extends InheritedWidget {
   final Future<StatisticsReportFile> Function(StatisticsReportRequest request)
   onDownloadStatisticsPdf;
   final Future<void> Function(String path) onOpenReport;
-  final Future<String> Function(String password) onExportDatabaseBackup;
+  final Future<String> Function() onExportDatabaseBackup;
   final Future<void> Function(String directoryPath, String password)
   onImportDatabaseBackup;
   final Future<void> Function() onDeleteAllDatabaseData;

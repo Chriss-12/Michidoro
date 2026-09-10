@@ -63,4 +63,49 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('master password recovers the same AES-256 backup key', () async {
+    final codec = EncryptedDatabaseBackupCodec(
+      parameters: parameters,
+      random: Random(9),
+    );
+    final material = await codec.createMasterKey(password);
+    final encrypted = await codec.encryptWithMasterKey(
+      databaseBytes: utf8.encode('SQLite format 3\u0000master protected'),
+      clearKey: material.clearKey,
+      recoveryEnvelope: material.recoveryEnvelope,
+    );
+
+    expect(utf8.decode(encrypted), isNot(contains('master protected')));
+    final decrypted = await codec.decryptWithMasterPassword(
+      encryptedBytes: encrypted,
+      password: password,
+    );
+    expect(decrypted.clearKey, material.clearKey);
+    expect(
+      utf8.decode(decrypted.databaseBytes),
+      contains('master protected'),
+    );
+  });
+
+  test('master backup rejects the wrong recovery password', () async {
+    final codec = EncryptedDatabaseBackupCodec(
+      parameters: parameters,
+      random: Random(10),
+    );
+    final material = await codec.createMasterKey(password);
+    final encrypted = await codec.encryptWithMasterKey(
+      databaseBytes: utf8.encode('SQLite format 3\u0000private'),
+      clearKey: material.clearKey,
+      recoveryEnvelope: material.recoveryEnvelope,
+    );
+
+    await expectLater(
+      codec.decryptWithMasterPassword(
+        encryptedBytes: encrypted,
+        password: 'another secure password',
+      ),
+      throwsA(isA<EncryptedDatabaseBackupException>()),
+    );
+  });
 }

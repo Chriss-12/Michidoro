@@ -77,7 +77,10 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MyApp(localAppLockController: LocalAppLockController()),
+      MyApp(
+        requireBackupMasterPassword: false,
+        localAppLockController: LocalAppLockController(),
+      ),
     );
 
     await tester.pumpAndSettle();

@@ -4053,25 +4053,29 @@ Status: Approved
 - [x] Definir Argon2id + AES-256-GCM para archivos portátiles.
 - [x] Definir migración atómica y rollback como puerta del cifrado local.
 
-### V21-M1 — Backup cifrado con contraseña
+### V21-M1 — Backup cifrado con clave maestra
 
 Status: Implemented
 
 - [x] Crear sobres versionados `.michi` con nombres únicos sin sobrescritura.
-- [x] Pedir contraseña y confirmación al exportar.
-- [x] Pedir contraseña al importar y autenticar ambas acciones con Android.
+- [x] Crear una única clave maestra de 12 o más caracteres y advertir que debe
+  guardarse en un gestor de contraseñas.
+- [x] Proteger una clave aleatoria de 256 bits mediante Argon2id y Android
+  Keystore, sin persistir la contraseña humana.
+- [x] Exportar solo después de huella, PIN o patrón, sin volver a pedir la clave.
+- [x] Pedir la clave maestra al importar y vincular el dispositivo restaurado.
 - [x] Validar antes de preparar el reemplazo y limpiar temporales.
-- [x] Pasar formato, análisis y las 515 pruebas completas.
+- [x] Pasar formato, análisis y pruebas criptográficas y de regresión enfocadas.
 - [ ] Compilar el APK Android cuando Gradle recupere su conexión loopback local.
 - [ ] Instalar y validar exportación/importación física sin perder datos.
 
 Implementation evidence on 2026-09-08:
-- El análisis de `lib` y `test` está limpio y las 515 pruebas pasan.
+- El análisis de `lib` y `test` está limpio y las 517 pruebas pasan.
 - Las pruebas incluyen sobre cifrado, texto no expuesto, manipulación,
   contraseña equivocada, round trip SQLite y rollback de importación.
-- Tres intentos de ensamblado con JDK 17 fallaron antes de compilar por el socket
-  interno de Gradle (`Unable to establish loopback connection`); no es un error
-  de análisis o prueba de la aplicación.
+- Los intentos de ensamblado con JDK 17, 20 y 21 fallaron antes de compilar por
+  el socket interno de Gradle (`Unable to establish loopback connection`);
+  no es un error de análisis o prueba de la aplicación.
 
 ### V21-M2 — Cifrado de la base viva
 

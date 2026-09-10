@@ -19,6 +19,8 @@ import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_
 import 'package:pomodoro_app_v1/features/reports/domain/repositories/statistics_report_file_writer.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/entities/timer_preferences.dart';
 import 'package:pomodoro_app_v1/features/settings/domain/repositories/settings_repository.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/entities/device_bound_key_envelope.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/device_bound_key_protector.dart';
 import 'package:pomodoro_app_v1/l10n/app_language.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -106,6 +108,16 @@ class AppNotification {
   bool get isGoalSummary => goalId != null;
 }
 
+class _BackupMasterKeyRecord {
+  const _BackupMasterKeyRecord({
+    required this.recoveryEnvelope,
+    required this.deviceEnvelope,
+  });
+
+  final Map<String, Object> recoveryEnvelope;
+  final DeviceBoundKeyEnvelope deviceEnvelope;
+}
+
 class AppSettingsController {
   AppSettingsController({
     Directory? documentsDirectory,
@@ -128,6 +140,7 @@ class AppSettingsController {
   ];
   static const encryptedDatabaseBackupFileName = 'michifocus-backup.michi';
   static const encryptedDatabaseBackupFilePrefix = 'michifocus-backup-';
+  static const backupMasterKeyId = 'group_6261636b75705f6d61737465725f7631';
 
   static const currentOnboardingVersion = 1;
 
@@ -142,10 +155,12 @@ class AppSettingsController {
   static const _stagingImportDirectoryName = 'michifocus-staging-import';
   static const _importCandidateFileName = '.michifocus-import.sqlite';
   static const _preImportFileName = '.michifocus-before-import.sqlite';
+  static const _backupMasterKeyFileName = 'michifocus-backup-master-key.json';
 
   final FlutterSignal<AppThemePreset> themePreset = signal(
     AppThemePreset.natureFocus,
   );
+  final FlutterSignal<bool> hasBackupMasterPassword = signal(false);
   final FlutterSignal<bool> isDarkMode = signal(false);
   final FlutterSignal<double> fontScale = signal<double>(1);
   final FlutterSignal<String> profileName = signal('Chriss');
@@ -585,13 +600,63 @@ class AppSettingsController {
     return backupDirectory.path;
   }
 
-  Future<String> exportEncryptedDatabaseBackup({
+  Future<void> loadBackupMasterPasswordState(
+    DeviceBoundKeyProtector keyProtector,
+  ) async {
+    final record = await _readBackupMasterKeyRecord();
+    hasBackupMasterPassword.value =
+        record != null && await keyProtector.hasKey(backupMasterKeyId);
+  }
+
+  Future<void> createBackupMasterPassword({
     required String password,
-    required Future<void> Function(String targetPath) createDatabaseSnapshot,
+    required String confirmation,
+    required DeviceBoundKeyProtector keyProtector,
   }) async {
+    if (password.length < EncryptedDatabaseBackupCodec.minimumPasswordLength) {
+      throw const FileSystemException(
+        'La clave maestra debe tener al menos 12 caracteres.',
+      );
+    }
+    if (password != confirmation) {
+      throw const FileSystemException('Las claves maestras no coinciden.');
+    }
+    final material = await _encryptedDatabaseBackupCodec.createMasterKey(
+      password,
+    );
+    try {
+      final deviceEnvelope = await keyProtector.wrap(
+        groupId: backupMasterKeyId,
+        clearKey: material.clearKey,
+      );
+      await _writeBackupMasterKeyRecord(
+        recoveryEnvelope: material.recoveryEnvelope,
+        deviceEnvelope: deviceEnvelope,
+      );
+      hasBackupMasterPassword.value = true;
+    } on Object {
+      hasBackupMasterPassword.value = false;
+      rethrow;
+    } finally {
+      _eraseBytes(material.clearKey);
+    }
+  }
+
+  Future<String> exportEncryptedDatabaseBackup({
+    required Future<void> Function(String targetPath) createDatabaseSnapshot,
+    String? password,
+    DeviceBoundKeyProtector? keyProtector,
+  }) async {
+    final record = password == null ? await _readBackupMasterKeyRecord() : null;
+    if (password == null && (record == null || keyProtector == null)) {
+      throw const FileSystemException(
+        'Primero crea la clave maestra de MichiDoro.',
+      );
+    }
     final appDirectory = await _applicationDocumentsDirectory();
     final snapshot = File('${appDirectory.path}/.michifocus-export.sqlite');
     var clearBytes = <int>[];
+    var masterKey = <int>[];
     try {
       if (snapshot.existsSync()) await snapshot.delete();
       await createDatabaseSnapshot(snapshot.path);
@@ -601,10 +666,24 @@ class AppSettingsController {
         );
       }
       clearBytes = await snapshot.readAsBytes();
-      final encryptedBytes = await _encryptedDatabaseBackupCodec.encrypt(
-        databaseBytes: clearBytes,
-        password: password,
-      );
+      final List<int> encryptedBytes;
+      if (password != null) {
+        encryptedBytes = await _encryptedDatabaseBackupCodec.encrypt(
+          databaseBytes: clearBytes,
+          password: password,
+        );
+      } else {
+        masterKey = await keyProtector!.unwrap(
+          groupId: backupMasterKeyId,
+          envelope: record!.deviceEnvelope,
+        );
+        encryptedBytes = await _encryptedDatabaseBackupCodec
+            .encryptWithMasterKey(
+              databaseBytes: clearBytes,
+              clearKey: masterKey,
+              recoveryEnvelope: record.recoveryEnvelope,
+            );
+      }
       final backupFileName = _newEncryptedBackupFileName();
 
       final externalFolder = _externalReportsFolderReference();
@@ -631,6 +710,7 @@ class AppSettingsController {
       return backupDirectory.path;
     } finally {
       _eraseBytes(clearBytes);
+      _eraseBytes(masterKey);
       if (snapshot.existsSync()) await snapshot.delete();
     }
   }
@@ -638,6 +718,7 @@ class AppSettingsController {
   Future<void> stageEncryptedDatabaseBackupImport(
     String directoryPath, {
     required String password,
+    DeviceBoundKeyProtector? keyProtector,
   }) async {
     final sourceDirectory = Directory(directoryPath.trim());
     final source = _latestEncryptedBackup(sourceDirectory);
@@ -655,11 +736,38 @@ class AppSettingsController {
       '${appDirectory.path}/$_stagingImportDirectoryName',
     );
     var clearBytes = <int>[];
+    var importedMasterKey = <int>[];
     try {
-      clearBytes = await _encryptedDatabaseBackupCodec.decrypt(
-        encryptedBytes: await source.readAsBytes(),
-        password: password,
-      );
+      DecryptedMasterDatabaseBackup? decrypted;
+      if (keyProtector == null) {
+        clearBytes = await _encryptedDatabaseBackupCodec.decrypt(
+          encryptedBytes: await source.readAsBytes(),
+          password: password,
+        );
+      } else {
+        final encryptedBytes = await source.readAsBytes();
+        try {
+          decrypted = await _encryptedDatabaseBackupCodec
+              .decryptWithMasterPassword(
+                encryptedBytes: encryptedBytes,
+                password: password,
+              );
+        } on EncryptedDatabaseBackupException {
+          final legacyDatabase = await _encryptedDatabaseBackupCodec.decrypt(
+            encryptedBytes: encryptedBytes,
+            password: password,
+          );
+          final migratedMaterial = await _encryptedDatabaseBackupCodec
+              .createMasterKey(password);
+          decrypted = DecryptedMasterDatabaseBackup(
+            clearKey: migratedMaterial.clearKey,
+            recoveryEnvelope: migratedMaterial.recoveryEnvelope,
+            databaseBytes: legacyDatabase,
+          );
+        }
+        clearBytes = decrypted.databaseBytes;
+        importedMasterKey = decrypted.clearKey;
+      }
       if (stagingDirectory.existsSync()) {
         await stagingDirectory.delete(recursive: true);
       }
@@ -669,10 +777,21 @@ class AppSettingsController {
       );
       await stagedDatabase.writeAsBytes(clearBytes, flush: true);
       await const UnifiedDatabaseValidator().validateForImport(stagedDatabase);
+      if (keyProtector != null && decrypted != null) {
+        final deviceEnvelope = await keyProtector.wrap(
+          groupId: backupMasterKeyId,
+          clearKey: importedMasterKey,
+        );
+        await _writeBackupMasterKeyRecord(
+          recoveryEnvelope: decrypted.recoveryEnvelope,
+          deviceEnvelope: deviceEnvelope,
+        );
+      }
       if (pendingDirectory.existsSync()) {
         await pendingDirectory.delete(recursive: true);
       }
       await stagingDirectory.rename(pendingDirectory.path);
+      if (keyProtector != null) hasBackupMasterPassword.value = true;
       lastReportPath.value = pendingDirectory.path;
     } on EncryptedDatabaseBackupException {
       if (stagingDirectory.existsSync()) {
@@ -696,6 +815,7 @@ class AppSettingsController {
       );
     } finally {
       _eraseBytes(clearBytes);
+      _eraseBytes(importedMasterKey);
     }
   }
 
@@ -954,6 +1074,65 @@ class AppSettingsController {
 
   Future<Directory> _applicationDocumentsDirectory() async {
     return _documentsDirectoryOverride ?? getApplicationDocumentsDirectory();
+  }
+
+  Future<_BackupMasterKeyRecord?> _readBackupMasterKeyRecord() async {
+    try {
+      final directory = await _applicationDocumentsDirectory();
+      final file = File('${directory.path}/$_backupMasterKeyFileName');
+      if (!file.existsSync()) return null;
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map<String, dynamic> ||
+          decoded['version'] != 1 ||
+          decoded['recovery'] is! Map<String, dynamic> ||
+          decoded['deviceEnvelope'] is! Map<String, dynamic>) {
+        return null;
+      }
+      return _BackupMasterKeyRecord(
+        recoveryEnvelope: Map<String, Object>.from(
+          decoded['recovery'] as Map<String, dynamic>,
+        ),
+        deviceEnvelope: DeviceBoundKeyEnvelope.fromJson(
+          decoded['deviceEnvelope'] as Map<String, dynamic>,
+        ),
+      );
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _writeBackupMasterKeyRecord({
+    required Map<String, Object> recoveryEnvelope,
+    required DeviceBoundKeyEnvelope deviceEnvelope,
+  }) async {
+    final directory = await _applicationDocumentsDirectory();
+    directory.createSync(recursive: true);
+    final destination = File(
+      '${directory.path}/$_backupMasterKeyFileName',
+    );
+    final temporary = File('${destination.path}.pending');
+    final previous = File('${destination.path}.previous');
+    if (temporary.existsSync()) await temporary.delete();
+    if (previous.existsSync()) await previous.delete();
+    await temporary.writeAsString(
+      jsonEncode(<String, Object>{
+        'version': 1,
+        'recovery': recoveryEnvelope,
+        'deviceEnvelope': deviceEnvelope.toJson(),
+      }),
+      flush: true,
+    );
+    try {
+      if (destination.existsSync()) await destination.rename(previous.path);
+      await temporary.rename(destination.path);
+      if (previous.existsSync()) await previous.delete();
+    } on Object {
+      if (!destination.existsSync() && previous.existsSync()) {
+        await previous.rename(destination.path);
+      }
+      if (temporary.existsSync()) await temporary.delete();
+      rethrow;
+    }
   }
 
   String _fileName(String path) {

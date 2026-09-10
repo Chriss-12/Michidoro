@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:pomodoro_app_v1/app/data/datasources/michifocus_database.dart';
 import 'package:pomodoro_app_v1/app/di/service_locator.dart';
 import 'package:pomodoro_app_v1/app/router/app_router.dart';
+import 'package:pomodoro_app_v1/app/security/encrypted_database_backup_codec.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_controller.dart';
 import 'package:pomodoro_app_v1/app/state/app_settings_scope.dart';
 import 'package:pomodoro_app_v1/app/state/pomodoro_runtime_scope.dart';
@@ -26,6 +27,7 @@ import 'package:pomodoro_app_v1/features/settings/data/repositories/file_setting
 import 'package:pomodoro_app_v1/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:pomodoro_app_v1/features/splash/presentation/pages/splash_page.dart';
 import 'package:pomodoro_app_v1/features/sync/data/services/android_local_device_authenticator.dart';
+import 'package:pomodoro_app_v1/features/sync/domain/services/device_bound_key_protector.dart';
 import 'package:pomodoro_app_v1/features/sync/domain/services/local_device_authenticator.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/controllers/device_identity_controller.dart';
 import 'package:pomodoro_app_v1/features/sync/presentation/controllers/local_app_lock_controller.dart';
@@ -134,6 +136,9 @@ class _AppBootstrapState extends State<AppBootstrap> {
   Future<void> _initializeApp() async {
     await appSettingsController.applyPendingDatabaseImport();
     await configureDependencies();
+    await appSettingsController.loadBackupMasterPasswordState(
+      serviceLocator<DeviceBoundKeyProtector>(),
+    );
     final localAppLockController = serviceLocator<LocalAppLockController>();
     await localAppLockController.loadPolicy();
     localAppLockController.authenticationSucceeded();
@@ -298,8 +303,222 @@ ThemeData _startupTheme() {
   );
 }
 
+class _BackupMasterPasswordGate extends StatefulWidget {
+  const _BackupMasterPasswordGate({required this.onCreate});
+
+  final Future<void> Function(String password, String confirmation) onCreate;
+
+  @override
+  State<_BackupMasterPasswordGate> createState() =>
+      _BackupMasterPasswordGateState();
+}
+
+class _BackupMasterPasswordGateState extends State<_BackupMasterPasswordGate> {
+  final _passwordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordController
+      ..clear()
+      ..dispose();
+    _confirmationController
+      ..clear()
+      ..dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (_saving) return;
+    final password = _passwordController.text;
+    final confirmation = _confirmationController.text;
+    if (password.length < EncryptedDatabaseBackupCodec.minimumPasswordLength) {
+      setState(() {
+        _error = context.tr(
+          'La clave maestra debe tener al menos 12 caracteres.',
+          'The master password must contain at least 12 characters.',
+        );
+      });
+      return;
+    }
+    if (password != confirmation) {
+      setState(() {
+        _error = context.tr(
+          'Las claves maestras no coinciden.',
+          'The master passwords do not match.',
+        );
+      });
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onCreate(password, confirmation);
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _error = context.tr(
+          'No se pudo proteger la clave. Confirma tu huella, PIN o patrón e inténtalo otra vez.',
+          'The key could not be protected. Confirm your fingerprint, PIN, or pattern and try again.',
+        );
+      });
+    } finally {
+      _passwordController.clear();
+      _confirmationController.clear();
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(
+                          Icons.key_rounded,
+                          size: 52,
+                          color: colors.primary,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          context.tr(
+                            'Crea tu clave maestra',
+                            'Create your master password',
+                          ),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          context.tr(
+                            'Será la única clave para recuperar tus copias en otro dispositivo. Para exportar usarás la huella, PIN o patrón de este teléfono.',
+                            'This will be the single password used to recover backups on another device. Exports use this phone’s fingerprint, PIN, or pattern.',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: colors.tertiaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.password_rounded,
+                                color: colors.onTertiaryContainer,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  context.tr(
+                                    'Guárdala ahora en un gestor de contraseñas. MichiDoro no puede mostrártela ni recuperarla si la olvidas.',
+                                    'Save it now in a password manager. MichiDoro cannot show or recover it if you forget it.',
+                                  ),
+                                  style: TextStyle(
+                                    color: colors.onTertiaryContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: _obscure,
+                          autofillHints: const [AutofillHints.newPassword],
+                          decoration: InputDecoration(
+                            labelText: context.tr(
+                              'Clave maestra (mínimo 12 caracteres)',
+                              'Master password (at least 12 characters)',
+                            ),
+                            suffixIcon: IconButton(
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
+                              icon: Icon(
+                                _obscure
+                                    ? Icons.visibility_rounded
+                                    : Icons.visibility_off_rounded,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _confirmationController,
+                          obscureText: _obscure,
+                          autofillHints: const [AutofillHints.newPassword],
+                          onSubmitted: (_) => _create(),
+                          decoration: InputDecoration(
+                            labelText: context.tr(
+                              'Repetir clave maestra',
+                              'Repeat master password',
+                            ),
+                          ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _error!,
+                            style: TextStyle(color: colors.error),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _saving ? null : _create,
+                          icon: _saving
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.shield_rounded),
+                          label: Text(
+                            context.tr(
+                              'Proteger y continuar',
+                              'Protect and continue',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MyApp extends StatefulWidget {
   const MyApp({
+    this.requireBackupMasterPassword = true,
     this.localAppLockController,
     this.deviceIdentityController,
     this.syncGroupEnrollmentController,
@@ -307,6 +526,7 @@ class MyApp extends StatefulWidget {
     super.key,
   });
 
+  final bool requireBackupMasterPassword;
   final LocalAppLockController? localAppLockController;
   final DeviceIdentityController? deviceIdentityController;
   final SyncGroupEnrollmentController? syncGroupEnrollmentController;
@@ -539,6 +759,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                           key: ValueKey('local-app-privacy-shield'),
                         );
                       }
+                      if (widget.requireBackupMasterPassword &&
+                          !controller.hasBackupMasterPassword.value) {
+                        return _BackupMasterPasswordGate(
+                          onCreate: (password, confirmation) async {
+                            if (!await _localAppLockController
+                                .requestUnlock()) {
+                              throw const FileSystemException(
+                                'Autenticación cancelada. No se creó la clave maestra.',
+                              );
+                            }
+                            await controller.createBackupMasterPassword(
+                              password: password,
+                              confirmation: confirmation,
+                              keyProtector:
+                                  serviceLocator<DeviceBoundKeyProtector>(),
+                            );
+                          },
+                        );
+                      }
 
                       final settingsScope = AppSettingsScope(
                         themePreset: controller.themePreset.value,
@@ -710,7 +949,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                               request: request,
                             ),
                         onOpenReport: controller.openReport,
-                        onExportDatabaseBackup: (password) async {
+                        onExportDatabaseBackup: () async {
                           if (!await _localAppLockController.requestUnlock()) {
                             throw const FileSystemException(
                               'Autenticación cancelada. No se exportó ningún dato.',
@@ -718,7 +957,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                           }
                           await pomodoroController.checkpointRuntime();
                           return controller.exportEncryptedDatabaseBackup(
-                            password: password,
+                            keyProtector:
+                                serviceLocator<DeviceBoundKeyProtector>(),
                             createDatabaseSnapshot:
                                 serviceLocator<MichiFocusDatabase>()
                                     .createBackupSnapshot,
@@ -733,6 +973,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                           await controller.stageEncryptedDatabaseBackupImport(
                             path,
                             password: password,
+                            keyProtector:
+                                serviceLocator<DeviceBoundKeyProtector>(),
                           );
                         },
                         onDeleteAllDatabaseData: _deleteAllDatabaseData,

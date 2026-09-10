@@ -95,7 +95,10 @@ void main() {
         ..language.value = AppLanguage.english;
 
       await tester.pumpWidget(
-        MyApp(localAppLockController: LocalAppLockController()),
+        MyApp(
+          requireBackupMasterPassword: false,
+          localAppLockController: LocalAppLockController(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -134,7 +137,10 @@ void main() {
       reportRepository.gate = Completer<void>();
 
       await tester.pumpWidget(
-        MyApp(localAppLockController: LocalAppLockController()),
+        MyApp(
+          requireBackupMasterPassword: false,
+          localAppLockController: LocalAppLockController(),
+        ),
       );
       await tester.pump(const Duration(milliseconds: 1800));
       expect(
@@ -235,7 +241,10 @@ void main() {
       };
 
       await tester.pumpWidget(
-        MyApp(localAppLockController: LocalAppLockController()),
+        MyApp(
+          requireBackupMasterPassword: false,
+          localAppLockController: LocalAppLockController(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -345,7 +354,10 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        MyApp(localAppLockController: LocalAppLockController()),
+        MyApp(
+          requireBackupMasterPassword: false,
+          localAppLockController: LocalAppLockController(),
+        ),
       );
       await tester.pumpAndSettle();
 

@@ -574,12 +574,19 @@ cleanup. Static analysis is clean and all 476 tests pass.
 
 ## V21 portable backup security
 
-The Settings export path no longer publishes raw SQLite. It creates a validated
-snapshot inside application-private storage, derives a key from a user-provided
-password with Argon2id, and writes a uniquely named, versioned
-`michifocus-backup-<timestamp>.michi` envelope encrypted and authenticated with
-AES-256-GCM. A new random salt and nonce are generated for every export; prior
-backups are not overwritten and the password is not persisted.
+The Settings export path no longer publishes raw SQLite. Initial setup creates
+one random 256-bit backup data key. The user's single master password derives an
+Argon2id key that wraps that data key, while Android Keystore keeps a separate
+device-bound envelope authorized by fingerprint, PIN, or pattern. The password
+is never persisted and the setup gate explicitly tells the user to save it in a
+password manager.
+
+Export unwraps the local data key only after Android authentication and writes a
+uniquely named, versioned `michifocus-backup-<timestamp>.michi` envelope
+encrypted and authenticated with AES-256-GCM. The portable envelope embeds only
+the Argon2id recovery wrapper, so a second phone can recover the data key with
+the master password and then bind it to that phone's Keystore. Export does not
+ask for the master password.
 
 Import copies only the encrypted artifact from Android's selected folder,
 decrypts it into private staging, validates the unified schema, indexes,

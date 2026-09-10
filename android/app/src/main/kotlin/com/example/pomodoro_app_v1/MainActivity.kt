@@ -689,7 +689,7 @@ class MainActivity : FlutterActivity() {
         }
 
         val builder = BiometricPrompt.Builder(this)
-            .setTitle("Desbloquear MichiFocus")
+            .setTitle("Desbloquear MichiDoro")
             .setSubtitle("Usa la seguridad registrada en este dispositivo")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -724,7 +724,7 @@ class MainActivity : FlutterActivity() {
     private fun showDeviceCredentialPrompt() {
         val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         val intent = keyguardManager.createConfirmDeviceCredentialIntent(
-            "Desbloquear MichiFocus",
+            "Desbloquear MichiDoro",
             "Usa el PIN, patron o contrasena de este dispositivo.",
         )
         if (intent == null) {

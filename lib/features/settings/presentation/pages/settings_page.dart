@@ -1058,13 +1058,11 @@ class _ReportsCard extends StatelessWidget {
     BuildContext context,
     AppSettingsScope settings,
   ) async {
-    final password = await _requestBackupPassword(context, confirm: true);
-    if (password == null || !context.mounted) return null;
     try {
       final selection = await NativeFileManager.pickExportFolder();
       if (selection != null) {
         settings.onReportsDirectoryPathChanged(selection.uri);
-        return settings.onExportDatabaseBackup(password);
+        return settings.onExportDatabaseBackup();
       }
     } on PlatformException catch (error) {
       if (context.mounted) {
@@ -1090,15 +1088,11 @@ class _ReportsCard extends StatelessWidget {
       return null;
     }
 
-    return settings.onExportDatabaseBackup(password);
+    return settings.onExportDatabaseBackup();
   }
 
-  Future<String?> _requestBackupPassword(
-    BuildContext context, {
-    bool confirm = false,
-  }) async {
+  Future<String?> _requestBackupPassword(BuildContext context) async {
     final passwordController = TextEditingController();
-    final confirmationController = TextEditingController();
     var obscurePassword = true;
     var errorText = '';
     try {
@@ -1109,8 +1103,8 @@ class _ReportsCard extends StatelessWidget {
           builder: (context, setState) => AlertDialog(
             title: Text(
               context.tr(
-                confirm ? 'Proteger copia' : 'Abrir copia protegida',
-                confirm ? 'Protect backup' : 'Open protected backup',
+                'Abrir copia protegida',
+                'Open protected backup',
               ),
             ),
             content: SingleChildScrollView(
@@ -1119,10 +1113,10 @@ class _ReportsCard extends StatelessWidget {
                 children: [
                   Text(
                     context.tr(
-                      'Usa al menos 12 caracteres y guárdala en Buttercup. '
-                          'Michi Focus no conserva esta contraseña.',
-                      'Use at least 12 characters and save it in Buttercup. '
-                          'Michi Focus does not store this password.',
+                      'Introduce la única clave maestra de MichiDoro. '
+                          'Es la que guardaste en tu gestor de contraseñas.',
+                      'Enter your single MichiDoro master password. '
+                          'It is the one saved in your password manager.',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1144,19 +1138,6 @@ class _ReportsCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (confirm) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: confirmationController,
-                      obscureText: obscurePassword,
-                      decoration: InputDecoration(
-                        labelText: context.tr(
-                          'Repetir contraseña',
-                          'Repeat password',
-                        ),
-                      ),
-                    ),
-                  ],
                   if (errorText.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Text(
@@ -1186,21 +1167,12 @@ class _ReportsCard extends StatelessWidget {
                     });
                     return;
                   }
-                  if (confirm && password != confirmationController.text) {
-                    setState(() {
-                      errorText = context.tr(
-                        'Las contraseñas no coinciden.',
-                        'Passwords do not match.',
-                      );
-                    });
-                    return;
-                  }
                   Navigator.of(dialogContext).pop(password);
                 },
                 child: Text(
                   context.tr(
-                    confirm ? 'Continuar' : 'Abrir',
-                    confirm ? 'Continue' : 'Open',
+                    'Abrir',
+                    'Open',
                   ),
                 ),
               ),
@@ -1209,10 +1181,9 @@ class _ReportsCard extends StatelessWidget {
         ),
       );
     } finally {
-      passwordController.clear();
-      confirmationController.clear();
-      passwordController.dispose();
-      confirmationController.dispose();
+      passwordController
+        ..clear()
+        ..dispose();
     }
   }
 
